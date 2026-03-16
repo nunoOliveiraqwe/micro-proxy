@@ -21,7 +21,7 @@ type ApplicationRoute struct {
 	HandlerFunc        ApplicationHandlerFunc
 }
 
-var externalRoutes = []ApplicationRoute{
+var routes = []ApplicationRoute{
 	{
 		Name:               "Healthcheck",
 		Description:        "Healthcheck endpoint",
@@ -31,23 +31,5 @@ var externalRoutes = []ApplicationRoute{
 		IsAllowedBeforeFTS: true,
 		IsSecure:           false,
 		HandlerFunc:        handleHealthCheck,
-	},
-	{
-		Name:               "Startup ID",
-		Description:        "Startup ID endpoint. Returns the startup ID of the application. Unique per container instance and lifecycle.",
-		Method:             "GET",
-		Pattern:            "/startup-id",
-		IsAllowedAfterFTS:  true,
-		IsAllowedBeforeFTS: true,
-		IsSecure:           false,
-	},
-	{
-		Name:               "Login",
-		Description:        "Login endpoint",
-		Method:             "POST",
-		Pattern:            "auth/login",
-		IsAllowedAfterFTS:  true,
-		IsAllowedBeforeFTS: false,
-		IsSecure:           false,
 	},
 }

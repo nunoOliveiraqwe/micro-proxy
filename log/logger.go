@@ -3,35 +3,33 @@ package log
 import (
 	"strings"
 
+	"github.com/nunoOliveiraqwe/micro-proxy/configuration"
 	"github.com/nunoOliveiraqwe/micro-proxy/util"
 	"go.uber.org/zap"
 	"go.uber.org/zap/zapcore"
 )
 
-func InitLogger(logFlags *Flags) {
+func InitLogger(conf configuration.LogConfig) {
 	var cfg zap.Config
 
-	if logFlags.Debug {
+	if conf.Debug {
 		cfg = zap.NewDevelopmentConfig()
 	} else {
 		cfg = zap.NewProductionConfig()
 
 	}
 
-	internalLogLevel := getLogLevelFromLogStr(logFlags.LogLevel)
-
+	internalLogLevel := getLogLevelFromLogStr(conf.LogLevel)
 	zapLevel := internalLogLevel.toZapLevel()
-
 	cfg.Level = zap.NewAtomicLevelAt(zapLevel)
-
 	cfg.OutputPaths = []string{"stdout"}
 	cfg.ErrorOutputPaths = []string{"stderr"}
 
-	if logFlags.LogPath != "" {
-		exists := util.FileExists(logFlags.LogPath)
+	if conf.LogPath != "" {
+		exists := util.FileExists(conf.LogPath)
 		if exists {
-			cfg.OutputPaths = []string{logFlags.LogPath, "stdout"}
-			cfg.ErrorOutputPaths = []string{logFlags.LogPath, "stderr"}
+			cfg.OutputPaths = []string{conf.LogPath, "stdout"}
+			cfg.ErrorOutputPaths = []string{conf.LogPath, "stderr"}
 		}
 	}
 

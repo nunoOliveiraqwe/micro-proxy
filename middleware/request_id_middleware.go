@@ -9,8 +9,6 @@ import (
 	"os"
 	"strings"
 	"sync/atomic"
-
-	"github.com/nunoOliveiraqwe/micro-proxy/configuration"
 )
 
 const requestIDHeader = "X-Request-ID"
@@ -19,7 +17,7 @@ const requestIdContextKey = "requestID"
 
 var requestIDCounter uint64
 
-func RequestIDMiddleware(next http.HandlerFunc, middlewareConf configuration.Middleware) http.HandlerFunc {
+func RequestIDMiddleware(next http.HandlerFunc, middlewareConf MiddlewareConfiguration) http.HandlerFunc {
 	prefix := ""
 	if middlewareConf.Config != nil {
 		requestIdPrefix := middlewareConf.Config["prefix"]

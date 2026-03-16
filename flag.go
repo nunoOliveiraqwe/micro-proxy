@@ -3,22 +3,24 @@ package microProxy
 import (
 	"flag"
 
-	"github.com/nunoOliveiraqwe/micro-proxy/log"
-	"github.com/nunoOliveiraqwe/micro-proxy/server"
+	"go.uber.org/zap"
 )
 
 type Flags struct {
-	LogFlags    *log.Flags
-	ServerFlags *server.Flags
+	ConfigPath string
+	Debug      *bool
+	LogLevel   *string
 }
 
 func RegisterFlags() *Flags {
-	return &Flags{
-		LogFlags:    log.RegisterLogFlags(),
-		ServerFlags: server.RegisterServerFlags(),
-	}
+	f := &Flags{}
+	flag.StringVar(&f.ConfigPath, "config", "", "Path to the configuration file")
+	f.Debug = flag.Bool("debug", false, "Enable debug logging (overrides config)")
+	f.LogLevel = flag.String("log-level", "", "Log level (overrides config)")
+	return f
 }
 
 func (f *Flags) ParseFlags() {
 	flag.Parse()
+	zap.S().Info("Flags parsed successfully")
 }

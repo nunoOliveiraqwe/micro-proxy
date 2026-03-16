@@ -23,5 +23,5 @@ func (l LogLevel) String() string {
 }
 
 func (l LogLevel) toZapLevel() zapcore.Level {
-	return zapcore.Level(l)
+	return zapcore.Level(l - 1)
 }

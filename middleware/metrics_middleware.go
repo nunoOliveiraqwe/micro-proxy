@@ -5,7 +5,6 @@ import (
 	"net/http"
 	"time"
 
-	"github.com/nunoOliveiraqwe/micro-proxy/configuration"
 	"github.com/nunoOliveiraqwe/micro-proxy/metrics"
 	"go.uber.org/zap"
 )
@@ -29,7 +28,7 @@ func (w *responseWriterWithMetrics) Write(b []byte) (int, error) {
 	return w.ResponseWriter.Write(b)
 }
 
-func MetricsMiddleware(next http.HandlerFunc, middlewareConf configuration.Middleware) http.HandlerFunc {
+func MetricsMiddleware(next http.HandlerFunc, middlewareConf MiddlewareConfiguration) http.HandlerFunc {
 	metricFunc := getConnectionMetrics(middlewareConf)
 	if metricFunc == nil {
 		zap.S().Warnf("Metrics middleware not configured properly. Skipping...")
@@ -52,7 +51,7 @@ func MetricsMiddleware(next http.HandlerFunc, middlewareConf configuration.Middl
 	}
 }
 
-func getConnectionMetrics(middlewareConf configuration.Middleware) metrics.MetricsReportFunc {
+func getConnectionMetrics(middlewareConf MiddlewareConfiguration) metrics.MetricsReportFunc {
 	metricsHandlerT, ok := middlewareConf.Config[METRICS_HANDLER_NAME]
 	if !ok {
 		zap.S().Warnf("Metrics handler not found when configuring metrics middleware")

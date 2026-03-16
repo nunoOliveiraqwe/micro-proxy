@@ -4,7 +4,6 @@ import (
 	"context"
 	"net/http"
 
-	"github.com/nunoOliveiraqwe/micro-proxy/configuration"
 	"go.uber.org/zap"
 )
 
@@ -58,7 +57,7 @@ func getRequestLoggerFromContext(r *http.Request) *zap.Logger {
 	return zap.NewNop()
 }
 
-func RequestLoggerMiddleware(next http.HandlerFunc, middleware configuration.Middleware) http.HandlerFunc {
+func RequestLoggerMiddleware(next http.HandlerFunc, middleware MiddlewareConfiguration) http.HandlerFunc {
 	newZapLogFormatter := newZapLogFormatter()
 	return func(w http.ResponseWriter, r *http.Request) {
 		newZapLogFormatter.LogRequest(r)
