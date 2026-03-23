@@ -104,7 +104,7 @@ func (s *UserStore) GetRolesForUser(ctx context.Context, username string) ([]dom
 	return roles, nil
 }
 
-func (s *UserStore) InsertUser(user *domain.User, ctx context.Context) error {
+func (s *UserStore) InsertUser(ctx context.Context, user *domain.User) error {
 	tx, err := s.db.BeginTx(ctx, nil)
 	if err != nil {
 		return err
@@ -116,7 +116,7 @@ func (s *UserStore) InsertUser(user *domain.User, ctx context.Context) error {
 	return tx.Commit()
 }
 
-func (s *UserStore) UpdateUser(user *domain.User, ctx context.Context) error {
+func (s *UserStore) UpdateUser(ctx context.Context, user *domain.User) error {
 	tx, err := s.db.BeginTx(ctx, nil)
 	if err != nil {
 		return err

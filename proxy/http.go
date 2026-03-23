@@ -17,6 +17,18 @@ type MicroProxyHttpServer struct {
 	bindPort          int
 	iPV4BindInterface string
 	iPV6BindInterface string
+	middlewareChain   []string
+}
+
+func (m *MicroProxyHttpServer) GetProxySnapshot() *ProxyConfigSnapshot {
+	return &ProxyConfigSnapshot{
+		Port:            m.bindPort,
+		Interface:       fmt.Sprintf("ipv4=%s, ipv6=%s", m.iPV4BindInterface, m.iPV6BindInterface),
+		MiddlewareChain: m.middlewareChain,
+		IsStarted:       m.isStarted.Load(),
+		IsUsingHTTPS:    false,
+		IsUsingACME:     false,
+	}
 }
 
 func (m *MicroProxyHttpServer) start(_ *MicroProxyAcmeManager) error {

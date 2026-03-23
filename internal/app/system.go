@@ -14,19 +14,15 @@ type SystemService interface {
 	Start() error
 	Stop() error
 	SessionRegistry() *session.Registry
-	GetDataStore() *DataStore
-	IsFirstTimeSetupCompleted() bool
+	GetServiceStore() *ServiceStore
+	GetConfiguredProxyServers() []*proxy.ProxyConfigSnapshot
 }
 
 type systemService struct {
-	micro     *proxy.MicroProxy
-	db        *sqlite.DB
-	sessions  *session.Registry
-	dataStore *DataStore
-}
-
-func (sm *systemService) GetDataStore() *DataStore {
-	return sm.dataStore
+	micro        *proxy.MicroProxy
+	db           *sqlite.DB
+	sessions     *session.Registry
+	serviceStore *ServiceStore
 }
 
 func NewSystemService(conf config.AppConfig) (SystemService, error) {
@@ -42,12 +38,16 @@ func NewSystemService(conf config.AppConfig) (SystemService, error) {
 		return nil, fmt.Errorf("failed to open database: %w", err)
 	}
 	sessions := session.NewRegistry(db, conf.Session)
-
 	return &systemService{
-		micro:    m,
-		db:       db,
-		sessions: sessions,
+		micro:        m,
+		db:           db,
+		sessions:     sessions,
+		serviceStore: NewServiceStore(NewDataStore(db)),
 	}, nil
+}
+
+func (sm *systemService) GetServiceStore() *ServiceStore {
+	return sm.serviceStore
 }
 
 func (sm *systemService) SessionRegistry() *session.Registry {
@@ -72,10 +72,7 @@ func (sm *systemService) Stop() error {
 	return nil
 }
 
-func (sm *systemService) GetRunningProxies() {
+func (sm *systemService) GetConfiguredProxyServers() []*proxy.ProxyConfigSnapshot {
 	zap.S().Infof("Getting running proxies")
-}
-
-func (sm *systemService) IsFirstTimeSetupCompleted() bool {
-	return true
+	return sm.micro.GetProxyConfSnapshots()
 }

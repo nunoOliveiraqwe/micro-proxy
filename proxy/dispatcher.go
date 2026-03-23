@@ -42,7 +42,7 @@ func buildHttpServer(conf config.HTTPListener) (MicroHttpServer, error) {
 		zap.S().Warnf("IPv6 bind interface %s does not have a valid IPv6 address", conf.Interface)
 		return nil, fmt.Errorf("IPv6 bind interface %s does not have a valid IPv6 address", conf.Interface)
 	}
-	handler, err := buildHttpDispatcher(conf.Default, conf.Routes)
+	handler, mwNames, err := buildHttpDispatcher(conf.Default, conf.Routes)
 	if err != nil {
 		zap.S().Errorf("Failed to build HTTP dispatcher: %v", err)
 		return nil, err
@@ -66,6 +66,7 @@ func buildHttpServer(conf config.HTTPListener) (MicroHttpServer, error) {
 			useAcme:           conf.TLS.UseAcme,
 			keyFilePath:       conf.TLS.Key,
 			certFilepath:      conf.TLS.Cert,
+			middlewareChain:   mwNames,
 		}, nil
 	}
 
@@ -75,10 +76,11 @@ func buildHttpServer(conf config.HTTPListener) (MicroHttpServer, error) {
 		bindPort:          conf.Port,
 		iPV4BindInterface: ipv4,
 		iPV6BindInterface: ipv4,
+		middlewareChain:   mwNames,
 	}, nil
 }
 
-func buildHttpDispatcher(routeTarget *config.RouteTarget, routes []config.Route) (http.Handler, error) {
+func buildHttpDispatcher(routeTarget *config.RouteTarget, routes []config.Route) (http.Handler, []string, error) {
 	zap.S().Infof("Building HTTP dispatcher with route target: %+v and routes: %+v", routeTarget, routes)
 	if routeTarget != nil {
 		return buildSingleRouteDispatcher(*routeTarget)
@@ -86,7 +88,7 @@ func buildHttpDispatcher(routeTarget *config.RouteTarget, routes []config.Route)
 	return buildMultiHostDispatcher(routes)
 }
 
-func buildSingleRouteDispatcher(target config.RouteTarget) (http.Handler, error) {
+func buildSingleRouteDispatcher(target config.RouteTarget) (http.Handler, []string, error) {
 	zap.S().Infof("Building single route dispatcher for target: %+v", target)
 	proxy, err := buildHttpRevProxy(target.Backend)
 	if err != nil {
@@ -97,20 +99,21 @@ func buildSingleRouteDispatcher(target config.RouteTarget) (http.Handler, error)
 	handler, err := buildMiddlewareChain(defaultHandler, target.Middlewares)
 	if err != nil {
 		zap.S().Errorf("Failed to build middleware chain for route with backend %s: %v", target.Backend, err)
-		return nil, err
+		return nil, nil, err
 	}
-	return handler, nil
+	return handler, middlewareNames(target.Middlewares), nil
 }
 
-func buildMultiHostDispatcher(routes []config.Route) (http.Handler, error) {
+func buildMultiHostDispatcher(routes []config.Route) (http.Handler, []string, error) {
 	zap.S().Infof("Building multi-host dispatcher for routes: %+v", routes)
 	if len(routes) == 0 {
 		zap.S().Errorf("No routes provided for multi-host dispatcher")
-		return nil, errors.New("no routes provided for multi-host dispatcher")
+		return nil, nil, errors.New("no routes provided for multi-host dispatcher")
 	}
 	d := &MultiRouteHttpDispatcher{
 		routes: make(map[string]http.Handler),
 	}
+	var mwNames []string
 
 	for _, route := range routes {
 		zap.S().Debugf("Building route for host %s with backend %s", route.Host, route.Backend)
@@ -130,12 +133,13 @@ func buildMultiHostDispatcher(routes []config.Route) (http.Handler, error) {
 			continue
 		}
 		d.routes[route.Host] = handler
+		mwNames = append(mwNames, middlewareNames(route.Middlewares)...)
 	}
 	if len(d.routes) == 0 {
 		zap.S().Errorf("No valid routes configured")
-		return nil, fmt.Errorf("no valid routes configured")
+		return nil, nil, fmt.Errorf("no valid routes configured")
 	}
-	return d, nil
+	return d, mwNames, nil
 }
 
 func buildMiddlewareChain(handler http.HandlerFunc, mwConfig []middleware.Config) (http.HandlerFunc, error) {
@@ -177,4 +181,12 @@ func rewriteProxyRequest(proxyUrl *url.URL) func(r *httputil.ProxyRequest) {
 		r.Out.Header.Set("X-Origin-Host", proxyUrl.Host)
 		zap.S().Debugf("Rewriting request to target: %s, X-Forwarded-For: %s", proxyUrl.String(), r.Out.Header.Get("X-Forwarded-For"))
 	}
+}
+
+func middlewareNames(configs []middleware.Config) []string {
+	names := make([]string, 0, len(configs))
+	for _, c := range configs {
+		names = append(names, c.Type)
+	}
+	return names
 }

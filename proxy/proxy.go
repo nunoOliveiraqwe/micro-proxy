@@ -10,6 +10,7 @@ import (
 )
 
 type MicroHttpServer interface {
+	GetProxySnapshot() *ProxyConfigSnapshot
 	start(acmeManager *MicroProxyAcmeManager) error
 	getHandler() http.Handler
 	updateHandler(handler http.Handler) error
@@ -129,6 +130,19 @@ func (m *MicroProxy) AddHttpServer(conf config.HTTPListener) error {
 
 func (m *MicroProxy) AddTcpServer(conf config.TCPListener) {
 	//TODO
+}
+
+func (m *MicroProxy) GetProxyConfSnapshots() []*ProxyConfigSnapshot {
+	proxySnapshots := make([]*ProxyConfigSnapshot, 0)
+	m.lock.Lock()
+	defer m.lock.Unlock()
+	for _, server := range m.stoppedHttpServers {
+		proxySnapshots = append(proxySnapshots, server.GetProxySnapshot())
+	}
+	for _, server := range m.startedHttpServers {
+		proxySnapshots = append(proxySnapshots, server.GetProxySnapshot())
+	}
+	return proxySnapshots
 }
 
 func (m *MicroProxy) initializeHttpNetworkStackFromConf(conf config.NetworkConfig) error {

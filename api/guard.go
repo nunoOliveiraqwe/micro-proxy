@@ -13,10 +13,13 @@ func checkIfRouteIsAllowedIfFtsIsNotDone(next http.HandlerFunc, isAllowedBeforeF
 		zap.S().Debugf("Checking if route %s is allowed when FTS is not done", r.URL.Path)
 		if isAllowedAfterFts && isAllowedBeforeFts {
 			next(w, r)
-		} else if isAllowedAfterFts && svc.IsFirstTimeSetupCompleted() {
+			return
+		}
+		isFtsDone := svc.GetServiceStore().GetSystemConfigurationService().IsFirstTimeSetupCompleted()
+		if isAllowedAfterFts && isFtsDone {
 			zap.S().Debugf("Route %s is allowed because FTS is done", r.URL.Path)
 			next(w, r)
-		} else if isAllowedBeforeFts && !svc.IsFirstTimeSetupCompleted() {
+		} else if isAllowedBeforeFts && !isFtsDone {
 			zap.S().Debugf("Route %s is allowed because FTS is not done", r.URL.Path)
 			next(w, r)
 		} else {

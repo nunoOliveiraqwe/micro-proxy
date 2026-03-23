@@ -9,8 +9,6 @@ import (
 	"go.uber.org/zap"
 )
 
-const METRICS_HANDLER_NAME = "metric_handler"
-
 type responseWriterWithMetrics struct {
 	http.ResponseWriter
 	reqMetrics *metrics.RequestMetric

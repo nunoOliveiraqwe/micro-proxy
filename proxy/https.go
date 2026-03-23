@@ -22,6 +22,18 @@ type MicroProxyHttpsServer struct {
 	useAcme           bool
 	keyFilePath       string
 	certFilepath      string
+	middlewareChain   []string
+}
+
+func (m *MicroProxyHttpsServer) GetProxySnapshot() *ProxyConfigSnapshot {
+	return &ProxyConfigSnapshot{
+		Port:            m.bindPort,
+		Interface:       fmt.Sprintf("ipv4=%s, ipv6=%s", m.iPV4BindInterface, m.iPV6BindInterface),
+		MiddlewareChain: m.middlewareChain,
+		IsStarted:       m.isStarted.Load(),
+		IsUsingHTTPS:    true,
+		IsUsingACME:     m.useAcme,
+	}
 }
 
 func (m *MicroProxyHttpsServer) start(acmeManager *MicroProxyAcmeManager) error {

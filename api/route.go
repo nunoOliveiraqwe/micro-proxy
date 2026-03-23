@@ -63,4 +63,14 @@ var routes = []ApplicationRoute{
 		IsSecure:           false,
 		HandlerFunc:        handleLogin,
 	},
+	{
+		Name:               "Active Proxy Routes",
+		Description:        "Fetches the configured proxy routes",
+		Method:             "GET",
+		Pattern:            "/proxy/routes",
+		IsAllowedBeforeFts: false,
+		IsAllowedAfterFts:  true,
+		IsSecure:           true,
+		HandlerFunc:        handleGetProxies,
+	},
 }
