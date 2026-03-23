@@ -27,7 +27,7 @@ func (s *UserService) PasswordMatches(password, username string) error {
 	if err != nil {
 		return fmt.Errorf("failed to get user by username: %w", err)
 	}
-	err = s.passwordEncoder.Matches(u.Password, password)
+	err = s.passwordEncoder.Matches(password, u.Password)
 	if err != nil {
 		return fmt.Errorf("password does not match: %w", err)
 	}

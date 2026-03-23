@@ -1,0 +1,90 @@
+{{define "title"}} – Dashboard{{end}}
+{{define "body"}}
+<nav class="container-fluid">
+    <ul>
+        <li><strong class="brand">🔀 microProxy</strong></li>
+    </ul>
+    <ul>
+        <li><small>{{.Username}}</small></li>
+        <li>
+            <a href="#" hx-post="/ui/logout" hx-swap="none" role="button" class="outline secondary">
+                Logout
+            </a>
+        </li>
+    </ul>
+</nav>
+<main class="container">
+    <hgroup>
+        <h2>Dashboard</h2>
+        <p>Proxy server overview and management</p>
+    </hgroup>
+
+    <section>
+        <h3>Proxy Routes</h3>
+        <div id="proxy-routes">
+            <p aria-busy="true">Loading proxy routes…</p>
+        </div>
+    </section>
+</main>
+<script>
+    function loadProxyRoutes() {
+        fetch('/api/v1/proxy/routes', {credentials: 'same-origin'})
+            .then(function (resp) {
+                if (resp.status === 401) { window.location.href = '/ui/login'; return null; }
+                if (!resp.ok) throw new Error(resp.statusText);
+                return resp.json();
+            })
+            .then(function (proxies) {
+                if (proxies === null) return;
+                renderProxyRoutes(proxies);
+            })
+            .catch(function () {
+                document.getElementById('proxy-routes').innerHTML =
+                    '<p>Failed to load proxy routes.</p>';
+            });
+    }
+
+    function renderProxyRoutes(proxies) {
+        var el = document.getElementById('proxy-routes');
+        if (!proxies || proxies.length === 0) {
+            el.innerHTML =
+                '<article class="text-center">' +
+                '<p>No proxy routes are currently configured.</p>' +
+                '<small>Add proxy routes in your configuration file and restart the server.</small>' +
+                '</article>';
+            return;
+        }
+        var h = '<div class="overflow-auto"><table class="striped">' +
+            '<thead><tr>' +
+            '<th>Port</th><th>Interface</th><th>HTTPS</th>' +
+            '<th>ACME</th><th>Status</th><th>Middleware</th>' +
+            '</tr></thead><tbody>';
+        proxies.forEach(function (p) {
+            h += '<tr>' +
+                '<td><code>' + p.port + '</code></td>' +
+                '<td>' + (p.interface || '<em>all</em>') + '</td>' +
+                '<td>' + badge(p.is_using_https) + '</td>' +
+                '<td>' + badge(p.is_using_acme) + '</td>' +
+                '<td>' + (p.is_started
+                    ? '<span class="badge badge-success">Running</span>'
+                    : '<span class="badge badge-danger">Stopped</span>') + '</td>' +
+                '<td>' + (p.middleware_chain && p.middleware_chain.length
+                    ? p.middleware_chain.join(', ')
+                    : '<em>none</em>') + '</td>' +
+                '</tr>';
+        });
+        h += '</tbody></table></div>';
+        el.innerHTML = h;
+    }
+
+    function badge(val) {
+        return val
+            ? '<span class="badge badge-success">Yes</span>'
+            : '<span class="badge badge-muted">No</span>';
+    }
+
+    loadProxyRoutes();
+    setInterval(loadProxyRoutes, 10000);
+</script>
+{{end}}
+

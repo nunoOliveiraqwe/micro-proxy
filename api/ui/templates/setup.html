@@ -1,0 +1,41 @@
+{{define "title"}} – First Time Setup{{end}}
+{{define "body"}}
+<main class="container">
+    <div class="auth-container">
+        <article>
+            <header>
+                <h2 class="text-center">⚙️ microProxy Setup</h2>
+                <p class="text-center">Welcome! Set an admin password to get started.</p>
+            </header>
+            <form hx-post="/api/v1/fts"
+                  hx-ext="json-enc"
+                  hx-swap="none"
+                  hx-on::before-request="if(!validateSetup()) event.preventDefault()"
+                  hx-on::after-request="onApiResponse(event, '/ui/dashboard', '/ui/login')">
+                <label for="password">Admin Password
+                    <input type="password" id="password" name="password" placeholder="Password" autocomplete="new-password" required minlength="8">
+                </label>
+                <label for="confirm_password">Confirm Password
+                    <input type="password" id="confirm_password" placeholder="Confirm password" autocomplete="new-password" required minlength="8">
+                </label>
+                <small>Must be at least 8 characters with an uppercase letter, a number, and a special character.</small>
+                <button type="submit" class="mt-1">Complete Setup</button>
+            </form>
+            <div id="result"></div>
+        </article>
+    </div>
+</main>
+<script>
+    function validateSetup() {
+        var pwd     = document.getElementById('password').value;
+        var confirm = document.getElementById('confirm_password').value;
+        if (pwd !== confirm) {
+            document.getElementById('result').innerHTML =
+                '<div class="error-alert" role="alert">Passwords do not match</div>';
+            return false;
+        }
+        return true;
+    }
+</script>
+{{end}}
+

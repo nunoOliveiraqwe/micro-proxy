@@ -10,6 +10,7 @@ import (
 	"sync/atomic"
 
 	"github.com/nunoOliveiraqwe/micro-proxy/internal/fsutil"
+	"github.com/nunoOliveiraqwe/micro-proxy/metrics"
 	"go.uber.org/zap"
 )
 
@@ -23,16 +24,18 @@ type MicroProxyHttpsServer struct {
 	keyFilePath       string
 	certFilepath      string
 	middlewareChain   []string
+	metricsName       string
 }
 
-func (m *MicroProxyHttpsServer) GetProxySnapshot() *ProxyConfigSnapshot {
-	return &ProxyConfigSnapshot{
+func (m *MicroProxyHttpsServer) GetProxySnapshot() *ProxySnapshot {
+	return &ProxySnapshot{
 		Port:            m.bindPort,
 		Interface:       fmt.Sprintf("ipv4=%s, ipv6=%s", m.iPV4BindInterface, m.iPV6BindInterface),
 		MiddlewareChain: m.middlewareChain,
 		IsStarted:       m.isStarted.Load(),
 		IsUsingHTTPS:    true,
 		IsUsingACME:     m.useAcme,
+		Metric:          metrics.GlobalMetricsManager.GetMetricForConnection(m.metricsName),
 	}
 }
 

@@ -1,6 +1,7 @@
 package api
 
 import (
+	"errors"
 	"net/http"
 
 	"github.com/nunoOliveiraqwe/micro-proxy/internal/app"
@@ -31,8 +32,14 @@ func handleCompleteFts(systemService app.SystemService) http.HandlerFunc {
 		}
 		zap.S().Infof("Received FTS completion request, setting admin user password")
 		err = systemService.GetServiceStore().GetUserService().
-			SetPasswordForUser("admin", f.Password)
+			SetPasswordForUser(f.Password, "admin")
 		if err != nil {
+			var pve *app.PasswordValidationError
+			if errors.As(err, &pve) {
+				zap.S().Errorf("Invalid password provided for FTS completion: %v", err)
+				http.Error(w, "Invalid password: "+pve.Error(), http.StatusBadRequest)
+				return
+			}
 			zap.S().Errorf("Failed to set admin user password: %v", err)
 			http.Error(w, "Internal Server Error", http.StatusInternalServerError)
 			return
@@ -46,7 +53,7 @@ func handleCompleteFts(systemService app.SystemService) http.HandlerFunc {
 			http.Error(w, "Internal Server Error", http.StatusInternalServerError)
 			return
 		}
-		handleLogin(systemService)(w, r)
+		handleLogin(systemService).ServeHTTP(w, r)
 		zap.S().Infof("FTS completed successfully")
 	}
 }

@@ -1,0 +1,27 @@
+{{define "title"}} – Login{{end}}
+{{define "body"}}
+<main class="container">
+    <div class="auth-container">
+        <article>
+            <header>
+                <h2 class="text-center">🔒 microProxy</h2>
+                <p class="text-center">Sign in to your account</p>
+            </header>
+            <form hx-post="/api/v1/auth/login"
+                  hx-ext="json-enc"
+                  hx-swap="none"
+                  hx-on::after-request="onApiResponse(event, '/ui/dashboard')">
+                <label for="username">Username
+                    <input type="text" id="username" name="username" placeholder="Username" autocomplete="username" required>
+                </label>
+                <label for="password">Password
+                    <input type="password" id="password" name="password" placeholder="Password" autocomplete="current-password" required>
+                </label>
+                <button type="submit">Sign In</button>
+            </form>
+            <div id="result"></div>
+        </article>
+    </div>
+</main>
+{{end}}
+

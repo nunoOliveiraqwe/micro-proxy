@@ -2,7 +2,9 @@ package middleware
 
 import (
 	"context"
+	"net"
 	"net/http"
+	"sync"
 	"time"
 
 	"github.com/nunoOliveiraqwe/micro-proxy/metrics"
@@ -26,13 +28,24 @@ func (w *responseWriterWithMetrics) Write(b []byte) (int, error) {
 	return w.ResponseWriter.Write(b)
 }
 
-func MetricsMiddleware(next http.HandlerFunc, middlewareConf Config) http.HandlerFunc {
-	metricFunc := getConnectionMetricsHandler(middlewareConf)
-	if metricFunc == nil {
-		zap.S().Warnf("Metrics middleware not configured properly. Skipping...")
-		return next
-	}
+func MetricsMiddleware(next http.HandlerFunc, _ Config) http.HandlerFunc {
+	var (
+		once       sync.Once
+		reportFunc metrics.MetricsReportFunc
+	)
+
 	return func(w http.ResponseWriter, r *http.Request) {
+		// Lazily resolve the report func on the first request – after that
+		// the cached value is reused for every subsequent request.
+		once.Do(func() {
+			reportFunc = resolveReportFunc(r)
+		})
+
+		if reportFunc == nil {
+			next.ServeHTTP(w, r)
+			return
+		}
+
 		logger := getRequestLoggerFromContext(r)
 		logger.Debug("Recording metrics for request")
 		metric := initializeRequestMetrics(r)
@@ -45,25 +58,22 @@ func MetricsMiddleware(next http.HandlerFunc, middlewareConf Config) http.Handle
 			metric.IsTimedOut = true
 		}
 		metric.LatencyMs = elapsedTime.Milliseconds()
-		metricFunc(metric)
+		reportFunc(metric)
 	}
 }
 
-func getConnectionMetricsHandler(middlewareConf Config) metrics.MetricsReportFunc {
-	metricsName := ""
-	if middlewareConf.Options != nil {
-		if nameVal, exists := middlewareConf.Options["name"]; exists {
-			if n, isStr := nameVal.(string); isStr {
-				metricsName = n
-			}
-		}
-	}
-	if metricsName == "" {
-		zap.S().Warnf("Metrics name not found when configuring metrics middleware, defaulting to 'default'")
+func resolveReportFunc(r *http.Request) metrics.MetricsReportFunc {
+	addr, ok := r.Context().Value(http.LocalAddrContextKey).(net.Addr)
+	if !ok {
+		zap.S().Warnf("Could not determine local address for metrics resolution")
 		return nil
 	}
-	zap.S().Debugf("Creating metrics handler for connection %s", metricsName)
-	return metrics.GlobalMetricsManager.NewConnectionMetricHandler(metricsName)
+	_, port, err := net.SplitHostPort(addr.String())
+	if err != nil {
+		zap.S().Warnf("Could not parse local address %s for metrics: %v", addr.String(), err)
+		return nil
+	}
+	return metrics.GlobalMetricsManager.GetReportFuncByPort(port)
 }
 
 func initializeRequestMetrics(r *http.Request) *metrics.RequestMetric {

@@ -80,7 +80,7 @@ func (s *UserStore) GetRolesForUser(ctx context.Context, username string) ([]dom
 		SELECT r.id, r.name
 		FROM role r
 		INNER JOIN user_role ur ON ur.role_id = r.id
-		INNER JOIN users u ON u.id = ur.user_id
+		INNER JOIN user u ON u.id = ur.user_id
 		WHERE u.username = ?`,
 		username,
 	)

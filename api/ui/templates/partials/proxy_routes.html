@@ -1,0 +1,36 @@
+{{define "proxy_routes"}}
+{{if .Proxies}}
+<div class="overflow-auto">
+    <table class="striped">
+        <thead>
+            <tr>
+                <th scope="col">Port</th>
+                <th scope="col">Interface</th>
+                <th scope="col">HTTPS</th>
+                <th scope="col">ACME</th>
+                <th scope="col">Status</th>
+                <th scope="col">Middleware</th>
+            </tr>
+        </thead>
+        <tbody>
+            {{range .Proxies}}
+            <tr>
+                <td><code>{{.Port}}</code></td>
+                <td>{{if .Interface}}{{.Interface}}{{else}}<em>all</em>{{end}}</td>
+                <td>{{if .IsUsingHTTPS}}<span class="badge badge-success">Yes</span>{{else}}<span class="badge badge-muted">No</span>{{end}}</td>
+                <td>{{if .IsUsingACME}}<span class="badge badge-info">Yes</span>{{else}}<span class="badge badge-muted">No</span>{{end}}</td>
+                <td>{{if .IsStarted}}<span class="badge badge-success">Running</span>{{else}}<span class="badge badge-danger">Stopped</span>{{end}}</td>
+                <td>{{if .MiddlewareChain}}{{join .MiddlewareChain ", "}}{{else}}<em>none</em>{{end}}</td>
+            </tr>
+            {{end}}
+        </tbody>
+    </table>
+</div>
+{{else}}
+<article class="text-center">
+    <p>No proxy routes are currently configured.</p>
+    <small>Add proxy routes in your configuration file and restart the server.</small>
+</article>
+{{end}}
+{{end}}
+

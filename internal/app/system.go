@@ -15,7 +15,7 @@ type SystemService interface {
 	Stop() error
 	SessionRegistry() *session.Registry
 	GetServiceStore() *ServiceStore
-	GetConfiguredProxyServers() []*proxy.ProxyConfigSnapshot
+	GetConfiguredProxyServers() []*proxy.ProxySnapshot
 }
 
 type systemService struct {
@@ -72,7 +72,7 @@ func (sm *systemService) Stop() error {
 	return nil
 }
 
-func (sm *systemService) GetConfiguredProxyServers() []*proxy.ProxyConfigSnapshot {
+func (sm *systemService) GetConfiguredProxyServers() []*proxy.ProxySnapshot {
 	zap.S().Infof("Getting running proxies")
 	return sm.micro.GetProxyConfSnapshots()
 }

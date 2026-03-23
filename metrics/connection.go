@@ -2,9 +2,7 @@ package metrics
 
 import (
 	"context"
-)
-
-import (
+	"strings"
 	"sync"
 
 	"go.uber.org/zap"
@@ -125,6 +123,22 @@ func (h *ConnectionMetricsManager) GetMetricForConnection(connectionName string)
 	conMetrics.metricsLock.RLock()
 	defer conMetrics.metricsLock.RUnlock()
 	return conMetrics.accumulatedMetrics.Copy()
+}
+
+func (h *ConnectionMetricsManager) GetReportFuncByPort(port string) MetricsReportFunc {
+	suffix := "-" + port
+	for name := range h.connectionMetricsMap {
+		if name != globalMetricsConName && strings.HasSuffix(name, suffix) {
+			connName := name
+			zap.S().Debugf("Resolved metrics connection %q for port %s", connName, port)
+			return func(metric *RequestMetric) {
+				metric.connectionName = connName
+				h.metricsChan <- metric
+			}
+		}
+	}
+	zap.S().Warnf("No registered metrics connection found for port %s", port)
+	return nil
 }
 
 func (h *ConnectionMetricsManager) StartCollectingMetrics() {

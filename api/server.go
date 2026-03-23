@@ -42,13 +42,17 @@ func buildMux(svc app.SystemService) *http.ServeMux {
 		routeHandlerFunc := route.HandlerFunc(svc)
 		routeHandlerFunc = middleware.RequestIDMiddleware(routeHandlerFunc, middleware.Config{})
 		routeHandlerFunc = middleware.RequestLoggerMiddleware(routeHandlerFunc, middleware.Config{})
-		routeHandlerFunc = checkIfRouteIsAllowedIfFtsIsNotDone(routeHandlerFunc, route.IsAllowedAfterFts,
-			route.IsAllowedBeforeFts, svc)
+		routeHandlerFunc = checkIfRouteIsAllowedIfFtsIsNotDone(routeHandlerFunc, route.IsAllowedBeforeFts,
+			route.IsAllowedAfterFts, svc)
 		if route.IsSecure {
 			routeHandlerFunc = isAuthenticatedRequest(routeHandlerFunc, svc)
 		}
 		mux.HandleFunc(fullPathWithMethod, routeHandlerFunc)
 		zap.S().Debugf("Route %s initialized", route.Name)
 	}
+
+	zap.S().Debugf("Registering UI routes")
+	registerUIRoutes(mux, svc)
+
 	return mux
 }

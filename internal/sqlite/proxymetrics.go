@@ -47,7 +47,7 @@ func (s *ProxyMetricsStore) GetGlobalProxyMetrics(ctx context.Context) (*domain.
 			ssl_handshakes,
 			backend_errors,
 			updated_at
-		FROM global_proxy_metrics
+		FROM global_proxy_metric
 		WHERE id = 1`,
 	).Scan(
 		&m.ID,
@@ -91,7 +91,7 @@ func (s *ProxyMetricsStore) UpdateGlobalProxyMetrics(ctx context.Context, metric
 
 func updateGlobalProxyMetrics(ctx context.Context, tx *Tx, metrics *domain.GlobalProxyMetrics) error {
 	_, err := tx.ExecContext(ctx, `
-		UPDATE global_proxy_metrics SET
+		UPDATE global_proxy_metric SET
 			request_count = ?,
 			error_count = ?,
 			total_latency_ms = ?,

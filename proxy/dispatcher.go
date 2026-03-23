@@ -10,6 +10,7 @@ import (
 
 	"github.com/nunoOliveiraqwe/micro-proxy/config"
 	"github.com/nunoOliveiraqwe/micro-proxy/internal/netutil"
+	"github.com/nunoOliveiraqwe/micro-proxy/metrics"
 	"github.com/nunoOliveiraqwe/micro-proxy/middleware"
 	"go.uber.org/zap"
 )
@@ -56,7 +57,10 @@ func buildHttpServer(conf config.HTTPListener) (MicroHttpServer, error) {
 		IdleTimeout:                  conf.IdleTimeout,
 	}
 
+	mName := proxyMetricsName(conf.Interface, conf.Port)
+	metrics.GlobalMetricsManager.NewConnectionMetricHandler(mName)
 	if conf.TLS != nil {
+
 		return &MicroProxyHttpsServer{
 			httpServer:        srv,
 			isStarted:         atomic.Bool{},
@@ -67,6 +71,7 @@ func buildHttpServer(conf config.HTTPListener) (MicroHttpServer, error) {
 			keyFilePath:       conf.TLS.Key,
 			certFilepath:      conf.TLS.Cert,
 			middlewareChain:   mwNames,
+			metricsName:       mName,
 		}, nil
 	}
 
@@ -77,6 +82,7 @@ func buildHttpServer(conf config.HTTPListener) (MicroHttpServer, error) {
 		iPV4BindInterface: ipv4,
 		iPV6BindInterface: ipv4,
 		middlewareChain:   mwNames,
+		metricsName:       mName,
 	}, nil
 }
 
@@ -189,4 +195,11 @@ func middlewareNames(configs []middleware.Config) []string {
 		names = append(names, c.Type)
 	}
 	return names
+}
+
+func proxyMetricsName(iface string, port int) string {
+	if iface == "" {
+		iface = "any"
+	}
+	return fmt.Sprintf("%s-%d", iface, port)
 }
