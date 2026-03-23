@@ -3,108 +3,178 @@
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.7/dist/chart.umd.min.js"></script>
 {{end}}
 {{define "body"}}
-<nav class="container-fluid">
-    <ul>
-        <li><strong class="brand">🔀 microProxy</strong></li>
-    </ul>
-    <ul>
-        <li><small>{{.Username}}</small></li>
-        <li>
-            <a href="#" hx-post="/ui/logout" hx-swap="none" role="button" class="outline secondary">
-                Logout
-            </a>
-        </li>
-    </ul>
-</nav>
-<main class="container">
-    <hgroup>
-        <h2>Dashboard</h2>
-        <p>Proxy server overview and management</p>
-    </hgroup>
-
-    <!-- Stat cards -->
-    <section id="stats-section">
-        <div class="stats-grid">
-            <div class="stat-card">
-                <p class="stat-value" id="stat-requests">–</p>
-                <p class="stat-label">Total Requests</p>
-            </div>
-            <div class="stat-card">
-                <p class="stat-value" id="stat-errors">–</p>
-                <p class="stat-label">Errors</p>
-            </div>
-            <div class="stat-card">
-                <p class="stat-value" id="stat-avg-latency">–</p>
-                <p class="stat-label">Avg Latency (ms)</p>
-            </div>
-            <div class="stat-card">
-                <p class="stat-value" id="stat-bytes-sent">–</p>
-                <p class="stat-label">Bytes Sent</p>
-            </div>
-            <div class="stat-card">
-                <p class="stat-value" id="stat-bytes-recv">–</p>
-                <p class="stat-label">Bytes Received</p>
-            </div>
-            <div class="stat-card">
-                <p class="stat-value" id="stat-active">–</p>
-                <p class="stat-label">Active Connections</p>
-            </div>
+<div class="app-layout">
+    <!-- Sidebar -->
+    <aside class="sidebar">
+        <div class="sidebar-brand">
+            <span style="font-size:1.3rem">🔀</span>
+            <strong>microProxy</strong>
         </div>
-    </section>
+        <ul class="sidebar-nav">
+            <li class="sidebar-section">Main</li>
+            <li><a href="#" class="nav-link active" data-page="dashboard">
+                <span class="nav-icon">📊</span><span class="nav-label">Dashboard</span>
+            </a></li>
+            <li><a href="#" class="nav-link" data-page="proxy-routes">
+                <span class="nav-icon">🔌</span><span class="nav-label">Proxy Routes</span>
+            </a></li>
+            <li class="sidebar-section">Account</li>
+            <li><a href="#" class="nav-link" data-page="account">
+                <span class="nav-icon">🔑</span><span class="nav-label">Account</span>
+            </a></li>
+        </ul>
+        <div class="sidebar-footer">
+            <div class="sidebar-user">
+                <div class="sidebar-user-avatar" id="sidebar-avatar">{{slice .Username 0 1}}</div>
+                <span class="sidebar-user-name" id="sidebar-username">{{.Username}}</span>
+            </div>
+            <a href="#" id="btn-logout">⎋ Sign out</a>
+        </div>
+    </aside>
 
-    <!-- Chart -->
-    <section>
-        <div class="chart-container">
-            <div class="chart-header">
-                <h4>Metrics Over Time</h4>
-                <select id="metric-selector" aria-label="Select metric">
-                    <option value="bytesSent">Bytes Sent</option>
-                    <option value="bytesReceived">Bytes Received</option>
-                    <option value="requestCount">Request Count</option>
-                    <option value="errorCount">Error Count</option>
-                    <option value="request2xx">2xx Responses</option>
-                    <option value="request4xx">4xx Responses</option>
-                    <option value="request5xx">5xx Responses</option>
+    <!-- Main content -->
+    <div class="app-main">
+
+        <!-- PAGE: Dashboard (stats + chart) -->
+        <section class="page" data-page="dashboard">
+            <div style="display:flex;justify-content:space-between;align-items:flex-start;flex-wrap:wrap;gap:1rem;margin-bottom:1.5rem;">
+                <hgroup style="margin:0;">
+                    <h2>Dashboard</h2>
+                    <p>Proxy server overview and management</p>
+                </hgroup>
+                <select id="connection-selector" aria-label="Select connection" style="width:auto;min-width:200px;margin:0;">
+                    <option value="global">Global (all proxies)</option>
                 </select>
             </div>
-            <div style="position:relative;height:300px;">
-                <canvas id="metricsChart"></canvas>
+            <div class="stats-grid">
+                <div class="stat-card">
+                    <p class="stat-value" id="stat-requests">–</p>
+                    <p class="stat-label">Total Requests</p>
+                </div>
+                <div class="stat-card">
+                    <p class="stat-value" id="stat-errors">–</p>
+                    <p class="stat-label">Errors</p>
+                </div>
+                <div class="stat-card">
+                    <p class="stat-value" id="stat-avg-latency">–</p>
+                    <p class="stat-label">Avg Latency (ms)</p>
+                </div>
+                <div class="stat-card">
+                    <p class="stat-value" id="stat-bytes-sent">–</p>
+                    <p class="stat-label">Bytes Sent</p>
+                </div>
+                <div class="stat-card">
+                    <p class="stat-value" id="stat-bytes-recv">–</p>
+                    <p class="stat-label">Bytes Received</p>
+                </div>
+                <div class="stat-card">
+                    <p class="stat-value" id="stat-active">–</p>
+                    <p class="stat-label">Active Connections</p>
+                </div>
             </div>
-        </div>
-    </section>
+            <div class="chart-container">
+                <div class="chart-header">
+                    <h4>Metrics Over Time</h4>
+                    <select id="metric-selector" aria-label="Select metric">
+                        <option value="bytesSent">Bytes Sent</option>
+                        <option value="bytesReceived">Bytes Received</option>
+                        <option value="requestCount">Request Count</option>
+                        <option value="errorCount">Error Count</option>
+                        <option value="request2xx">2xx Responses</option>
+                        <option value="request4xx">4xx Responses</option>
+                        <option value="request5xx">5xx Responses</option>
+                    </select>
+                </div>
+                <div style="position:relative;height:300px;">
+                    <canvas id="metricsChart"></canvas>
+                </div>
+            </div>
+            <h4 style="margin-top:1.5rem;">Response Codes</h4>
+            <div class="stats-grid">
+                <div class="stat-card">
+                    <p class="stat-value" id="stat-2xx" style="color:#2ecc71">–</p>
+                    <p class="stat-label">2xx Success</p>
+                </div>
+                <div class="stat-card">
+                    <p class="stat-value" id="stat-3xx" style="color:#3498db">–</p>
+                    <p class="stat-label">3xx Redirect</p>
+                </div>
+                <div class="stat-card">
+                    <p class="stat-value" id="stat-4xx" style="color:#f39c12">–</p>
+                    <p class="stat-label">4xx Client Error</p>
+                </div>
+                <div class="stat-card">
+                    <p class="stat-value" id="stat-5xx" style="color:#e74c3c">–</p>
+                    <p class="stat-label">5xx Server Error</p>
+                </div>
+            </div>
+        </section>
 
-    <!-- Status breakdown -->
-    <section>
-        <h3>Response Status Breakdown</h3>
-        <div class="stats-grid">
-            <div class="stat-card">
-                <p class="stat-value" id="stat-2xx" style="color:#2ecc71">–</p>
-                <p class="stat-label">2xx Success</p>
+        <!-- PAGE: Proxy Routes -->
+        <section class="page" data-page="proxy-routes" style="display:none;">
+            <hgroup>
+                <h2>Proxy Routes</h2>
+                <p>Configured proxy server routes</p>
+            </hgroup>
+            <div id="proxy-routes">
+                <p aria-busy="true">Loading proxy routes…</p>
             </div>
-            <div class="stat-card">
-                <p class="stat-value" id="stat-3xx" style="color:#3498db">–</p>
-                <p class="stat-label">3xx Redirect</p>
-            </div>
-            <div class="stat-card">
-                <p class="stat-value" id="stat-4xx" style="color:#f39c12">–</p>
-                <p class="stat-label">4xx Client Error</p>
-            </div>
-            <div class="stat-card">
-                <p class="stat-value" id="stat-5xx" style="color:#e74c3c">–</p>
-                <p class="stat-label">5xx Server Error</p>
-            </div>
-        </div>
-    </section>
+        </section>
 
-    <!-- Proxy routes table -->
-    <section>
-        <h3>Proxy Routes</h3>
-        <div id="proxy-routes">
-            <p aria-busy="true">Loading proxy routes…</p>
-        </div>
-    </section>
-</main>
+        <!-- PAGE: Account -->
+        <section class="page" data-page="account" style="display:none;">
+            <hgroup>
+                <h2>Account</h2>
+                <p>Manage your account settings</p>
+            </hgroup>
+            <div class="stat-card" style="text-align:left;max-width:480px;">
+                <p class="stat-label" style="margin-bottom:0.75rem;">Change Password</p>
+                <form id="change-password-form" autocomplete="off">
+                    <label for="old-password" style="font-size:0.85rem;margin-bottom:0.25rem;">
+                        Current Password
+                        <input type="password" id="old-password" name="oldPassword" placeholder="Current password" required style="margin-bottom:0.5rem;">
+                    </label>
+                    <label for="new-password" style="font-size:0.85rem;margin-bottom:0.25rem;">
+                        New Password
+                        <input type="password" id="new-password" name="newPassword" placeholder="New password" required style="margin-bottom:0.75rem;">
+                    </label>
+                    <button type="submit" style="width:100%;">Update Password</button>
+                </form>
+                <div id="password-result"></div>
+            </div>
+        </section>
+
+    </div><!-- /.app-main -->
+</div><!-- /.app-layout -->
 <script>
+    // ---------- Page navigation ----------
+    var navLinks = document.querySelectorAll('.nav-link');
+    var pages    = document.querySelectorAll('.page');
+
+    function showPage(pageId) {
+        pages.forEach(function (p) {
+            p.style.display = p.getAttribute('data-page') === pageId ? '' : 'none';
+        });
+        navLinks.forEach(function (a) {
+            if (a.getAttribute('data-page') === pageId) {
+                a.classList.add('active');
+            } else {
+                a.classList.remove('active');
+            }
+        });
+        // Chart.js needs a resize kick when its container becomes visible
+        if (pageId === 'dashboard' && chart) {
+            chart.resize();
+        }
+    }
+
+    navLinks.forEach(function (link) {
+        link.addEventListener('click', function (e) {
+            e.preventDefault();
+            showPage(this.getAttribute('data-page'));
+        });
+    });
+
     // ---------- Metric history for charting ----------
     var MAX_POINTS = 30;
     var metricsHistory = {
@@ -120,7 +190,7 @@
 
     var selectedMetric = 'bytesSent';
     var chart = null;
-    var prevSnapshot = null; // previous poll snapshot for computing deltas
+    var prevSnapshot = null;
 
     var metricMeta = {
         bytesSent:     { label: 'Bytes Sent /5s',      color: 'rgba(124,110,240,1)',  bg: 'rgba(124,110,240,0.15)' },
@@ -154,9 +224,7 @@
                 responsive: true,
                 maintainAspectRatio: false,
                 interaction: { mode: 'index', intersect: false },
-                plugins: {
-                    legend: { display: false }
-                },
+                plugins: { legend: { display: false } },
                 scales: {
                     x: {
                         grid: { color: 'rgba(255,255,255,0.06)' },
@@ -205,61 +273,110 @@
     }
 
     // ---------- Fetch global metrics ----------
-    function loadGlobalMetrics() {
-        fetch('/api/v1/proxy/metrics', { credentials: 'same-origin' })
+    var selectedConnection = 'global';
+    var cachedProxySnapshots = [];
+
+    function getMetricsForConnection() {
+        if (selectedConnection === 'global') {
+            return fetch('/api/v1/proxy/metrics', { credentials: 'same-origin' })
+                .then(function (resp) {
+                    if (resp.status === 401) { window.location.href = '/ui/login'; return null; }
+                    if (!resp.ok) throw new Error(resp.statusText);
+                    return resp.json();
+                });
+        }
+        // Per-connection: fetch fresh proxy routes to get current metrics
+        return fetch('/api/v1/proxy/routes', { credentials: 'same-origin' })
             .then(function (resp) {
                 if (resp.status === 401) { window.location.href = '/ui/login'; return null; }
                 if (!resp.ok) throw new Error(resp.statusText);
                 return resp.json();
             })
-            .then(function (m) {
-                if (!m) return;
-
-                // Update stat cards
-                document.getElementById('stat-requests').textContent   = fmtNum(m.request_count);
-                document.getElementById('stat-errors').textContent     = fmtNum(m.error_count);
-                document.getElementById('stat-avg-latency').textContent= fmtNum(m.avg_response_time_ms);
-                document.getElementById('stat-bytes-sent').textContent = fmtBytes(m.bytes_sent);
-                document.getElementById('stat-bytes-recv').textContent = fmtBytes(m.bytes_received);
-                document.getElementById('stat-active').textContent     = fmtNum(m.active_connections);
-
-                // Status breakdown
-                document.getElementById('stat-2xx').textContent = fmtNum(m.request_2xx_count);
-                document.getElementById('stat-3xx').textContent = fmtNum(m.request_3xx_count);
-                document.getElementById('stat-4xx').textContent = fmtNum(m.request_4xx_count);
-                document.getElementById('stat-5xx').textContent = fmtNum(m.request_5xx_count);
-
-                // Push deltas to chart history (rate of change per poll interval)
-                if (prevSnapshot) {
-                    metricsHistory.labels.push(timeLabel());
-                    metricsHistory.bytesSent.push(Math.max(0, m.bytes_sent - prevSnapshot.bytes_sent));
-                    metricsHistory.bytesReceived.push(Math.max(0, m.bytes_received - prevSnapshot.bytes_received));
-                    metricsHistory.requestCount.push(Math.max(0, m.request_count - prevSnapshot.request_count));
-                    metricsHistory.errorCount.push(Math.max(0, m.error_count - prevSnapshot.error_count));
-                    metricsHistory.request2xx.push(Math.max(0, m.request_2xx_count - prevSnapshot.request_2xx_count));
-                    metricsHistory.request4xx.push(Math.max(0, m.request_4xx_count - prevSnapshot.request_4xx_count));
-                    metricsHistory.request5xx.push(Math.max(0, m.request_5xx_count - prevSnapshot.request_5xx_count));
-
-                    // Trim to max points
-                    if (metricsHistory.labels.length > MAX_POINTS) {
-                        metricsHistory.labels.shift();
-                        metricsHistory.bytesSent.shift();
-                        metricsHistory.bytesReceived.shift();
-                        metricsHistory.requestCount.shift();
-                        metricsHistory.errorCount.shift();
-                        metricsHistory.request2xx.shift();
-                        metricsHistory.request4xx.shift();
-                        metricsHistory.request5xx.shift();
-                    }
-
-                    if (chart) chart.update();
-                }
-                prevSnapshot = m;
-            })
-            .catch(function (err) {
-                console.error('Failed to load global metrics', err);
+            .then(function (proxies) {
+                if (!proxies) return null;
+                var snap = proxies.find(function (p) {
+                    return connectionKey(p) === selectedConnection;
+                });
+                return snap && snap.Metric ? snap.Metric : null;
             });
     }
+
+    function connectionKey(proxy) {
+        return ':-' + proxy.port;
+    }
+
+    function loadMetrics() {
+        getMetricsForConnection()
+            .then(function (m) {
+                if (!m) return;
+                updateDashboardWithMetrics(m);
+            })
+            .catch(function (err) {
+                console.error('Failed to load metrics', err);
+            });
+    }
+
+    function updateDashboardWithMetrics(m) {
+        // Update stat cards
+        document.getElementById('stat-requests').textContent   = fmtNum(m.request_count);
+        document.getElementById('stat-errors').textContent     = fmtNum(m.error_count);
+        document.getElementById('stat-avg-latency').textContent= fmtNum(m.avg_response_time_ms);
+        document.getElementById('stat-bytes-sent').textContent = fmtBytes(m.bytes_sent);
+        document.getElementById('stat-bytes-recv').textContent = fmtBytes(m.bytes_received);
+        document.getElementById('stat-active').textContent     = fmtNum(m.active_connections);
+
+        // Status breakdown
+        document.getElementById('stat-2xx').textContent = fmtNum(m.request_2xx_count);
+        document.getElementById('stat-3xx').textContent = fmtNum(m.request_3xx_count);
+        document.getElementById('stat-4xx').textContent = fmtNum(m.request_4xx_count);
+        document.getElementById('stat-5xx').textContent = fmtNum(m.request_5xx_count);
+
+        // Push deltas to chart history
+        if (prevSnapshot) {
+            metricsHistory.labels.push(timeLabel());
+            metricsHistory.bytesSent.push(Math.max(0, m.bytes_sent - prevSnapshot.bytes_sent));
+            metricsHistory.bytesReceived.push(Math.max(0, m.bytes_received - prevSnapshot.bytes_received));
+            metricsHistory.requestCount.push(Math.max(0, m.request_count - prevSnapshot.request_count));
+            metricsHistory.errorCount.push(Math.max(0, m.error_count - prevSnapshot.error_count));
+            metricsHistory.request2xx.push(Math.max(0, m.request_2xx_count - prevSnapshot.request_2xx_count));
+            metricsHistory.request4xx.push(Math.max(0, m.request_4xx_count - prevSnapshot.request_4xx_count));
+            metricsHistory.request5xx.push(Math.max(0, m.request_5xx_count - prevSnapshot.request_5xx_count));
+
+            if (metricsHistory.labels.length > MAX_POINTS) {
+                metricsHistory.labels.shift();
+                metricsHistory.bytesSent.shift();
+                metricsHistory.bytesReceived.shift();
+                metricsHistory.requestCount.shift();
+                metricsHistory.errorCount.shift();
+                metricsHistory.request2xx.shift();
+                metricsHistory.request4xx.shift();
+                metricsHistory.request5xx.shift();
+            }
+
+            if (chart) chart.update();
+        }
+        prevSnapshot = m;
+    }
+
+    // Reset chart history when switching connections
+    function resetChartHistory() {
+        metricsHistory.labels.length = 0;
+        metricsHistory.bytesSent.length = 0;
+        metricsHistory.bytesReceived.length = 0;
+        metricsHistory.requestCount.length = 0;
+        metricsHistory.errorCount.length = 0;
+        metricsHistory.request2xx.length = 0;
+        metricsHistory.request4xx.length = 0;
+        metricsHistory.request5xx.length = 0;
+        prevSnapshot = null;
+        if (chart) chart.update();
+    }
+
+    document.getElementById('connection-selector').addEventListener('change', function () {
+        selectedConnection = this.value;
+        resetChartHistory();
+        loadMetrics();
+    });
 
     // ---------- Proxy routes ----------
     function loadProxyRoutes() {
@@ -271,12 +388,31 @@
             })
             .then(function (proxies) {
                 if (proxies === null) return;
+                cachedProxySnapshots = proxies || [];
+                updateConnectionSelector(cachedProxySnapshots);
                 renderProxyRoutes(proxies);
             })
             .catch(function () {
                 document.getElementById('proxy-routes').innerHTML =
                     '<p>Failed to load proxy routes.</p>';
             });
+    }
+
+    function updateConnectionSelector(proxies) {
+        var sel = document.getElementById('connection-selector');
+        var current = sel.value;
+        // Keep global as first option, then add per-proxy options
+        var html = '<option value="global">Global (all proxies)</option>';
+        proxies.forEach(function (p) {
+            var key = connectionKey(p);
+            var label = 'Port ' + p.port + (p.is_using_https ? ' (HTTPS)' : ' (HTTP)');
+            html += '<option value="' + key + '">' + label + '</option>';
+        });
+        sel.innerHTML = html;
+        // Restore previous selection if it still exists
+        if (current && sel.querySelector('option[value="' + current + '"]')) {
+            sel.value = current;
+        }
     }
 
     function renderProxyRoutes(proxies) {
@@ -318,13 +454,78 @@
             : '<span class="badge badge-muted">No</span>';
     }
 
+    // ---------- Identity ----------
+    function loadIdentity() {
+        fetch('/api/v1/auth/user', { credentials: 'same-origin' })
+            .then(function (resp) {
+                if (resp.status === 401) { window.location.href = '/ui/login'; return null; }
+                if (!resp.ok) throw new Error(resp.statusText);
+                return resp.json();
+            })
+            .then(function (u) {
+                if (!u) return;
+                var name = u.username || '';
+                document.getElementById('sidebar-username').textContent = name;
+                document.getElementById('sidebar-avatar').textContent = name.charAt(0).toUpperCase();
+            })
+            .catch(function (err) {
+                console.error('Failed to load identity', err);
+            });
+    }
+
+    // ---------- Logout via API ----------
+    document.getElementById('btn-logout').addEventListener('click', function (e) {
+        e.preventDefault();
+        fetch('/api/v1/auth/logout', {
+            method: 'POST',
+            credentials: 'same-origin'
+        }).then(function () {
+            window.location.href = '/ui/login';
+        }).catch(function () {
+            window.location.href = '/ui/login';
+        });
+    });
+
+    // ---------- Change Password ----------
+    document.getElementById('change-password-form').addEventListener('submit', function (e) {
+        e.preventDefault();
+        var resultEl = document.getElementById('password-result');
+        var oldPwd = document.getElementById('old-password').value;
+        var newPwd = document.getElementById('new-password').value;
+        resultEl.innerHTML = '';
+
+        fetch('/api/v1/auth/user', {
+            method: 'POST',
+            credentials: 'same-origin',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ oldPassword: oldPwd, newPassword: newPwd })
+        })
+        .then(function (resp) {
+            if (resp.status === 401) {
+                resultEl.innerHTML = '<div class="error-alert">Current password is incorrect.</div>';
+                return;
+            }
+            if (!resp.ok) {
+                return resp.text().then(function (t) {
+                    resultEl.innerHTML = '<div class="error-alert">' + (t || 'Failed to change password.') + '</div>';
+                });
+            }
+            resultEl.innerHTML = '<div style="background:rgba(46,204,113,0.15);border:1px solid #2ecc71;border-radius:0.35rem;color:#2ecc71;padding:0.75rem 1rem;margin-top:0.75rem;font-size:0.9em;">Password updated successfully.</div>';
+            document.getElementById('old-password').value = '';
+            document.getElementById('new-password').value = '';
+        })
+        .catch(function () {
+            resultEl.innerHTML = '<div class="error-alert">An error occurred. Please try again.</div>';
+        });
+    });
+
     // ---------- Bootstrap ----------
     initChart();
-    loadGlobalMetrics();
+    loadMetrics();
     loadProxyRoutes();
+    loadIdentity();
 
-    // Poll every 5 seconds for metrics, 10 seconds for routes
-    setInterval(loadGlobalMetrics, 5000);
+    setInterval(loadMetrics, 5000);
     setInterval(loadProxyRoutes, 10000);
 </script>
 {{end}}

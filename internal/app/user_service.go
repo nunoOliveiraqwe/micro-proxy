@@ -22,7 +22,7 @@ func NewUserService(dataStore *DataStore) *UserService {
 	}
 }
 
-func (s *UserService) PasswordMatches(password, username string) error {
+func (s *UserService) PasswordMatchesForUser(password, username string) error {
 	u, err := s.dataStore.UserStore.GetUserByUsername(context.Background(), username)
 	if err != nil {
 		return fmt.Errorf("failed to get user by username: %w", err)

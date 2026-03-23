@@ -88,6 +88,146 @@
             padding: 0.35rem 0.75rem;
             font-size: 0.85rem;
         }
+
+        /* Sidebar layout */
+        .app-layout {
+            display: flex;
+            min-height: 100vh;
+        }
+        .sidebar {
+            width: 240px;
+            min-width: 240px;
+            background: #13111c;
+            border-right: 1px solid rgba(255,255,255,0.07);
+            display: flex;
+            flex-direction: column;
+            padding: 0;
+            position: fixed;
+            top: 0;
+            left: 0;
+            bottom: 0;
+            z-index: 100;
+            overflow-y: auto;
+        }
+        .sidebar-brand {
+            padding: 1.25rem 1.25rem 1rem;
+            border-bottom: 1px solid rgba(255,255,255,0.07);
+            display: flex;
+            align-items: center;
+            gap: 0.6rem;
+        }
+        .sidebar-brand strong {
+            font-size: 1.15rem;
+            color: #fff;
+        }
+        .sidebar-nav {
+            list-style: none;
+            padding: 0.75rem 0;
+            margin: 0;
+            flex: 1;
+        }
+        .sidebar-nav li { margin: 0; }
+        .sidebar-section {
+            font-size: 0.65rem;
+            text-transform: uppercase;
+            letter-spacing: 0.1em;
+            color: rgba(255,255,255,0.3);
+            padding: 1.25rem 1.25rem 0.4rem;
+            margin: 0;
+        }
+        .sidebar-nav a {
+            display: flex;
+            align-items: center;
+            gap: 0.75rem;
+            padding: 0.6rem 1.25rem;
+            color: rgba(255,255,255,0.55);
+            text-decoration: none;
+            font-size: 0.88rem;
+            border-radius: 0;
+            transition: background 0.15s, color 0.15s;
+        }
+        .sidebar-nav a:hover {
+            background: rgba(124,110,240,0.08);
+            color: rgba(255,255,255,0.9);
+        }
+        .sidebar-nav a.active {
+            background: rgba(124,110,240,0.15);
+            color: #7c6ef0;
+            font-weight: 600;
+        }
+        .sidebar-nav .nav-icon {
+            width: 1.2em;
+            text-align: center;
+            flex-shrink: 0;
+            font-size: 1.05em;
+        }
+        .sidebar-footer {
+            border-top: 1px solid rgba(255,255,255,0.07);
+            padding: 1rem 1.25rem;
+        }
+        .sidebar-footer .sidebar-user {
+            display: flex;
+            align-items: center;
+            gap: 0.6rem;
+            margin-bottom: 0.6rem;
+        }
+        .sidebar-footer .sidebar-user-avatar {
+            width: 32px;
+            height: 32px;
+            border-radius: 50%;
+            background: #7c6ef0;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 0.8rem;
+            font-weight: 700;
+            color: #fff;
+            flex-shrink: 0;
+        }
+        .sidebar-footer .sidebar-user-name {
+            font-size: 0.85rem;
+            color: rgba(255,255,255,0.8);
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+        .sidebar-footer a {
+            display: block;
+            font-size: 0.8rem;
+            color: rgba(255,255,255,0.4);
+            text-decoration: none;
+            padding: 0.3rem 0;
+        }
+        .sidebar-footer a:hover { color: #e74c3c; }
+
+        .app-main {
+            flex: 1;
+            margin-left: 240px;
+            padding: 2rem;
+            min-width: 0;
+        }
+        .app-main > .main-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-start;
+            margin-bottom: 1.5rem;
+        }
+        .app-main > .main-header hgroup { margin: 0; }
+
+        /* Mobile: collapse sidebar */
+        @media (max-width: 768px) {
+            .sidebar { width: 56px; min-width: 56px; }
+            .sidebar-brand strong,
+            .sidebar-nav .nav-label,
+            .sidebar-section,
+            .sidebar-footer .sidebar-user-name,
+            .sidebar-footer a { display: none; }
+            .sidebar-brand { justify-content: center; padding: 1rem 0.5rem; }
+            .sidebar-nav a { justify-content: center; padding: 0.7rem 0; }
+            .sidebar-footer { padding: 0.75rem 0.5rem; text-align: center; }
+            .sidebar-footer .sidebar-user { justify-content: center; }
+            .app-main { margin-left: 56px; padding: 1.5rem 1rem; }
+        }
     </style>
     {{block "head" .}}{{end}}
 </head>
