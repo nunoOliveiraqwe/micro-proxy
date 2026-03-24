@@ -15,6 +15,7 @@ import (
 	"github.com/nunoOliveiraqwe/micro-proxy/internal/domain"
 	"github.com/nunoOliveiraqwe/micro-proxy/internal/sqlite"
 	"github.com/nunoOliveiraqwe/micro-proxy/internal/store"
+	"github.com/nunoOliveiraqwe/micro-proxy/metrics"
 	"github.com/nunoOliveiraqwe/micro-proxy/proxy"
 	"github.com/stretchr/testify/mock"
 	"go.uber.org/zap"
@@ -144,6 +145,21 @@ func (t *testSystemService) Stop() error                                       {
 func (t *testSystemService) SessionRegistry() *session.Registry                { return t.sessions }
 func (t *testSystemService) GetServiceStore() *app.ServiceStore                { return t.serviceStore }
 func (t *testSystemService) GetConfiguredProxyServers() []*proxy.ProxySnapshot { return t.proxies }
+func (t *testSystemService) GetGlobalMetricsManager() *metrics.ConnectionMetricsManager {
+	return nil
+}
+func (t *testSystemService) GetSSEBroker() *app.SSEBroker { return nil }
+func (t *testSystemService) StartProxy(port int) error    { return nil }
+func (t *testSystemService) StopProxy(port int) error     { return nil }
+func (t *testSystemService) GetSystemHealth() *app.SystemHealth {
+	return &app.SystemHealth{}
+}
+func (t *testSystemService) GetRecentErrors(n int) []metrics.ErrorEntry {
+	return []metrics.ErrorEntry{}
+}
+func (t *testSystemService) GetRecentRequests(n int) []metrics.RequestLogEntry {
+	return []metrics.RequestLogEntry{}
+}
 
 // ---------------------------------------------------------------------------
 // Test fixture builder

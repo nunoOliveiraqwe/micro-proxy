@@ -8,6 +8,7 @@ import (
 	"net"
 	"net/http"
 	"sync/atomic"
+	"time"
 
 	"github.com/nunoOliveiraqwe/micro-proxy/internal/fsutil"
 	"github.com/nunoOliveiraqwe/micro-proxy/metrics"
@@ -16,6 +17,11 @@ import (
 
 type MicroProxyHttpsServer struct {
 	httpServer        *http.Server
+	handler           http.Handler
+	readTimeout       time.Duration
+	readHeaderTimeout time.Duration
+	writeTimeout      time.Duration
+	idleTimeout       time.Duration
 	isStarted         atomic.Bool
 	bindPort          int
 	iPV4BindInterface string
@@ -25,9 +31,10 @@ type MicroProxyHttpsServer struct {
 	certFilepath      string
 	middlewareChain   []string
 	metricsName       string
+	backends          []string
 }
 
-func (m *MicroProxyHttpsServer) GetProxySnapshot() *ProxySnapshot {
+func (m *MicroProxyHttpsServer) GetProxySnapshot(metric *metrics.Metric) *ProxySnapshot {
 	return &ProxySnapshot{
 		Port:            m.bindPort,
 		Interface:       fmt.Sprintf("ipv4=%s, ipv6=%s", m.iPV4BindInterface, m.iPV6BindInterface),
@@ -36,16 +43,28 @@ func (m *MicroProxyHttpsServer) GetProxySnapshot() *ProxySnapshot {
 		IsUsingHTTPS:    true,
 		IsUsingACME:     m.useAcme,
 		MetricsName:     m.metricsName,
-		Metric:          metrics.GlobalMetricsManager.GetMetricForConnection(m.metricsName),
+		Metric:          metric,
+		Backends:        m.backends,
 	}
+}
+
+func (m *MicroProxyHttpsServer) GetMetricsName() string {
+	return m.metricsName
 }
 
 func (m *MicroProxyHttpsServer) start(acmeManager *MicroProxyAcmeManager) error {
 	zap.S().Infof("Starting HTTPS server on %d, ipv4 = %s, ipv6 = %s", m.bindPort, m.iPV4BindInterface, m.iPV6BindInterface)
 	listeners := buildNetListeners(m.iPV4BindInterface, m.iPV6BindInterface, m.bindPort)
 	if len(listeners) == 0 {
-		zap.S().Errorf("No listeners available to start HTTP server")
-		return nil
+		zap.S().Errorf("No listeners available to start HTTPS server")
+		return fmt.Errorf("no listeners available for port %d", m.bindPort)
+	}
+	m.httpServer = &http.Server{
+		Handler:           m.handler,
+		ReadTimeout:       m.readTimeout,
+		ReadHeaderTimeout: m.readHeaderTimeout,
+		WriteTimeout:      m.writeTimeout,
+		IdleTimeout:       m.idleTimeout,
 	}
 	if m.useAcme {
 		zap.S().Infof("Starting ACME HTTPS server")
@@ -68,7 +87,7 @@ func (m *MicroProxyHttpsServer) start(acmeManager *MicroProxyAcmeManager) error 
 	if fsutil.FileExists(m.keyFilePath) && fsutil.FileExists(m.certFilepath) {
 		zap.S().Infof("Starting HTTPS server with provided certificate and key")
 		m.httpServer.TLSConfig = &tls.Config{
-			MinVersion: tls.VersionTLS12, //TODO -> maybe not hardcode?
+			MinVersion: tls.VersionTLS12,
 		}
 		for _, listener := range listeners {
 			go func(ln net.Listener) {
@@ -94,13 +113,13 @@ func (m *MicroProxyHttpsServer) stop() error {
 }
 
 func (m *MicroProxyHttpsServer) getHandler() http.Handler {
-	return m.httpServer.Handler
+	return m.handler
 }
 
 func (m *MicroProxyHttpsServer) updateHandler(handler http.Handler) error {
 	if m.isStarted.Load() {
 		return fmt.Errorf("HTTPS server is already started, cannot update handler")
 	}
-	m.httpServer.Handler = handler
+	m.handler = handler
 	return nil
 }

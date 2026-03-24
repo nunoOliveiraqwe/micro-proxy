@@ -4,6 +4,7 @@ import "github.com/nunoOliveiraqwe/micro-proxy/metrics"
 
 type ProxySnapshot struct {
 	Port            int             `json:"port"`
+	Backends        []string        `json:"backend"`
 	Interface       string          `json:"interface"`
 	MiddlewareChain []string        `json:"middleware_chain"`
 	IsStarted       bool            `json:"is_started"`

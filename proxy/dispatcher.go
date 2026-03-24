@@ -29,7 +29,7 @@ func (d *MultiRouteHttpDispatcher) ServeHTTP(w http.ResponseWriter, r *http.Requ
 	http.Error(w, "no route", http.StatusBadGateway)
 }
 
-func buildHttpServer(conf config.HTTPListener) (MicroHttpServer, error) {
+func buildHttpServer(conf config.HTTPListener, mgr *metrics.ConnectionMetricsManager) (MicroHttpServer, error) {
 	zap.S().Infof("Building HTTP server with configuration: %+v", conf)
 	ifFace := "lo"
 	if conf.Interface == "" {
@@ -54,25 +54,21 @@ func buildHttpServer(conf config.HTTPListener) (MicroHttpServer, error) {
 		zap.S().Warnf("IPv6 bind interface %s does not have a valid IPv6 address", conf.Interface)
 		return nil, fmt.Errorf("IPv6 bind interface %s does not have a valid IPv6 address", conf.Interface)
 	}
-	handler, mwNames, err := buildHttpDispatcher(conf.Default, conf.Routes)
+	handler, mwNames, backends, err := buildHttpDispatcher(conf.Port, conf.Default, conf.Routes, mgr)
 	if err != nil {
 		zap.S().Errorf("Failed to build HTTP dispatcher: %v", err)
 		return nil, err
-	}
-	srv := &http.Server{
-		Handler:                      handler,
-		DisableGeneralOptionsHandler: false,
-		ReadTimeout:                  conf.ReadTimeout,
-		ReadHeaderTimeout:            conf.ReadHeaderTimeout,
-		WriteTimeout:                 conf.WriteTimeout,
-		IdleTimeout:                  conf.IdleTimeout,
 	}
 
 	mName := metrics.ProxyMetricsName(strconv.Itoa(conf.Port))
 	zap.S().Infof("Built HTTP server proxy Ipv4=%s, Ipv6=%s, Port=%d", ipv4, ipv6, conf.Port)
 	if conf.TLS != nil {
 		return &MicroProxyHttpsServer{
-			httpServer:        srv,
+			handler:           handler,
+			readTimeout:       conf.ReadTimeout,
+			readHeaderTimeout: conf.ReadHeaderTimeout,
+			writeTimeout:      conf.WriteTimeout,
+			idleTimeout:       conf.IdleTimeout,
 			isStarted:         atomic.Bool{},
 			bindPort:          conf.Port,
 			iPV4BindInterface: ipv4,
@@ -82,29 +78,36 @@ func buildHttpServer(conf config.HTTPListener) (MicroHttpServer, error) {
 			certFilepath:      conf.TLS.Cert,
 			middlewareChain:   mwNames,
 			metricsName:       mName,
+			backends:          backends,
 		}, nil
 	}
 
 	return &MicroProxyHttpServer{
-		httpServer:        srv,
+		handler:           handler,
+		readTimeout:       conf.ReadTimeout,
+		readHeaderTimeout: conf.ReadHeaderTimeout,
+		writeTimeout:      conf.WriteTimeout,
+		idleTimeout:       conf.IdleTimeout,
 		isStarted:         atomic.Bool{},
 		bindPort:          conf.Port,
 		iPV4BindInterface: ipv4,
 		iPV6BindInterface: ipv6,
 		middlewareChain:   mwNames,
 		metricsName:       mName,
+		backends:          backends,
 	}, nil
 }
 
-func buildHttpDispatcher(routeTarget *config.RouteTarget, routes []config.Route) (http.Handler, []string, error) {
+func buildHttpDispatcher(port int, routeTarget *config.RouteTarget,
+	routes []config.Route, mgr *metrics.ConnectionMetricsManager) (http.Handler, []string, []string, error) {
 	zap.S().Infof("Building HTTP dispatcher with route target: %+v and routes: %+v", routeTarget, routes)
 	if routeTarget != nil {
-		return buildSingleRouteDispatcher(*routeTarget)
+		return buildSingleRouteDispatcher(port, *routeTarget, mgr)
 	}
-	return buildMultiHostDispatcher(routes)
+	return buildMultiHostDispatcher(port, routes, mgr)
 }
 
-func buildSingleRouteDispatcher(target config.RouteTarget) (http.Handler, []string, error) {
+func buildSingleRouteDispatcher(port int, target config.RouteTarget, mgr *metrics.ConnectionMetricsManager) (http.Handler, []string, []string, error) {
 	zap.S().Infof("Building single route dispatcher for target: %+v", target)
 	proxy, err := buildHttpRevProxy(target.Backend)
 	if err != nil {
@@ -112,25 +115,25 @@ func buildSingleRouteDispatcher(target config.RouteTarget) (http.Handler, []stri
 
 	}
 	defaultHandler := buildDefaultHttpHandler(proxy)
-	handler, err := buildMiddlewareChain(defaultHandler, target.Middlewares)
+	handler, err := buildMiddlewareChain(port, defaultHandler, target.Middlewares, mgr)
 	if err != nil {
 		zap.S().Errorf("Failed to build middleware chain for route with backend %s: %v", target.Backend, err)
-		return nil, nil, err
+		return nil, nil, nil, err
 	}
-	return handler, middlewareNames(target.Middlewares), nil
+	return handler, middlewareNames(target.Middlewares), []string{target.Backend}, nil
 }
 
-func buildMultiHostDispatcher(routes []config.Route) (http.Handler, []string, error) {
+func buildMultiHostDispatcher(port int, routes []config.Route, mgr *metrics.ConnectionMetricsManager) (http.Handler, []string, []string, error) {
 	zap.S().Infof("Building multi-host dispatcher for routes: %+v", routes)
 	if len(routes) == 0 {
 		zap.S().Errorf("No routes provided for multi-host dispatcher")
-		return nil, nil, errors.New("no routes provided for multi-host dispatcher")
+		return nil, nil, nil, errors.New("no routes provided for multi-host dispatcher")
 	}
 	d := &MultiRouteHttpDispatcher{
 		routes: make(map[string]http.Handler),
 	}
 	var mwNames []string
-
+	var backends []string
 	for _, route := range routes {
 		zap.S().Debugf("Building route for host %s with backend %s", route.Host, route.Backend)
 		if route.Host == "" {
@@ -143,26 +146,27 @@ func buildMultiHostDispatcher(routes []config.Route) (http.Handler, []string, er
 			continue
 		}
 		defaultHandler := buildDefaultHttpHandler(proxy)
-		handler, err := buildMiddlewareChain(defaultHandler, route.Middlewares)
+		handler, err := buildMiddlewareChain(port, defaultHandler, route.Middlewares, mgr)
 		if err != nil {
 			zap.S().Errorf("Failed to build middleware chain for route with backend %s: %v", route.Backend, err)
 			continue
 		}
 		d.routes[route.Host] = handler
 		mwNames = append(mwNames, middlewareNames(route.Middlewares)...)
+		backends = append(backends, route.Backend)
 	}
 	if len(d.routes) == 0 {
 		zap.S().Errorf("No valid routes configured")
-		return nil, nil, fmt.Errorf("no valid routes configured")
+		return nil, nil, nil, fmt.Errorf("no valid routes configured")
 	}
-	return d, mwNames, nil
+	return d, mwNames, backends, nil
 }
 
-func buildMiddlewareChain(handler http.HandlerFunc, mwConfig []middleware.Config) (http.HandlerFunc, error) {
+func buildMiddlewareChain(port int, handler http.HandlerFunc, mwConfig []middleware.Config, mgr *metrics.ConnectionMetricsManager) (http.HandlerFunc, error) {
 	if mwConfig == nil || len(mwConfig) == 0 {
 		return handler, nil
 	}
-	next, err := middleware.ApplyMiddlewares(handler, mwConfig)
+	next, err := middleware.ApplyMiddlewares(port, handler, mwConfig, mgr)
 	if err != nil {
 		zap.S().Errorf("Error applying middleware chain: %v", err)
 		return nil, err

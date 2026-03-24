@@ -3,6 +3,7 @@
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.7/dist/chart.umd.min.js"></script>
 {{end}}
 {{define "body"}}
+<div id="toast-container" class="toast-container"></div>
 <div class="app-layout">
     <!-- Sidebar -->
     <aside class="sidebar">
@@ -17,6 +18,9 @@
             </a></li>
             <li><a href="#" class="nav-link" data-page="proxy-routes">
                 <span class="nav-icon">🔌</span><span class="nav-label">Proxy Routes</span>
+            </a></li>
+            <li><a href="#" class="nav-link" data-page="system">
+                <span class="nav-icon">🖥️</span><span class="nav-label">System</span>
             </a></li>
             <li class="sidebar-section">Account</li>
             <li><a href="#" class="nav-link" data-page="account">
@@ -35,11 +39,11 @@
     <!-- Main content -->
     <div class="app-main">
 
-        <!-- PAGE: Dashboard (stats + chart) -->
+        <!-- PAGE: Dashboard -->
         <section class="page" data-page="dashboard">
             <div style="display:flex;justify-content:space-between;align-items:flex-start;flex-wrap:wrap;gap:1rem;margin-bottom:1.5rem;">
                 <hgroup style="margin:0;">
-                    <h2>Dashboard</h2>
+                    <h2><span class="sse-indicator connecting" id="sse-dot" title="SSE disconnected"></span>Dashboard</h2>
                     <p>Proxy server overview and management</p>
                 </hgroup>
                 <select id="connection-selector" aria-label="Select connection" style="width:auto;min-width:200px;margin:0;">
@@ -47,17 +51,25 @@
                 </select>
             </div>
             <div class="stats-grid">
+                <!-- Feature 3: req/s card -->
                 <div class="stat-card">
-                    <p class="stat-value loading" id="stat-requests">–</p>
-                    <p class="stat-label">Total Requests</p>
+                    <p class="stat-value loading" id="stat-rps">–</p>
+                    <p class="stat-label">Requests / sec</p>
+                    <p class="stat-sub" id="stat-total-requests"></p>
                 </div>
                 <div class="stat-card">
                     <p class="stat-value loading" id="stat-errors">–</p>
                     <p class="stat-label">Errors</p>
+                    <p class="stat-sub" id="stat-error-rate"></p>
                 </div>
+                <!-- Feature 1: latency percentile card -->
                 <div class="stat-card">
-                    <p class="stat-value loading" id="stat-avg-latency">–</p>
-                    <p class="stat-label">Avg Latency (ms)</p>
+                    <div class="latency-percentiles">
+                        <div class="latency-row"><span class="latency-label">P50</span><span class="latency-value" id="stat-p50">–</span></div>
+                        <div class="latency-row"><span class="latency-label">P95</span><span class="latency-value" id="stat-p95">–</span></div>
+                        <div class="latency-row"><span class="latency-label">P99</span><span class="latency-value" id="stat-p99">–</span></div>
+                    </div>
+                    <p class="stat-label">Latency (ms)</p>
                 </div>
                 <div class="stat-card">
                     <p class="stat-value loading" id="stat-bytes-sent">–</p>
@@ -67,15 +79,13 @@
                     <p class="stat-value loading" id="stat-bytes-recv">–</p>
                     <p class="stat-label">Bytes Received</p>
                 </div>
-                <div class="stat-card">
-                    <p class="stat-value loading" id="stat-active">–</p>
-                    <p class="stat-label">Active Connections</p>
-                </div>
             </div>
             <div class="chart-container">
                 <div class="chart-header">
                     <h4>Metrics Over Time</h4>
                     <select id="metric-selector" aria-label="Select metric">
+                        <option value="reqPerSec">Req/s</option>
+                        <option value="latencyP99">Latency P99</option>
                         <option value="bytesSent">Bytes Sent</option>
                         <option value="bytesReceived">Bytes Received</option>
                         <option value="requestCount">Request Count</option>
@@ -124,6 +134,52 @@
             </div>
         </section>
 
+        <!-- PAGE: System -->
+        <section class="page" data-page="system" style="display:none;">
+            <hgroup>
+                <h2>System</h2>
+                <p>Process health, request log and errors</p>
+            </hgroup>
+            <!-- System Health -->
+            <div class="stat-card" style="text-align:left;max-width:560px;margin-bottom:1.5rem;">
+                <p class="stat-label" style="margin-bottom:0.75rem;">Runtime Health</p>
+                <div class="health-gauges">
+                    <div class="gauge-row">
+                        <span class="gauge-label">Memory</span>
+                        <div class="gauge-bar"><div class="gauge-fill" id="gauge-memory-fill" style="width:0%"></div></div>
+                        <span class="gauge-value" id="gauge-memory-text">–</span>
+                    </div>
+                    <div class="gauge-row">
+                        <span class="gauge-label">Goroutines</span>
+                        <div class="gauge-bar"><div class="gauge-fill" id="gauge-goroutine-fill" style="width:0%"></div></div>
+                        <span class="gauge-value" id="gauge-goroutine-text">–</span>
+                    </div>
+                    <div class="gauge-row">
+                        <span class="gauge-label">GC Pause</span>
+                        <div class="gauge-bar"><div class="gauge-fill" id="gauge-gc-fill" style="width:0%"></div></div>
+                        <span class="gauge-value" id="gauge-gc-text">–</span>
+                    </div>
+                    <div style="font-size:0.75rem;color:var(--pico-muted-color);margin-top:0.5rem;">
+                        Uptime: <span id="health-uptime">–</span>
+                    </div>
+                </div>
+            </div>
+            <!-- Request Log -->
+            <h4>Request Log</h4>
+            <div class="stat-card" style="text-align:left;padding:0;">
+                <div class="request-feed" id="request-feed">
+                    <div class="error-empty">No requests recorded</div>
+                </div>
+            </div>
+            <!-- Recent Errors -->
+            <h4 style="margin-top:1.5rem;">Recent Errors</h4>
+            <div class="stat-card" style="text-align:left;padding:0;">
+                <div class="error-feed" id="error-feed">
+                    <div class="error-empty">No errors recorded</div>
+                </div>
+            </div>
+        </section>
+
         <!-- PAGE: Account -->
         <section class="page" data-page="account" style="display:none;">
             <hgroup>
@@ -150,35 +206,59 @@
     </div><!-- /.app-main -->
 </div><!-- /.app-layout -->
 <script>
+    // ---------- Toast notifications ----------
+    function showToast(message, type) {
+        type = type || 'info';
+        var container = document.getElementById('toast-container');
+        var toast = document.createElement('div');
+        toast.className = 'toast toast-' + type;
+        toast.textContent = message;
+        container.appendChild(toast);
+        setTimeout(function () {
+            toast.classList.add('toast-fade-out');
+            toast.addEventListener('animationend', function () { toast.remove(); });
+        }, 3000);
+    }
+
+    // ---------- SSE indicator ----------
+    var sseDot = document.getElementById('sse-dot');
+    function setSseStatus(status) {
+        sseDot.className = 'sse-indicator ' + status;
+        sseDot.title = 'SSE ' + status;
+    }
+
     // ---------- Page navigation ----------
     var navLinks = document.querySelectorAll('.nav-link');
     var pages    = document.querySelectorAll('.page');
+    var currentPage = 'dashboard';
+    var healthInterval = null;
 
     function showPage(pageId) {
+        currentPage = pageId;
         pages.forEach(function (p) {
             if (p.getAttribute('data-page') === pageId) {
                 p.style.display = '';
-                // Re-trigger fade animation
                 p.style.animation = 'none';
-                p.offsetHeight; // force reflow
+                p.offsetHeight;
                 p.style.animation = '';
             } else {
                 p.style.display = 'none';
             }
         });
         navLinks.forEach(function (a) {
-            if (a.getAttribute('data-page') === pageId) {
-                a.classList.add('active');
-            } else {
-                a.classList.remove('active');
-            }
+            a.classList.toggle('active', a.getAttribute('data-page') === pageId);
         });
-        // Scroll to top of main content
         document.querySelector('.app-main').scrollTo(0, 0);
-        window.scrollTo(0, 0);
-        // Chart.js needs a resize kick when its container becomes visible
-        if (pageId === 'dashboard' && chart) {
-            chart.resize();
+        if (pageId === 'dashboard' && chart) chart.resize();
+
+        // Start/stop system health polling based on page
+        if (pageId === 'system') {
+            fetchSystemHealth();
+            loadRecentErrors();
+            loadRecentRequests();
+            if (!healthInterval) healthInterval = setInterval(fetchSystemHealth, 5000);
+        } else {
+            if (healthInterval) { clearInterval(healthInterval); healthInterval = null; }
         }
     }
 
@@ -190,31 +270,43 @@
     });
 
     // ---------- Metric history for charting ----------
-    var MAX_POINTS = 30;
+    var MAX_POINTS = 60;
     var metricsHistory = {
-        labels:        [],
-        bytesSent:     [],
-        bytesReceived: [],
-        requestCount:  [],
-        errorCount:    [],
-        request2xx:    [],
-        request4xx:    [],
-        request5xx:    []
+        labels: [], bytesSent: [], bytesReceived: [], requestCount: [],
+        errorCount: [], request2xx: [], request4xx: [], request5xx: [],
+        latencyP99: [], reqPerSec: []
     };
 
-    var selectedMetric = 'bytesSent';
+    var selectedMetric = 'reqPerSec';
     var chart = null;
     var prevSnapshot = null;
 
     var metricMeta = {
-        bytesSent:     { label: 'Bytes Sent /5s',      color: 'rgba(124,110,240,1)',  bg: 'rgba(124,110,240,0.15)' },
-        bytesReceived: { label: 'Bytes Received /5s',   color: 'rgba(52,152,219,1)',   bg: 'rgba(52,152,219,0.15)' },
-        requestCount:  { label: 'Requests /5s',         color: 'rgba(46,204,113,1)',   bg: 'rgba(46,204,113,0.15)' },
-        errorCount:    { label: 'Errors /5s',            color: 'rgba(231,76,60,1)',    bg: 'rgba(231,76,60,0.15)' },
-        request2xx:    { label: '2xx /5s',               color: 'rgba(46,204,113,1)',   bg: 'rgba(46,204,113,0.15)' },
-        request4xx:    { label: '4xx /5s',               color: 'rgba(243,156,18,1)',   bg: 'rgba(243,156,18,0.15)' },
-        request5xx:    { label: '5xx /5s',               color: 'rgba(231,76,60,1)',    bg: 'rgba(231,76,60,0.15)' }
+        reqPerSec:     { label: 'Req/s',            color: 'rgba(124,110,240,1)', bg: 'rgba(124,110,240,0.15)' },
+        latencyP99:    { label: 'Latency P99 (ms)', color: 'rgba(231,76,60,1)',   bg: 'rgba(231,76,60,0.15)',  isMs: true },
+        bytesSent:     { label: 'Bytes Sent',       color: 'rgba(124,110,240,1)', bg: 'rgba(124,110,240,0.15)', isBytes: true },
+        bytesReceived: { label: 'Bytes Received',   color: 'rgba(52,152,219,1)',  bg: 'rgba(52,152,219,0.15)',  isBytes: true },
+        requestCount:  { label: 'Requests',         color: 'rgba(46,204,113,1)',  bg: 'rgba(46,204,113,0.15)' },
+        errorCount:    { label: 'Errors',            color: 'rgba(231,76,60,1)',   bg: 'rgba(231,76,60,0.15)' },
+        request2xx:    { label: '2xx',              color: 'rgba(46,204,113,1)',  bg: 'rgba(46,204,113,0.15)' },
+        request4xx:    { label: '4xx',              color: 'rgba(243,156,18,1)',  bg: 'rgba(243,156,18,0.15)' },
+        request5xx:    { label: '5xx',              color: 'rgba(231,76,60,1)',   bg: 'rgba(231,76,60,0.15)' }
     };
+
+    function fmtBytes(b) {
+        if (b === null || b === undefined || isNaN(b) || b <= 0) return '0 B';
+        var units = ['B', 'KB', 'MB', 'GB', 'TB'];
+        var i = Math.min(Math.floor(Math.log(b) / Math.log(1024)), units.length - 1);
+        if (i < 0) return '0 B';
+        return (b / Math.pow(1024, i)).toFixed(i ? 1 : 0) + ' ' + units[i];
+    }
+    function fmtNum(n) { return (n || 0).toLocaleString(); }
+    function timeLabel() {
+        var d = new Date();
+        return d.getHours().toString().padStart(2, '0') + ':' +
+               d.getMinutes().toString().padStart(2, '0') + ':' +
+               d.getSeconds().toString().padStart(2, '0');
+    }
 
     function initChart() {
         var ctx = document.getElementById('metricsChart').getContext('2d');
@@ -228,15 +320,12 @@
                     data: metricsHistory[selectedMetric],
                     borderColor: meta.color,
                     backgroundColor: meta.bg,
-                    fill: true,
-                    tension: 0.35,
-                    pointRadius: 3,
-                    pointBackgroundColor: meta.color
+                    fill: true, tension: 0.35, pointRadius: 0, pointHitRadius: 6
                 }]
             },
             options: {
-                responsive: true,
-                maintainAspectRatio: false,
+                responsive: true, maintainAspectRatio: false,
+                animation: { duration: 200 },
                 interaction: { mode: 'index', intersect: false },
                 plugins: { legend: { display: false } },
                 scales: {
@@ -247,7 +336,15 @@
                     y: {
                         beginAtZero: true,
                         grid: { color: 'rgba(255,255,255,0.06)' },
-                        ticks: { color: 'rgba(255,255,255,0.5)' }
+                        ticks: {
+                            color: 'rgba(255,255,255,0.5)',
+                            callback: function (value) {
+                                var m = metricMeta[selectedMetric];
+                                if (m && m.isBytes) return fmtBytes(value);
+                                if (m && m.isMs) return value + ' ms';
+                                return value;
+                            }
+                        }
                     }
                 }
             }
@@ -261,138 +358,434 @@
         chart.data.datasets[0].data = metricsHistory[key];
         chart.data.datasets[0].borderColor = meta.color;
         chart.data.datasets[0].backgroundColor = meta.bg;
-        chart.data.datasets[0].pointBackgroundColor = meta.color;
         chart.update();
     }
-
     document.getElementById('metric-selector').addEventListener('change', function () {
         switchMetric(this.value);
     });
 
-    // ---------- Format helpers ----------
-    function fmtBytes(b) {
-        if (b === 0) return '0 B';
-        var units = ['B', 'KB', 'MB', 'GB', 'TB'];
-        var i = Math.floor(Math.log(b) / Math.log(1024));
-        return (b / Math.pow(1024, i)).toFixed(i ? 1 : 0) + ' ' + units[i];
-    }
-    function fmtNum(n) {
-        return n.toLocaleString();
-    }
-    function timeLabel() {
-        var d = new Date();
-        return d.getHours().toString().padStart(2, '0') + ':' +
-               d.getMinutes().toString().padStart(2, '0') + ':' +
-               d.getSeconds().toString().padStart(2, '0');
-    }
-
-    // ---------- Fetch global metrics ----------
     var selectedConnection = 'global';
     var cachedProxySnapshots = [];
+    var metricsEventSource = null;
+    var latestSnapshot = null;
+    var perConnectionSnapshots = {};
+    var chartTickInterval = null;
+    var CHART_TICK_MS = 1000;
+    var lastSnapshotTime = null;
 
-    function getMetricsForConnection() {
-        if (selectedConnection === 'global') {
-            return fetch('/api/v1/proxy/metrics', { credentials: 'same-origin' })
-                .then(function (resp) {
-                    if (resp.status === 401) { window.location.href = '/ui/login'; return null; }
-                    if (!resp.ok) throw new Error(resp.statusText);
-                    return resp.json();
-                });
+    function connectMetricsSSE() {
+        if (metricsEventSource) metricsEventSource.close();
+        setSseStatus('connecting');
+        metricsEventSource = new EventSource('/api/v1/proxy/metrics/stream');
+        metricsEventSource.addEventListener('metrics', function (e) {
+            setSseStatus('connected');
+            var snap = JSON.parse(e.data);
+            var connName = snap.connection_name || '';
+            // Store every per-connection snapshot
+            perConnectionSnapshots[connName] = snap;
+            // Update dashboard cards only for the selected connection
+            if (selectedConnection === 'global' && connName === 'global') {
+                applySnapshot(snap);
+            } else if (connName === selectedConnection) {
+                applySnapshot(snap);
+            }
+        });
+        metricsEventSource.addEventListener('proxy_error', function (e) {
+            addErrorToFeed(JSON.parse(e.data));
+        });
+        metricsEventSource.addEventListener('proxy_request', function (e) {
+            var entry = JSON.parse(e.data);
+            addRequestToFeed(entry);
+            // Feed sparkline buffers from request events
+            var connKey = entry.connection_name || '';
+            if (sparklineBuffers[connKey]) {
+                sparklineBuffers[connKey].count++;
+            }
+        });
+        metricsEventSource.onopen = function () { setSseStatus('connected'); };
+        metricsEventSource.onerror = function () { setSseStatus('disconnected'); };
+    }
+
+    function applySnapshot(snap) {
+        var now = Date.now();
+        latestSnapshot = snap;
+        latestSnapshot._ts = now;
+        updateStatCards(latestSnapshot);
+        if (!prevSnapshot) { prevSnapshot = latestSnapshot; lastSnapshotTime = now; }
+    }
+
+    var currentRps = 0;
+
+    function startChartTick() {
+        if (chartTickInterval) clearInterval(chartTickInterval);
+        chartTickInterval = setInterval(tickChart, CHART_TICK_MS);
+    }
+
+    function tickChart() {
+        // Always push a data point so the chart keeps moving even when idle
+        metricsHistory.labels.push(timeLabel());
+
+        if (latestSnapshot && prevSnapshot) {
+            var deltaSec = CHART_TICK_MS / 1000;
+            var deltaRequests = Math.max(0, latestSnapshot.request_count - prevSnapshot.request_count);
+            currentRps = parseFloat((deltaRequests / deltaSec).toFixed(1));
+            metricsHistory.bytesSent.push(Math.max(0, latestSnapshot.bytes_sent - prevSnapshot.bytes_sent));
+            metricsHistory.bytesReceived.push(Math.max(0, latestSnapshot.bytes_received - prevSnapshot.bytes_received));
+            metricsHistory.requestCount.push(deltaRequests);
+            metricsHistory.errorCount.push(Math.max(0, latestSnapshot.error_count - prevSnapshot.error_count));
+            metricsHistory.request2xx.push(Math.max(0, latestSnapshot.request_2xx_count - prevSnapshot.request_2xx_count));
+            metricsHistory.request4xx.push(Math.max(0, latestSnapshot.request_4xx_count - prevSnapshot.request_4xx_count));
+            metricsHistory.request5xx.push(Math.max(0, latestSnapshot.request_5xx_count - prevSnapshot.request_5xx_count));
+            metricsHistory.latencyP99.push(latestSnapshot.p99_ms || 0);
+            metricsHistory.reqPerSec.push(currentRps);
+            prevSnapshot = latestSnapshot;
+            lastSnapshotTime = Date.now();
+        } else {
+            currentRps = 0;
+            // No data yet — push zeros to keep the chart alive
+            metricsHistory.bytesSent.push(0);
+            metricsHistory.bytesReceived.push(0);
+            metricsHistory.requestCount.push(0);
+            metricsHistory.errorCount.push(0);
+            metricsHistory.request2xx.push(0);
+            metricsHistory.request4xx.push(0);
+            metricsHistory.request5xx.push(0);
+            metricsHistory.latencyP99.push(0);
+            metricsHistory.reqPerSec.push(0);
         }
-        // Per-connection: use the dedicated metrics endpoint
-        return fetch('/api/v1/proxy/metrics/' + encodeURIComponent(selectedConnection), { credentials: 'same-origin' })
-            .then(function (resp) {
-                if (resp.status === 401) { window.location.href = '/ui/login'; return null; }
-                if (!resp.ok) throw new Error(resp.statusText);
-                return resp.json();
-            });
+
+        if (metricsHistory.labels.length > MAX_POINTS) {
+            Object.keys(metricsHistory).forEach(function (k) { metricsHistory[k].shift(); });
+        }
+        if (chart) chart.update();
+
+        // Update the req/s card in sync with the chart tick
+        document.getElementById('stat-rps').textContent = currentRps.toFixed(1);
+
+        document.getElementById('last-updated').innerHTML =
+            '<span class="dot"></span>' + (latestSnapshot ? 'Last updated at ' : 'Waiting for data… ') + timeLabel();
     }
 
-    function connectionKey(proxy) {
-        return proxy.metrics_name;
+    function connectionKey(proxy) { return proxy.metrics_name; }
+
+    function resetStatCards() {
+        currentRps = 0;
+        document.getElementById('stat-rps').textContent = '–';
+        document.getElementById('stat-total-requests').textContent = '';
+        document.getElementById('stat-errors').textContent = '–';
+        document.getElementById('stat-error-rate').textContent = '';
+        document.getElementById('stat-p50').textContent = '–';
+        document.getElementById('stat-p95').textContent = '–';
+        document.getElementById('stat-p99').textContent = '–';
+        document.getElementById('stat-bytes-sent').textContent = '–';
+        document.getElementById('stat-bytes-recv').textContent = '–';
+        document.getElementById('stat-2xx').textContent = '–';
+        document.getElementById('stat-3xx').textContent = '–';
+        document.getElementById('stat-4xx').textContent = '–';
+        document.getElementById('stat-5xx').textContent = '–';
     }
 
-    function loadMetrics() {
-        getMetricsForConnection()
-            .then(function (m) {
-                if (!m) return;
-                updateDashboardWithMetrics(m);
-            })
-            .catch(function (err) {
-                console.error('Failed to load metrics', err);
-            });
-    }
-
-    function updateDashboardWithMetrics(m) {
-        // Remove loading pulse on first data
+    function updateStatCards(m) {
         document.querySelectorAll('.stat-value.loading').forEach(function (el) {
             el.classList.remove('loading');
         });
 
-        // Update stat cards
-        document.getElementById('stat-requests').textContent   = fmtNum(m.request_count);
-        document.getElementById('stat-errors').textContent     = fmtNum(m.error_count);
-        document.getElementById('stat-avg-latency').textContent= fmtNum(m.avg_response_time_ms);
-        document.getElementById('stat-bytes-sent').textContent = fmtBytes(m.bytes_sent);
-        document.getElementById('stat-bytes-recv').textContent = fmtBytes(m.bytes_received);
-        document.getElementById('stat-active').textContent     = fmtNum(m.active_connections);
+        document.getElementById('stat-rps').textContent = currentRps.toFixed(1);
+        document.getElementById('stat-total-requests').textContent = fmtNum(m.request_count) + ' total';
 
-        // Status breakdown
+        document.getElementById('stat-errors').textContent      = fmtNum(m.error_count);
+        document.getElementById('stat-bytes-sent').textContent   = fmtBytes(m.bytes_sent);
+        document.getElementById('stat-bytes-recv').textContent   = fmtBytes(m.bytes_received);
+
+        var rate = m.request_count > 0 ? ((m.error_count / m.request_count) * 100).toFixed(1) + '%' : '0%';
+        document.getElementById('stat-error-rate').textContent = rate + ' error rate';
+
+        document.getElementById('stat-p50').textContent = fmtNum(m.p50_ms);
+        document.getElementById('stat-p95').textContent = fmtNum(m.p95_ms);
+        document.getElementById('stat-p99').textContent = fmtNum(m.p99_ms);
+
         document.getElementById('stat-2xx').textContent = fmtNum(m.request_2xx_count);
         document.getElementById('stat-3xx').textContent = fmtNum(m.request_3xx_count);
         document.getElementById('stat-4xx').textContent = fmtNum(m.request_4xx_count);
         document.getElementById('stat-5xx').textContent = fmtNum(m.request_5xx_count);
-
-        // Push deltas to chart history
-        if (prevSnapshot) {
-            metricsHistory.labels.push(timeLabel());
-            metricsHistory.bytesSent.push(Math.max(0, m.bytes_sent - prevSnapshot.bytes_sent));
-            metricsHistory.bytesReceived.push(Math.max(0, m.bytes_received - prevSnapshot.bytes_received));
-            metricsHistory.requestCount.push(Math.max(0, m.request_count - prevSnapshot.request_count));
-            metricsHistory.errorCount.push(Math.max(0, m.error_count - prevSnapshot.error_count));
-            metricsHistory.request2xx.push(Math.max(0, m.request_2xx_count - prevSnapshot.request_2xx_count));
-            metricsHistory.request4xx.push(Math.max(0, m.request_4xx_count - prevSnapshot.request_4xx_count));
-            metricsHistory.request5xx.push(Math.max(0, m.request_5xx_count - prevSnapshot.request_5xx_count));
-
-            if (metricsHistory.labels.length > MAX_POINTS) {
-                metricsHistory.labels.shift();
-                metricsHistory.bytesSent.shift();
-                metricsHistory.bytesReceived.shift();
-                metricsHistory.requestCount.shift();
-                metricsHistory.errorCount.shift();
-                metricsHistory.request2xx.shift();
-                metricsHistory.request4xx.shift();
-                metricsHistory.request5xx.shift();
-            }
-
-            if (chart) chart.update();
-        }
-        prevSnapshot = m;
-
-        // Update last-updated indicator
-        document.getElementById('last-updated').innerHTML =
-            '<span class="dot"></span>Last updated at ' + timeLabel();
     }
 
-    // Reset chart history when switching connections
     function resetChartHistory() {
-        metricsHistory.labels.length = 0;
-        metricsHistory.bytesSent.length = 0;
-        metricsHistory.bytesReceived.length = 0;
-        metricsHistory.requestCount.length = 0;
-        metricsHistory.errorCount.length = 0;
-        metricsHistory.request2xx.length = 0;
-        metricsHistory.request4xx.length = 0;
-        metricsHistory.request5xx.length = 0;
+        Object.keys(metricsHistory).forEach(function (k) { metricsHistory[k].length = 0; });
         prevSnapshot = null;
+        latestSnapshot = null;
+        lastSnapshotTime = null;
+        resetStatCards();
         if (chart) chart.update();
     }
 
     document.getElementById('connection-selector').addEventListener('change', function () {
         selectedConnection = this.value;
         resetChartHistory();
-        loadMetrics();
     });
+
+    // ---------- System Health ----------
+    function fetchSystemHealth() {
+        fetch('/api/v1/system/health', { credentials: 'same-origin' })
+            .then(function (resp) {
+                if (!resp.ok) return null;
+                return resp.json();
+            })
+            .then(function (h) {
+                if (!h) return;
+                var memPct = h.heap_sys_bytes > 0 ? (h.heap_alloc_bytes / h.heap_sys_bytes) * 100 : 0;
+                var memFill = document.getElementById('gauge-memory-fill');
+                memFill.style.width = Math.min(memPct, 100).toFixed(1) + '%';
+                memFill.className = 'gauge-fill' + (memPct > 85 ? ' danger' : memPct > 65 ? ' warn' : '');
+                document.getElementById('gauge-memory-text').textContent =
+                    fmtBytes(h.heap_alloc_bytes) + ' / ' + fmtBytes(h.heap_sys_bytes);
+
+                var grPct = Math.min((h.goroutines / 200) * 100, 100);
+                var grFill = document.getElementById('gauge-goroutine-fill');
+                grFill.style.width = grPct.toFixed(1) + '%';
+                grFill.className = 'gauge-fill' + (h.goroutines > 150 ? ' danger' : h.goroutines > 80 ? ' warn' : '');
+                document.getElementById('gauge-goroutine-text').textContent = h.goroutines;
+
+                var gcMs = h.gc_pause_total_ns / 1e6;
+                var gcPct = Math.min((gcMs / 100) * 100, 100);
+                var gcFill = document.getElementById('gauge-gc-fill');
+                gcFill.style.width = gcPct.toFixed(1) + '%';
+                gcFill.className = 'gauge-fill' + (gcMs > 80 ? ' danger' : gcMs > 30 ? ' warn' : '');
+                document.getElementById('gauge-gc-text').textContent = gcMs.toFixed(1) + ' ms (' + h.num_gc + ' cycles)';
+
+                var secs = Math.floor(h.uptime_seconds);
+                var days = Math.floor(secs / 86400); secs %= 86400;
+                var hrs  = Math.floor(secs / 3600);  secs %= 3600;
+                var mins = Math.floor(secs / 60);    secs %= 60;
+                var parts = [];
+                if (days) parts.push(days + 'd');
+                if (hrs)  parts.push(hrs + 'h');
+                if (mins) parts.push(mins + 'm');
+                parts.push(secs + 's');
+                document.getElementById('health-uptime').textContent = parts.join(' ');
+            })
+            .catch(function () {});
+    }
+
+    // ---------- Error Log Feed ----------
+    var MAX_ERROR_ENTRIES = 20;
+    var errorEntries = [];
+
+    function buildErrorRow(e) {
+        var ts = new Date(e.timestamp);
+        var time = ts.getHours().toString().padStart(2,'0') + ':' +
+                   ts.getMinutes().toString().padStart(2,'0') + ':' +
+                   ts.getSeconds().toString().padStart(2,'0');
+        var row = document.createElement('div');
+        row.className = 'error-entry';
+        row.innerHTML =
+            '<span class="error-time">' + time + '</span>' +
+            '<span class="error-remote">' + (e.remote_address || '–') + '</span>' +
+            '<span class="error-status">' + (e.status_code || '5xx') + '</span>' +
+            '<span class="error-method">' + (e.method || '?') + '</span>' +
+            '<span class="error-path" title="' + (e.path || '').replace(/"/g,'&quot;') + '">' + (e.path || '/') + '</span>' +
+            '<span class="error-latency">' + (e.latency_ms || 0) + ' ms</span>';
+        return row;
+    }
+
+    var errorFeedHeader = '<div class="error-entry req-header">' +
+        '<span class="error-time">Time</span>' +
+        '<span class="error-remote">Remote</span>' +
+        '<span class="error-status">Code</span>' +
+        '<span class="error-method">Method</span>' +
+        '<span class="error-path">Path</span>' +
+        '<span class="error-latency">Latency</span>' +
+        '</div>';
+
+    function ensureErrorFeedHeader(el) {
+        if (!el.querySelector('.req-header')) {
+            el.innerHTML = errorFeedHeader;
+        }
+    }
+
+    function addErrorToFeed(entry) {
+        errorEntries.unshift(entry);
+        if (errorEntries.length > MAX_ERROR_ENTRIES) errorEntries.pop();
+        var el = document.getElementById('error-feed');
+        // Remove the empty-state placeholder if present
+        var empty = el.querySelector('.error-empty');
+        if (empty) empty.remove();
+        ensureErrorFeedHeader(el);
+        var header = el.querySelector('.req-header');
+        var row = buildErrorRow(entry);
+        header.insertAdjacentElement('afterend', row);
+        // Trim excess rows (children beyond header + MAX_ERROR_ENTRIES)
+        while (el.children.length > MAX_ERROR_ENTRIES + 1) {
+            el.removeChild(el.lastElementChild);
+        }
+    }
+
+    function renderErrorFeed() {
+        var el = document.getElementById('error-feed');
+        if (errorEntries.length === 0) {
+            el.innerHTML = '<div class="error-empty">No errors recorded</div>';
+            return;
+        }
+        var html = errorFeedHeader;
+        errorEntries.forEach(function (e) { html += buildErrorRow(e).outerHTML; });
+        el.innerHTML = html;
+    }
+
+    function loadRecentErrors() {
+        fetch('/api/v1/proxy/errors', { credentials: 'same-origin' })
+            .then(function (resp) { return resp.ok ? resp.json() : []; })
+            .then(function (entries) {
+                if (entries && entries.length) {
+                    errorEntries = entries.slice(0, MAX_ERROR_ENTRIES);
+                    renderErrorFeed();
+                }
+            })
+            .catch(function () {});
+    }
+
+    // ---------- Request Log Feed ----------
+    var MAX_REQUEST_ENTRIES = 100;
+    var requestEntries = [];
+
+    function statusClass(code) {
+        if (code >= 500) return 's5xx';
+        if (code >= 400) return 's4xx';
+        if (code >= 300) return 's3xx';
+        return 's2xx';
+    }
+
+    function parsePort(connectionName) {
+        if (!connectionName) return '–';
+        var m = connectionName.match(/port-(\d+)/);
+        return m ? m[1] : connectionName;
+    }
+
+    function buildRequestRow(e) {
+        var ts = new Date(e.timestamp);
+        var time = ts.getHours().toString().padStart(2,'0') + ':' +
+                   ts.getMinutes().toString().padStart(2,'0') + ':' +
+                   ts.getSeconds().toString().padStart(2,'0');
+        var sc = e.status_code || 0;
+        var row = document.createElement('div');
+        row.className = 'req-entry';
+        row.innerHTML =
+            '<span class="req-time">' + time + '</span>' +
+            '<span class="req-remote">' + (e.remote_address || '–') + '</span>' +
+            '<span class="req-route">:' + parsePort(e.connection_name) + '</span>' +
+            '<span class="req-path" title="' + (e.path || '').replace(/"/g,'&quot;') + '">' + (e.path || '/') + '</span>' +
+            '<span class="req-method">' + (e.method || '?') + '</span>' +
+            '<span class="req-status ' + statusClass(sc) + '">' + (sc || '–') + '</span>' +
+            '<span class="req-latency">' + (e.latency_ms || 0) + ' ms</span>';
+        return row;
+    }
+
+    var requestFeedHeader = '<div class="req-entry req-header">' +
+        '<span class="req-time">Time</span>' +
+        '<span class="req-remote">Remote</span>' +
+        '<span class="req-route">Route</span>' +
+        '<span class="req-path">Path</span>' +
+        '<span class="req-method">Method</span>' +
+        '<span class="req-status">Code</span>' +
+        '<span class="req-latency">Latency</span>' +
+        '</div>';
+
+    function ensureRequestFeedHeader(el) {
+        if (!el.querySelector('.req-header')) {
+            el.innerHTML = requestFeedHeader;
+        }
+    }
+
+    function addRequestToFeed(entry) {
+        requestEntries.unshift(entry);
+        if (requestEntries.length > MAX_REQUEST_ENTRIES) requestEntries.pop();
+        var el = document.getElementById('request-feed');
+        // Remove the empty-state placeholder if present
+        var empty = el.querySelector('.error-empty');
+        if (empty) empty.remove();
+        ensureRequestFeedHeader(el);
+        var header = el.querySelector('.req-header');
+        var row = buildRequestRow(entry);
+        header.insertAdjacentElement('afterend', row);
+        // Trim excess rows (children beyond header + MAX_REQUEST_ENTRIES)
+        while (el.children.length > MAX_REQUEST_ENTRIES + 1) {
+            el.removeChild(el.lastElementChild);
+        }
+    }
+
+    function renderRequestFeed() {
+        var el = document.getElementById('request-feed');
+        if (requestEntries.length === 0) {
+            el.innerHTML = '<div class="error-empty">No requests recorded</div>';
+            return;
+        }
+        var html = requestFeedHeader;
+        requestEntries.forEach(function (e) { html += buildRequestRow(e).outerHTML; });
+        el.innerHTML = html;
+    }
+
+    function loadRecentRequests() {
+        fetch('/api/v1/proxy/requests', { credentials: 'same-origin' })
+            .then(function (resp) { return resp.ok ? resp.json() : []; })
+            .then(function (entries) {
+                if (entries && entries.length) {
+                    requestEntries = entries.slice(0, MAX_REQUEST_ENTRIES);
+                    renderRequestFeed();
+                }
+            })
+            .catch(function () {});
+    }
+
+    // ---------- Sparklines ----------
+    var sparklineBuffers = {};  // key → { history: [], count: 0 }
+    var SPARKLINE_POINTS = 30;
+
+    function drawSparkline(canvas, data) {
+        var ctx = canvas.getContext('2d');
+        var w = canvas.width;
+        var h = canvas.height;
+        ctx.clearRect(0, 0, w, h);
+        if (data.length < 2) return;
+        var max = Math.max.apply(null, data) || 1;
+        ctx.beginPath();
+        ctx.strokeStyle = '#7c6ef0';
+        ctx.lineWidth = 1.5;
+        for (var i = 0; i < data.length; i++) {
+            var x = (i / (SPARKLINE_POINTS - 1)) * w;
+            var y = h - (data[i] / max) * (h - 2) - 1;
+            if (i === 0) ctx.moveTo(x, y); else ctx.lineTo(x, y);
+        }
+        ctx.stroke();
+    }
+
+    function ensureSparklineBuffers(proxies) {
+        // Add buffers for new routes
+        proxies.forEach(function (p) {
+            if (!p.is_started) return;
+            var key = connectionKey(p);
+            if (!sparklineBuffers[key]) {
+                sparklineBuffers[key] = { history: [], count: 0 };
+            }
+        });
+        // Remove buffers for stopped/removed routes
+        var wantKeys = {};
+        proxies.forEach(function (p) {
+            if (p.is_started) wantKeys[connectionKey(p)] = true;
+        });
+        Object.keys(sparklineBuffers).forEach(function (k) {
+            if (!wantKeys[k]) delete sparklineBuffers[k];
+        });
+    }
+
+    function tickSparklines() {
+        Object.keys(sparklineBuffers).forEach(function (key) {
+            var buf = sparklineBuffers[key];
+            buf.history.push(buf.count);
+            buf.count = 0;
+            if (buf.history.length > SPARKLINE_POINTS) buf.history.shift();
+            var canvas = document.querySelector('.sparkline[data-connection="' + key + '"]');
+            if (canvas) drawSparkline(canvas, buf.history);
+        });
+    }
 
     // ---------- Proxy routes ----------
     function loadProxyRoutes() {
@@ -407,17 +800,16 @@
                 cachedProxySnapshots = proxies || [];
                 updateConnectionSelector(cachedProxySnapshots);
                 renderProxyRoutes(proxies);
+                ensureSparklineBuffers(proxies);
             })
             .catch(function () {
-                document.getElementById('proxy-routes').innerHTML =
-                    '<p>Failed to load proxy routes.</p>';
+                document.getElementById('proxy-routes').innerHTML = '<p>Failed to load proxy routes.</p>';
             });
     }
 
     function updateConnectionSelector(proxies) {
         var sel = document.getElementById('connection-selector');
         var current = sel.value;
-        // Keep global as first option, then add per-proxy options
         var html = '<option value="global">Global (all proxies)</option>';
         proxies.forEach(function (p) {
             var key = connectionKey(p);
@@ -425,50 +817,139 @@
             html += '<option value="' + key + '">' + label + '</option>';
         });
         sel.innerHTML = html;
-        // Restore previous selection if it still exists
-        if (current && sel.querySelector('option[value="' + current + '"]')) {
-            sel.value = current;
+        if (current && sel.querySelector('option[value="' + current + '"]')) sel.value = current;
+    }
+
+    function metricsSummary(met) {
+        if (!met) return 'No metrics available';
+        return 'Requests: ' + fmtNum(met.request_count) +
+            '\nErrors: ' + fmtNum(met.error_count) +
+            '\nP50: ' + fmtNum(met.p50_ms) + ' ms  P95: ' + fmtNum(met.p95_ms) + ' ms  P99: ' + fmtNum(met.p99_ms) + ' ms' +
+            '\nBytes Sent: ' + fmtBytes(met.bytes_sent) +
+            '\nBytes Received: ' + fmtBytes(met.bytes_received) +
+            '\nTimeouts: ' + fmtNum(met.upstream_timeouts) +
+            '\n2xx: ' + fmtNum(met.request_2xx_count) +
+            '  3xx: ' + fmtNum(met.request_3xx_count) +
+            '  4xx: ' + fmtNum(met.request_4xx_count) +
+            '  5xx: ' + fmtNum(met.request_5xx_count);
+    }
+
+    // Track the last-rendered route fingerprint so we know when a full rebuild is needed.
+    var lastRouteFingerprint = '';
+
+    function routeFingerprint(proxies) {
+        return proxies.slice().sort(function (a, b) { return a.port - b.port; }).map(function (p) {
+            return p.port + ':' + (p.is_started ? '1' : '0');
+        }).join('|');
+    }
+
+    function metricsHtmlFor(met) {
+        if (met && met.request_count > 0) {
+            return '<div class="route-metrics">' +
+                '<span>' + fmtNum(met.request_count) + ' req</span>' +
+                '<span>' + fmtNum(met.error_count) + ' err</span>' +
+                '<span>P50 ' + fmtNum(met.p50_ms) + 'ms</span>' +
+                '<span>P99 ' + fmtNum(met.p99_ms) + 'ms</span>' +
+                '</div>';
         }
+        return '<span style="color:var(--pico-muted-color);font-size:0.75rem">–</span>';
+    }
+
+    function redrawAllSparklines() {
+        Object.keys(sparklineBuffers).forEach(function (key) {
+            var buf = sparklineBuffers[key];
+            var canvas = document.querySelector('.sparkline[data-connection="' + key + '"]');
+            if (canvas && buf.history.length >= 2) drawSparkline(canvas, buf.history);
+        });
+    }
+
+    function sortProxiesByPort(proxies) {
+        return proxies.slice().sort(function (a, b) { return a.port - b.port; });
     }
 
     function renderProxyRoutes(proxies) {
         var el = document.getElementById('proxy-routes');
         if (!proxies || proxies.length === 0) {
+            lastRouteFingerprint = '';
             el.innerHTML =
-                '<div class="empty-state">' +
-                '<div class="empty-icon">🔌</div>' +
+                '<div class="empty-state"><div class="empty-icon">🔌</div>' +
                 '<p><strong>No proxy routes configured</strong></p>' +
-                '<p><small>Add proxy routes in your configuration file and restart the server.</small></p>' +
-                '</div>';
+                '<p><small>Add proxy routes in your configuration file and restart the server.</small></p></div>';
             return;
         }
-        var h = '<div class="overflow-auto"><table class="striped">' +
-            '<thead><tr>' +
-            '<th>Port</th><th>Interface</th><th>HTTPS</th>' +
-            '<th>ACME</th><th>Status</th><th>Middleware</th>' +
+
+        proxies = sortProxiesByPort(proxies);
+        var fp = routeFingerprint(proxies);
+
+        // Fast path: if the route structure hasn't changed, just update metrics cells in-place.
+        if (fp === lastRouteFingerprint) {
+            var rows = el.querySelectorAll('tbody tr');
+            proxies.forEach(function (p, i) {
+                if (!rows[i]) return;
+                var cells = rows[i].querySelectorAll('td');
+                // cells[7] = Metrics column
+                if (cells[7]) cells[7].innerHTML = metricsHtmlFor(p.metric);
+            });
+            return;
+        }
+
+        // Full rebuild (route structure changed)
+        lastRouteFingerprint = fp;
+        var h = '<div class="overflow-auto"><table class="striped"><thead><tr>' +
+            '<th>Port</th><th>Interface</th><th>Backends</th><th>HTTPS</th>' +
+            '<th>ACME</th><th>Status</th><th>Traffic</th><th>Metrics</th><th>Middleware</th><th>Actions</th>' +
             '</tr></thead><tbody>';
         proxies.forEach(function (p) {
+            var actionBtn = p.is_started
+                ? '<button class="badge badge-danger proxy-action-btn" data-port="' + p.port + '" data-action="stop">Stop</button>'
+                : '<button class="badge badge-success proxy-action-btn" data-port="' + p.port + '" data-action="start">Start</button>';
+            var sparkHtml = p.is_started
+                ? '<canvas class="sparkline" data-connection="' + connectionKey(p) + '" width="60" height="30"></canvas>'
+                : '<span style="color:var(--pico-muted-color);font-size:0.75rem">–</span>';
             h += '<tr>' +
                 '<td><code>' + p.port + '</code></td>' +
                 '<td>' + (p.interface || '<em>all</em>') + '</td>' +
+                '<td>' + (p.backend && p.backend.length
+                    ? p.backend.map(function (b) { return '<code>' + b + '</code>'; }).join('<br>')
+                    : '<em>none</em>') + '</td>' +
                 '<td>' + badge(p.is_using_https) + '</td>' +
                 '<td>' + badge(p.is_using_acme) + '</td>' +
                 '<td>' + (p.is_started
                     ? '<span class="badge badge-success">Running</span>'
                     : '<span class="badge badge-danger">Stopped</span>') + '</td>' +
+                '<td>' + sparkHtml + '</td>' +
+                '<td>' + metricsHtmlFor(p.metric) + '</td>' +
                 '<td>' + (p.middleware_chain && p.middleware_chain.length
-                    ? p.middleware_chain.join(', ')
-                    : '<em>none</em>') + '</td>' +
+                    ? p.middleware_chain.join(', ') : '<em>none</em>') + '</td>' +
+                '<td>' + actionBtn + '</td>' +
                 '</tr>';
         });
         h += '</tbody></table></div>';
         el.innerHTML = h;
+        el.querySelectorAll('.proxy-action-btn').forEach(function (btn) {
+            btn.addEventListener('click', function () {
+                toggleProxy(this.getAttribute('data-port'), this.getAttribute('data-action'));
+            });
+        });
+        // Immediately redraw sparklines so canvases aren't blank after rebuild
+        redrawAllSparklines();
+    }
+
+    function toggleProxy(port, action) {
+        if (!confirm('Are you sure you want to ' + action + ' the proxy on port ' + port + '?')) return;
+        lastRouteFingerprint = '';  // force full rebuild on next load
+        fetch('/api/v1/proxy/routes/' + port + '/' + action, { method: 'POST', credentials: 'same-origin' })
+        .then(function (resp) {
+            if (resp.status === 401) { window.location.href = '/ui/login'; return; }
+            if (!resp.ok) return resp.text().then(function (t) { showToast(t || 'Failed to ' + action + ' proxy', 'error'); });
+            showToast('Proxy on port ' + port + ' ' + (action === 'stop' ? 'stopped' : 'started'), 'success');
+            loadProxyRoutes();
+        })
+        .catch(function () { showToast('Failed to ' + action + ' proxy on port ' + port, 'error'); });
     }
 
     function badge(val) {
-        return val
-            ? '<span class="badge badge-success">Yes</span>'
-            : '<span class="badge badge-muted">No</span>';
+        return val ? '<span class="badge badge-success">Yes</span>' : '<span class="badge badge-muted">No</span>';
     }
 
     // ---------- Identity ----------
@@ -485,22 +966,15 @@
                 document.getElementById('sidebar-username').textContent = name;
                 document.getElementById('sidebar-avatar').textContent = name.charAt(0).toUpperCase();
             })
-            .catch(function (err) {
-                console.error('Failed to load identity', err);
-            });
+            .catch(function (err) { console.error('Failed to load identity', err); });
     }
 
     // ---------- Logout via API ----------
     document.getElementById('btn-logout').addEventListener('click', function (e) {
         e.preventDefault();
-        fetch('/api/v1/auth/logout', {
-            method: 'POST',
-            credentials: 'same-origin'
-        }).then(function () {
-            window.location.href = '/ui/login';
-        }).catch(function () {
-            window.location.href = '/ui/login';
-        });
+        fetch('/api/v1/auth/logout', { method: 'POST', credentials: 'same-origin' })
+            .then(function () { window.location.href = '/ui/login'; })
+            .catch(function () { window.location.href = '/ui/login'; });
     });
 
     // ---------- Change Password ----------
@@ -510,42 +984,31 @@
         var oldPwd = document.getElementById('old-password').value;
         var newPwd = document.getElementById('new-password').value;
         resultEl.innerHTML = '';
-
         fetch('/api/v1/auth/user', {
-            method: 'POST',
-            credentials: 'same-origin',
+            method: 'POST', credentials: 'same-origin',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ oldPassword: oldPwd, newPassword: newPwd })
         })
         .then(function (resp) {
-            if (resp.status === 401) {
-                resultEl.innerHTML = '<div class="error-alert">Current password is incorrect.</div>';
-                return;
-            }
-            if (!resp.ok) {
-                return resp.text().then(function (t) {
-                    resultEl.innerHTML = '<div class="error-alert">' + (t || 'Failed to change password.') + '</div>';
-                });
-            }
+            if (resp.status === 401) { resultEl.innerHTML = '<div class="error-alert">Current password is incorrect.</div>'; return; }
+            if (!resp.ok) return resp.text().then(function (t) {
+                resultEl.innerHTML = '<div class="error-alert">' + (t || 'Failed to change password.') + '</div>';
+            });
             resultEl.innerHTML = '<div class="success-alert">Password updated successfully.</div>';
             document.getElementById('old-password').value = '';
             document.getElementById('new-password').value = '';
         })
-        .catch(function () {
-            resultEl.innerHTML = '<div class="error-alert">An error occurred. Please try again.</div>';
-        });
+        .catch(function () { resultEl.innerHTML = '<div class="error-alert">An error occurred. Please try again.</div>'; });
     });
 
     // ---------- Bootstrap ----------
     initChart();
-    loadMetrics();
+    connectMetricsSSE();
+    startChartTick();
     loadProxyRoutes();
     loadIdentity();
-
-    setInterval(loadMetrics, 5000);
     setInterval(loadProxyRoutes, 10000);
+    setInterval(tickSparklines, 1000);
 </script>
 {{end}}
-
-
 

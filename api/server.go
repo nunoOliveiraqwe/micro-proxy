@@ -3,6 +3,7 @@ package api
 import (
 	"fmt"
 	"net/http"
+	"strconv"
 	"time"
 
 	"github.com/nunoOliveiraqwe/micro-proxy/config"
@@ -26,13 +27,13 @@ func StartServer(conf config.APIServerConfig, systemService app.SystemService) *
 	httpServer.ReadTimeout = time.Duration(conf.ReadTimeoutSecs) * time.Second
 	httpServer.WriteTimeout = time.Duration(conf.WriteTimeoutSecs) * time.Second
 
-	mux := buildMux(systemService)
+	mux := buildMux(conf.Port, systemService)
 	httpServer.Handler = systemService.SessionRegistry().WrapWithSessionMiddleware(mux)
 	return httpServer
 
 }
 
-func buildMux(svc app.SystemService) *http.ServeMux {
+func buildMux(port int, svc app.SystemService) *http.ServeMux {
 	zap.S().Debugf("Building http mux for proxy API")
 	mux := http.NewServeMux()
 	for _, route := range routes {
@@ -42,7 +43,14 @@ func buildMux(svc app.SystemService) *http.ServeMux {
 		routeHandlerFunc := route.HandlerFunc(svc)
 		routeHandlerFunc = middleware.RequestIDMiddleware(routeHandlerFunc, middleware.Config{})
 		routeHandlerFunc = middleware.RequestLoggerMiddleware(routeHandlerFunc, middleware.Config{})
-		routeHandlerFunc = middleware.MetricsMiddleware(routeHandlerFunc, middleware.Config{})
+
+		confMetrics := middleware.Config{
+			Type:    "Metrics",
+			Options: make(map[string]interface{}),
+		}
+		confMetrics.Options[middleware.MgrKey] = svc.GetGlobalMetricsManager()
+		confMetrics.Options["port"] = strconv.Itoa(port)
+		routeHandlerFunc = middleware.MetricsMiddleware(routeHandlerFunc, confMetrics)
 		routeHandlerFunc = checkIfRouteIsAllowedIfFtsIsNotDone(routeHandlerFunc, route.IsAllowedBeforeFts,
 			route.IsAllowedAfterFts, svc)
 		if route.IsSecure {

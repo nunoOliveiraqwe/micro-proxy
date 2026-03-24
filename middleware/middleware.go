@@ -3,9 +3,13 @@ package middleware
 import (
 	"errors"
 	"net/http"
+	"strconv"
 
+	"github.com/nunoOliveiraqwe/micro-proxy/metrics"
 	"go.uber.org/zap"
 )
+
+const MgrKey = "metricsManager"
 
 type Func func(next http.HandlerFunc, middlewareConf Config) http.HandlerFunc
 
@@ -26,7 +30,7 @@ func init() {
 	}
 }
 
-func ApplyMiddlewares(handler http.HandlerFunc, middlewares []Config) (http.HandlerFunc, error) {
+func ApplyMiddlewares(port int, handler http.HandlerFunc, middlewares []Config, mgr *metrics.ConnectionMetricsManager) (http.HandlerFunc, error) {
 	if handler == nil {
 		zap.S().Errorf("Handler cannot be nil when applying middleware chain")
 		return nil, errors.New("handler cannot be nil when applying middleware chain")
@@ -38,6 +42,18 @@ func ApplyMiddlewares(handler http.HandlerFunc, middlewares []Config) (http.Hand
 			zap.S().Errorf("Error applying middleware of type %s: %v", middlewares[i].Type, err)
 			return nil, err
 		}
+		if middlewares[i].Options == nil {
+			zap.S().Warnf("Middleware options for middleware of type %s is nil. Initializing it as an empty map", middlewares[i].Type)
+			middlewares[i].Options = make(map[string]interface{})
+		}
+		_, exists := middlewares[i].Options[MgrKey]
+		if exists {
+			zap.S().Warn("Middleware options should not contain 'systemService' key as it is reserved for internal use. Clearing it")
+			middlewares[i].Options[MgrKey] = nil
+		}
+		middlewares[i].Options["port"] = strconv.Itoa(port)
+
+		middlewares[i].Options[MgrKey] = mgr //mgr is always injected
 		handler = middleware(handler, middlewares[i])
 	}
 	return handler, nil

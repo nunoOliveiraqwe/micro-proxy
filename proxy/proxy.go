@@ -6,11 +6,13 @@ import (
 	"sync"
 
 	"github.com/nunoOliveiraqwe/micro-proxy/config"
+	"github.com/nunoOliveiraqwe/micro-proxy/metrics"
 	"go.uber.org/zap"
 )
 
 type MicroHttpServer interface {
-	GetProxySnapshot() *ProxySnapshot
+	GetProxySnapshot(metric *metrics.Metric) *ProxySnapshot
+	GetMetricsName() string
 	start(acmeManager *MicroProxyAcmeManager) error
 	getHandler() http.Handler
 	updateHandler(handler http.Handler) error
@@ -22,16 +24,18 @@ type MicroProxy struct {
 	startedHttpServers map[int]MicroHttpServer
 	lock               sync.Mutex
 	acmeManager        *MicroProxyAcmeManager
+	metricsManager     *metrics.ConnectionMetricsManager
 }
 
-func NewMicroProxy(conf config.NetworkConfig) (*MicroProxy, error) {
+func NewMicroProxy(conf config.NetworkConfig, mgr *metrics.ConnectionMetricsManager) (*MicroProxy, error) {
 	zap.S().Info("Initializing MicroProxy with configuration: ", conf)
 	m := MicroProxy{
 		stoppedHttpServers: make(map[int]MicroHttpServer),
 		startedHttpServers: make(map[int]MicroHttpServer),
 		lock:               sync.Mutex{},
+		metricsManager:     mgr,
 	}
-	err := m.initializeHttpNetworkStackFromConf(conf)
+	err := m.initializeHttpNetworkStackFromConf(conf, mgr)
 	if err != nil {
 		return nil, err
 	}
@@ -44,59 +48,97 @@ func NewMicroProxy(conf config.NetworkConfig) (*MicroProxy, error) {
 	return &m, nil
 }
 
-func (m *MicroProxy) Start() error {
+func (m *MicroProxy) StartAll() error {
 	zap.S().Infof("Starting MicroProxy with %d HTTP servers", len(m.stoppedHttpServers))
-	m.lock.Lock()
-	defer m.lock.Unlock()
-	for port, server := range m.stoppedHttpServers {
-		zap.S().Infof("Starting HTTP server on port %d", port)
-
-		if port == 80 && m.acmeManager != nil { //handle por 80 attach
-			zap.S().Infof("Attaching ACME manager to port 80")
-			serverHandler := server.getHandler()
-			if serverHandler != nil {
-				zap.S().Debugf("Original handler for port 80: %T", serverHandler)
-				nHandler := m.acmeManager.bindAcmeHandlerToPort80(serverHandler)
-				if nHandler != nil {
-					err := server.updateHandler(nHandler)
-					if err != nil {
-						zap.S().Errorf("Failed to update handler for port 80 with ACME manager: %v", err)
-						return err
-					}
-				}
-			}
-		}
-
-		err := server.start(m.acmeManager)
+	for port, _ := range m.stoppedHttpServers {
+		//hmmm, i can't lock here, because i wanto to call start
+		err := m.StartProxy(port)
 		if err != nil {
 			zap.S().Errorf("Failed to start HTTP server on port %d: %v", port, err)
-			return err
+			//should i stop everything if one fails??
 		}
-		zap.S().Infof("No stopped HTTP server found for port 80, ACME manager will not be able to handle HTTP challenges ")
-
-		m.startedHttpServers[port] = server
-		delete(m.stoppedHttpServers, port)
 	}
 
 	//TODO -> start TCP servers
 	return nil
 }
 
-func (m *MicroProxy) Stop() error {
+func (m *MicroProxy) StopAll() error {
 	zap.S().Infof("Stopping MicroProxy with %d HTTP servers", len(m.startedHttpServers))
-	m.lock.Lock()
-	defer m.lock.Unlock()
-	for port, server := range m.startedHttpServers {
-		zap.S().Infof("Stopping HTTP server on port %d", port)
-		err := server.stop()
+	for port, _ := range m.startedHttpServers {
+		err := m.StopProxy(port)
 		if err != nil {
 			zap.S().Errorf("Failed to stop HTTP server on port %d: %v", port, err)
-			return err
 		}
-		m.stoppedHttpServers[port] = server
-		delete(m.startedHttpServers, port)
 	}
 	//TODO -> stop TCP servers
+	return nil
+}
+
+func (m *MicroProxy) StartProxy(port int) error {
+	zap.S().Infof("Starting proxy server on port %d", port)
+	if port <= 0 {
+		return fmt.Errorf("invalid port number: %d", port)
+	}
+	m.lock.Lock()
+	defer m.lock.Unlock()
+	if m.startedHttpServers[port] != nil {
+		return fmt.Errorf("proxy server already started on port %d", port)
+	}
+	server, ok := m.stoppedHttpServers[port]
+	if !ok {
+		return fmt.Errorf("no stopped HTTP server found for port %d", port)
+	}
+	if port == 80 && m.acmeManager != nil { //handle por 80 attach
+		zap.S().Infof("Attaching ACME manager to port 80")
+		serverHandler := server.getHandler()
+		if serverHandler != nil {
+			zap.S().Debugf("Original handler for port 80: %T", serverHandler)
+			nHandler := m.acmeManager.bindAcmeHandlerToPort80(serverHandler)
+			if nHandler != nil {
+				err := server.updateHandler(nHandler)
+				if err != nil {
+					zap.S().Errorf("Failed to update handler for port 80 with ACME manager: %v", err)
+					return err
+				}
+			}
+		}
+	}
+
+	err := server.start(m.acmeManager)
+	if err != nil {
+		zap.S().Errorf("Failed to start HTTP server on port %d: %v", port, err)
+		return err
+	}
+	m.startedHttpServers[port] = server
+	delete(m.stoppedHttpServers, port)
+	return nil
+}
+
+func (m *MicroProxy) StopProxy(port int) error {
+	zap.S().Infof("Stopping proxy server on port %d", port)
+	if port <= 0 {
+		return fmt.Errorf("invalid port number: %d", port)
+	}
+	m.lock.Lock()
+	defer m.lock.Unlock()
+	if m.stoppedHttpServers[port] != nil {
+		zap.S().Warnf("Proxy server already stopped on port %d", port)
+		return fmt.Errorf("proxy server already stopped on port %d", port)
+	}
+	server, ok := m.startedHttpServers[port]
+	if !ok {
+		zap.S().Warnf("No started HTTP server found for port %d", port)
+		return fmt.Errorf("no started HTTP server found for port %d", port)
+	}
+	zap.S().Infof("Stopping HTTP server on port %d", port)
+	err := server.stop()
+	if err != nil {
+		zap.S().Errorf("Failed to stop HTTP server on port %d: %v", port, err)
+		return err
+	}
+	m.stoppedHttpServers[port] = server
+	delete(m.startedHttpServers, port)
 	return nil
 }
 
@@ -115,11 +157,11 @@ func (m *MicroProxy) StartAcmeManager(conf *config.ACMEConfig) error {
 	return nil
 }
 
-func (m *MicroProxy) AddHttpServer(conf config.HTTPListener) error {
+func (m *MicroProxy) AddHttpServer(conf config.HTTPListener, mgr *metrics.ConnectionMetricsManager) error {
 	zap.S().Debugf("Adding HTTP server for listener configuration: %+v", conf)
 	m.lock.Lock()
 	defer m.lock.Unlock()
-	httpServer, err := buildHttpServer(conf)
+	httpServer, err := buildHttpServer(conf, mgr)
 	if err != nil {
 		zap.S().Errorf("Failed to build HTTP server: %v", err)
 		return fmt.Errorf("failed to build HTTP server: %w", err)
@@ -137,15 +179,18 @@ func (m *MicroProxy) GetProxyConfSnapshots() []*ProxySnapshot {
 	m.lock.Lock()
 	defer m.lock.Unlock()
 	for _, server := range m.stoppedHttpServers {
-		proxySnapshots = append(proxySnapshots, server.GetProxySnapshot())
+
+		proxySnapshots = append(proxySnapshots,
+			server.GetProxySnapshot(m.metricsManager.GetMetricForConnection(server.GetMetricsName())))
 	}
 	for _, server := range m.startedHttpServers {
-		proxySnapshots = append(proxySnapshots, server.GetProxySnapshot())
+		proxySnapshots = append(proxySnapshots,
+			server.GetProxySnapshot(m.metricsManager.GetMetricForConnection(server.GetMetricsName())))
 	}
 	return proxySnapshots
 }
 
-func (m *MicroProxy) initializeHttpNetworkStackFromConf(conf config.NetworkConfig) error {
+func (m *MicroProxy) initializeHttpNetworkStackFromConf(conf config.NetworkConfig, mgr *metrics.ConnectionMetricsManager) error {
 	zap.S().Infof("Initializing HTTP servers")
 	if conf.HTTPListeners == nil || len(conf.HTTPListeners) == 0 {
 		zap.S().Warn("No HTTP network configurations provided, skipping server initialization")
@@ -153,7 +198,7 @@ func (m *MicroProxy) initializeHttpNetworkStackFromConf(conf config.NetworkConfi
 	}
 	for _, ln := range conf.HTTPListeners {
 		zap.S().Debugf("Initializing HTTP server with configuration: %+v", ln)
-		m.AddHttpServer(ln)
+		m.AddHttpServer(ln, mgr)
 	}
 	return nil
 }

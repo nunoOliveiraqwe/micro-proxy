@@ -7,6 +7,7 @@ import (
 	"net"
 	"net/http"
 	"sync/atomic"
+	"time"
 
 	"github.com/nunoOliveiraqwe/micro-proxy/metrics"
 	"go.uber.org/zap"
@@ -14,15 +15,21 @@ import (
 
 type MicroProxyHttpServer struct {
 	httpServer        *http.Server
+	handler           http.Handler
+	readTimeout       time.Duration
+	readHeaderTimeout time.Duration
+	writeTimeout      time.Duration
+	idleTimeout       time.Duration
 	isStarted         atomic.Bool
 	bindPort          int
 	iPV4BindInterface string
 	iPV6BindInterface string
 	middlewareChain   []string
 	metricsName       string
+	backends          []string
 }
 
-func (m *MicroProxyHttpServer) GetProxySnapshot() *ProxySnapshot {
+func (m *MicroProxyHttpServer) GetProxySnapshot(metric *metrics.Metric) *ProxySnapshot {
 	return &ProxySnapshot{
 		Port:            m.bindPort,
 		Interface:       fmt.Sprintf("ipv4=%s, ipv6=%s", m.iPV4BindInterface, m.iPV6BindInterface),
@@ -31,8 +38,13 @@ func (m *MicroProxyHttpServer) GetProxySnapshot() *ProxySnapshot {
 		IsUsingHTTPS:    false,
 		IsUsingACME:     false,
 		MetricsName:     m.metricsName,
-		Metric:          metrics.GlobalMetricsManager.GetMetricForConnection(m.metricsName),
+		Metric:          metric,
+		Backends:        m.backends,
 	}
+}
+
+func (m *MicroProxyHttpServer) GetMetricsName() string {
+	return m.metricsName
 }
 
 func (m *MicroProxyHttpServer) start(_ *MicroProxyAcmeManager) error {
@@ -40,17 +52,22 @@ func (m *MicroProxyHttpServer) start(_ *MicroProxyAcmeManager) error {
 	listeners := buildNetListeners(m.iPV4BindInterface, m.iPV6BindInterface, m.bindPort)
 	if len(listeners) == 0 {
 		zap.S().Errorf("No listeners available to start HTTP server")
-		return nil
+		return fmt.Errorf("no listeners available for port %d", m.bindPort)
+	}
+	m.httpServer = &http.Server{
+		Handler:           m.handler,
+		ReadTimeout:       m.readTimeout,
+		ReadHeaderTimeout: m.readHeaderTimeout,
+		WriteTimeout:      m.writeTimeout,
+		IdleTimeout:       m.idleTimeout,
 	}
 	for _, listener := range listeners {
 		go func(ln net.Listener) {
 			m.isStarted.Store(true)
 			if err := m.httpServer.Serve(ln); err != nil && !errors.Is(err, http.ErrServerClosed) {
 				zap.S().Errorf("HTTP server error: %v", err)
-				err := listener.Close()
-				if err != nil {
+				if err := ln.Close(); err != nil {
 					zap.S().Errorf("Failed to close listener: %v", err)
-					return
 				}
 			}
 		}(listener)
@@ -68,14 +85,14 @@ func (m *MicroProxyHttpServer) stop() error {
 }
 
 func (m *MicroProxyHttpServer) getHandler() http.Handler {
-	return m.httpServer.Handler
+	return m.handler
 }
 
 func (m *MicroProxyHttpServer) updateHandler(handler http.Handler) error {
 	if m.isStarted.Load() {
 		return fmt.Errorf("HTTP server is already started, cannot update handler")
 	}
-	m.httpServer.Handler = handler
+	m.handler = handler
 	return nil
 }
 

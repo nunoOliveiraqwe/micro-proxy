@@ -21,7 +21,74 @@
         .badge-danger  { background-color: #e74c3c; color: #fff; }
         .badge-info    { background-color: #3498db; color: #fff; }
         .badge-muted   { background-color: #6c757d; color: #fff; }
+        .proxy-action-btn {
+            cursor: pointer;
+            border: none;
+            padding: 0.25em 0.75em;
+            font-size: 0.8em;
+            line-height: 1.4;
+        }
+        .proxy-action-btn:hover { opacity: 0.85; }
         .text-center   { text-align: center; }
+
+        /* SSE connection indicator */
+        .sse-indicator {
+            display: inline-block;
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+            margin-right: 0.4rem;
+            vertical-align: middle;
+            transition: background 0.3s;
+        }
+        .sse-indicator.connected    { background: #2ecc71; }
+        .sse-indicator.disconnected { background: #e74c3c; }
+        .sse-indicator.connecting   { background: #f39c12; animation: pulse 1s infinite; }
+
+        /* Toast notifications */
+        .toast-container {
+            position: fixed;
+            top: 1rem;
+            right: 1rem;
+            z-index: 9999;
+            display: flex;
+            flex-direction: column;
+            gap: 0.5rem;
+            pointer-events: none;
+        }
+        .toast {
+            pointer-events: auto;
+            padding: 0.75rem 1.25rem;
+            border-radius: 0.4rem;
+            font-size: 0.85rem;
+            color: #fff;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.3);
+            animation: toastIn 0.25s ease-out;
+            max-width: 360px;
+        }
+        .toast.toast-success { background: #2ecc71; color: #1a1a2e; }
+        .toast.toast-error   { background: #e74c3c; }
+        .toast.toast-info    { background: #3498db; }
+        .toast-fade-out { animation: toastOut 0.3s ease-in forwards; }
+        @keyframes toastIn  { from { opacity:0; transform:translateX(40px); } to { opacity:1; transform:translateX(0); } }
+        @keyframes toastOut { from { opacity:1; } to { opacity:0; transform:translateY(-10px); } }
+
+
+        /* Stat sub-label */
+        .stat-sub {
+            font-size: 0.7rem;
+            color: var(--pico-muted-color);
+            margin: 0.15rem 0 0;
+        }
+
+        /* Inline route metrics */
+        .route-metrics {
+            display: flex;
+            gap: 0.75rem;
+            font-size: 0.75rem;
+            color: var(--pico-muted-color);
+        }
+        .route-metrics span { white-space: nowrap; }
         .brand         { font-weight: 700; font-size: 1.25rem; }
         .mt-1          { margin-top: 1rem; }
         .auth-container { max-width: 420px; margin: 4rem auto; border-radius: 10px; }
@@ -295,6 +362,229 @@
         }
         .empty-state p {
             margin: 0.25rem 0;
+        }
+
+        /* Latency percentile card */
+        .latency-percentiles { text-align: left; }
+        .latency-row {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 0.15rem 0;
+        }
+        .latency-label {
+            font-size: 0.7rem;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+            color: var(--pico-muted-color);
+        }
+        .latency-value {
+            font-size: 1.15rem;
+            font-weight: 700;
+            color: #7c6ef0;
+        }
+
+        /* System health gauges */
+        .collapsible-section {
+            margin-top: 1.5rem;
+        }
+        .collapsible-section summary {
+            cursor: pointer;
+            list-style: none;
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+        .collapsible-section summary::-webkit-details-marker { display: none; }
+        .collapsible-section summary::before {
+            content: '▸';
+            font-size: 0.8rem;
+            transition: transform 0.15s;
+        }
+        .collapsible-section[open] summary::before {
+            transform: rotate(90deg);
+        }
+        .collapsible-section summary h4 { margin: 0; }
+        .health-gauges {
+            display: flex;
+            flex-direction: column;
+            gap: 0.75rem;
+            margin-top: 1rem;
+            max-width: 520px;
+        }
+        .gauge-row {
+            display: flex;
+            align-items: center;
+            gap: 0.75rem;
+        }
+        .gauge-label {
+            font-size: 0.75rem;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+            color: var(--pico-muted-color);
+            min-width: 80px;
+        }
+        .gauge-bar {
+            flex: 1;
+            height: 10px;
+            background: rgba(255,255,255,0.06);
+            border-radius: 5px;
+            overflow: hidden;
+        }
+        .gauge-fill {
+            height: 100%;
+            border-radius: 5px;
+            transition: width 0.4s ease;
+            background: #7c6ef0;
+        }
+        .gauge-fill.warn  { background: #f39c12; }
+        .gauge-fill.danger { background: #e74c3c; }
+        .gauge-value {
+            font-size: 0.75rem;
+            color: var(--pico-muted-color);
+            min-width: 90px;
+            text-align: right;
+            white-space: nowrap;
+        }
+
+        /* Sparkline canvas in proxy routes */
+        .sparkline-cell {
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+        .sparkline {
+            display: inline-block;
+            vertical-align: middle;
+        }
+
+        /* Error log feed */
+        .error-feed {
+            max-height: 340px;
+            overflow-y: auto;
+            margin-top: 0.75rem;
+        }
+        .error-entry {
+            display: flex;
+            align-items: baseline;
+            gap: 0.75rem;
+            padding: 0.45rem 0.6rem;
+            border-radius: 0.3rem;
+            font-size: 0.8rem;
+            animation: fadeIn 0.25s ease-out;
+            border-bottom: 1px solid rgba(255,255,255,0.04);
+        }
+        .error-entry:hover { background: rgba(231,76,60,0.06); }
+        .error-entry .error-time {
+            font-size: 0.7rem;
+            color: var(--pico-muted-color);
+            white-space: nowrap;
+        }
+        .error-entry .error-remote {
+            font-size: 0.7rem;
+            color: var(--pico-muted-color);
+            white-space: nowrap;
+            min-width: 110px;
+        }
+        .error-entry .error-status {
+            font-weight: 700;
+            color: #e74c3c;
+            min-width: 32px;
+        }
+        .error-entry .error-method {
+            font-weight: 600;
+            min-width: 36px;
+        }
+        .error-entry .error-path {
+            color: var(--pico-muted-color);
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+            flex: 1;
+        }
+        .error-entry .error-latency {
+            color: var(--pico-muted-color);
+            font-size: 0.7rem;
+            white-space: nowrap;
+        }
+        .error-empty {
+            text-align: center;
+            padding: 1.5rem;
+            color: var(--pico-muted-color);
+            font-size: 0.85rem;
+        }
+
+        /* Request log feed */
+        .request-feed {
+            max-height: 480px;
+            overflow-y: auto;
+            margin-top: 0.75rem;
+        }
+        .req-entry {
+            display: flex;
+            align-items: baseline;
+            gap: 0.75rem;
+            padding: 0.35rem 0.6rem;
+            font-size: 0.78rem;
+            border-bottom: 1px solid rgba(255,255,255,0.04);
+            animation: fadeIn 0.2s ease-out;
+        }
+        .req-entry:hover { background: rgba(124,110,240,0.04); }
+        .req-header, .req-header:hover {
+            font-weight: 600;
+            font-size: 0.65rem;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+            color: var(--pico-muted-color);
+            background: none;
+            border-bottom: 1px solid rgba(255,255,255,0.08);
+            animation: none;
+        }
+        .req-entry .req-time {
+            font-size: 0.68rem;
+            color: var(--pico-muted-color);
+            white-space: nowrap;
+            min-width: 58px;
+        }
+        .req-entry .req-remote {
+            font-size: 0.68rem;
+            color: var(--pico-muted-color);
+            white-space: nowrap;
+            min-width: 110px;
+        }
+        .req-entry .req-route {
+            font-size: 0.68rem;
+            color: var(--pico-muted-color);
+            min-width: 52px;
+            white-space: nowrap;
+        }
+        .req-entry .req-path {
+            color: var(--pico-muted-color);
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+            flex: 1;
+        }
+        .req-entry .req-method {
+            font-weight: 600;
+            min-width: 36px;
+        }
+        .req-entry .req-status {
+            font-weight: 700;
+            min-width: 28px;
+        }
+        .req-status.s2xx { color: #2ecc71; }
+        .req-status.s3xx { color: #3498db; }
+        .req-status.s4xx { color: #f39c12; }
+        .req-status.s5xx { color: #e74c3c; }
+        .req-entry .req-latency {
+            color: var(--pico-muted-color);
+            font-size: 0.68rem;
+            white-space: nowrap;
+            min-width: 48px;
+            text-align: right;
         }
     </style>
     {{block "head" .}}{{end}}

@@ -8,6 +8,9 @@ type Metric struct {
 	ErrorCount        int64  `json:"error_count"`
 	TotalLatencyMs    int64  `json:"total_latency_ms"`
 	AvgResponseTimeMs int64  `json:"avg_response_time_ms"`
+	P50Ms             int64  `json:"p50_ms"`
+	P95Ms             int64  `json:"p95_ms"`
+	P99Ms             int64  `json:"p99_ms"`
 	UpstreamTimeouts  int64  `json:"upstream_timeouts"`
 	BytesSent         int64  `json:"bytes_sent"`
 	BytesReceived     int64  `json:"bytes_received"`
@@ -18,9 +21,14 @@ type Metric struct {
 	Request5xxCount   int64  `json:"request_5xx_count"`
 	CacheHits         int64  `json:"cache_hits"`
 	CacheMisses       int64  `json:"cache_misses"`
+
+	// latencies is the internal ring buffer used to compute percentiles.
+	// It is not serialised to JSON and is only present on accumulated metrics.
+	latencies *latencyRing
 }
 
 type RequestMetric struct {
+	RemoteAddress  string
 	connectionName string
 	LatencyMs      int64
 	IsTimedOut     bool
@@ -30,6 +38,16 @@ type RequestMetric struct {
 	Is3xxResponse  bool
 	Is4xxResponse  bool
 	Is5xxResponse  bool
+	StatusCode     int
+	Path           string
+	Method         string
+}
+
+// NewMetric creates a Metric with an initialised latency ring buffer.
+func NewMetric() *Metric {
+	return &Metric{
+		latencies: newLatencyRing(latencyBufferSize),
+	}
 }
 
 func (m *Metric) AddRequestMetric(metric *RequestMetric) {
@@ -51,6 +69,9 @@ func (m *Metric) AddRequestMetric(metric *RequestMetric) {
 		m.UpstreamTimeouts++
 	}
 	m.AvgResponseTimeMs = m.TotalLatencyMs / m.RequestCount
+	if m.latencies != nil {
+		m.latencies.Add(metric.LatencyMs)
+	}
 }
 
 func (m *Metric) Add(other *Metric) {
@@ -71,7 +92,8 @@ func (m *Metric) Add(other *Metric) {
 }
 
 func (m *Metric) Copy() *Metric {
-	return &Metric{
+	cp := &Metric{
+		ConnectionName:    m.ConnectionName,
 		RequestCount:      m.RequestCount,
 		ErrorCount:        m.ErrorCount,
 		TotalLatencyMs:    m.TotalLatencyMs,
@@ -87,15 +109,27 @@ func (m *Metric) Copy() *Metric {
 		CacheHits:         m.CacheHits,
 		CacheMisses:       m.CacheMisses,
 	}
+	if m.latencies != nil {
+		cp.P50Ms = m.latencies.Percentile(50)
+		cp.P95Ms = m.latencies.Percentile(95)
+		cp.P99Ms = m.latencies.Percentile(99)
+	}
+	return cp
 }
 
 func (m *Metric) Reset() {
+	lat := m.latencies
 	*m = Metric{}
+	if lat != nil {
+		lat.reset()
+		m.latencies = lat
+	}
 }
 
 func (m *Metric) String() string {
 	return fmt.Sprintf("Metric{ConnectionName: %s, RequestCount: %d,"+
-		" ErrorCount: %d, TotalLatencyMs: %d, AvgResponseTimeMs: %d, UpstreamTimeouts: %d,"+
+		" ErrorCount: %d, TotalLatencyMs: %d, AvgResponseTimeMs: %d,"+
+		" P50Ms: %d, P95Ms: %d, P99Ms: %d, UpstreamTimeouts: %d,"+
 		" BytesSent: %d, BytesReceived: %d, ActiveConnections: %d, Request2xxCount: %d, "+
 		"Request3xxCount: %d, Request4xxCount: %d, Request5xxCount: %d, CacheHits: %d,"+
 		" CacheMisses: %d",
@@ -104,6 +138,9 @@ func (m *Metric) String() string {
 		m.ErrorCount,
 		m.TotalLatencyMs,
 		m.AvgResponseTimeMs,
+		m.P50Ms,
+		m.P95Ms,
+		m.P99Ms,
 		m.UpstreamTimeouts,
 		m.BytesSent,
 		m.BytesReceived,
