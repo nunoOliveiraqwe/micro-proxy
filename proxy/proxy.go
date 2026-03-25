@@ -1,6 +1,7 @@
 package proxy
 
 import (
+	"context"
 	"fmt"
 	"net/http"
 	"sync"
@@ -11,8 +12,8 @@ import (
 )
 
 type MicroHttpServer interface {
-	GetProxySnapshot(metric *metrics.Metric) *ProxySnapshot
-	GetMetricsName() string
+	GetServerId() string
+	GetProxySnapshot(metric []*metrics.Metric) *ProxySnapshot
 	start(acmeManager *MicroProxyAcmeManager) error
 	getHandler() http.Handler
 	updateHandler(handler http.Handler) error
@@ -35,7 +36,8 @@ func NewMicroProxy(conf config.NetworkConfig, mgr *metrics.ConnectionMetricsMana
 		lock:               sync.Mutex{},
 		metricsManager:     mgr,
 	}
-	err := m.initializeHttpNetworkStackFromConf(conf, mgr)
+	ctx := context.WithValue(context.Background(), "metricsManager", mgr)
+	err := m.initializeHttpNetworkStackFromConf(ctx, conf)
 	if err != nil {
 		return nil, err
 	}
@@ -179,13 +181,16 @@ func (m *MicroProxy) GetProxyConfSnapshots() []*ProxySnapshot {
 	m.lock.Lock()
 	defer m.lock.Unlock()
 	for _, server := range m.stoppedHttpServers {
-
-		proxySnapshots = append(proxySnapshots,
-			server.GetProxySnapshot(m.metricsManager.GetMetricForConnection(server.GetMetricsName())))
+		serverId := server.GetServerId()
+		zap.S().Debugf("Fetching all metrics for serverId %d", serverId)
+		mts := m.metricsManager.GetAllMetricsByServer(serverId)
+		proxySnapshots = append(proxySnapshots, server.GetProxySnapshot(mts))
 	}
 	for _, server := range m.startedHttpServers {
-		proxySnapshots = append(proxySnapshots,
-			server.GetProxySnapshot(m.metricsManager.GetMetricForConnection(server.GetMetricsName())))
+		serverId := server.GetServerId()
+		zap.S().Debugf("Fetching all metrics for serverId %d", serverId)
+		mts := m.metricsManager.GetAllMetricsByServer(serverId)
+		proxySnapshots = append(proxySnapshots, server.GetProxySnapshot(mts))
 	}
 	return proxySnapshots
 }

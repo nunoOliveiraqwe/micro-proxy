@@ -5,37 +5,39 @@ import (
 	"strconv"
 
 	"github.com/nunoOliveiraqwe/micro-proxy/internal/app"
-	"github.com/nunoOliveiraqwe/micro-proxy/metrics"
+	"github.com/nunoOliveiraqwe/micro-proxy/middleware"
 	"go.uber.org/zap"
 )
 
 func handleGetProxies(systemService app.SystemService) http.HandlerFunc {
 	return func(writer http.ResponseWriter, request *http.Request) {
-		zap.S().Infof("Fetching configured proxy servers")
+		logger := middleware.GetRequestLoggerFromContext(request)
+		logger.Debug("Fetching configured proxy servers")
 		proxies := systemService.GetConfiguredProxyServers()
 		if proxies == nil {
-			zap.S().Errorf("Failed to retrieve configured proxy servers")
+			logger.Error("Failed to retrieve configured proxy servers")
 			http.Error(writer, "Failed to retrieve configured proxy servers", http.StatusInternalServerError)
 			return
 		}
-		zap.S().Infof("Retrieved %d configured proxy servers", len(proxies))
+		logger.Debug("Retrieved configured proxy servers", zap.Int("count", len(proxies)))
 		WriteResponseAsJSON(proxies, writer)
 	}
 }
 
 func handleStartProxy(systemService app.SystemService) http.HandlerFunc {
 	return func(writer http.ResponseWriter, request *http.Request) {
-		port := request.PathValue("connectionId")
-		zap.S().Infof("Starting proxy server on port %s", port)
+		logger := middleware.GetRequestLoggerFromContext(request)
+		port := request.PathValue("serverId")
+		logger.Info("Starting proxy server", zap.String("port", port))
 		portInt, err := strconv.Atoi(port)
 		if err != nil {
-			zap.S().Errorf("Invalid port format: %s", port)
+			logger.Error("Invalid port format", zap.String("port", port))
 			http.Error(writer, "Invalid port format", http.StatusBadRequest)
 			return
 		}
 		err = systemService.StartProxy(portInt)
 		if err != nil {
-			zap.S().Errorf("Failed to start proxy server on port %s: %v", port, err)
+			logger.Error("Failed to start proxy server", zap.String("port", port), zap.Error(err))
 			http.Error(writer, "Failed to start proxy server: "+err.Error(), http.StatusInternalServerError)
 			return
 		}
@@ -45,17 +47,18 @@ func handleStartProxy(systemService app.SystemService) http.HandlerFunc {
 
 func handleStopProxy(systemService app.SystemService) http.HandlerFunc {
 	return func(writer http.ResponseWriter, request *http.Request) {
-		port := request.PathValue("connectionId")
-		zap.S().Infof("Stopping proxy server on port %s", port)
+		logger := middleware.GetRequestLoggerFromContext(request)
+		port := request.PathValue("serverId")
+		logger.Info("Stopping proxy server", zap.String("port", port))
 		portInt, err := strconv.Atoi(port)
 		if err != nil {
-			zap.S().Errorf("Invalid port format: %s", port)
+			logger.Error("Invalid port format", zap.String("port", port))
 			http.Error(writer, "Invalid port format", http.StatusBadRequest)
 			return
 		}
 		err = systemService.StopProxy(portInt)
 		if err != nil {
-			zap.S().Errorf("Failed to stop proxy server on port %s: %v", port, err)
+			logger.Error("Failed to stop proxy server", zap.String("port", port), zap.Error(err))
 			http.Error(writer, "Failed to stop proxy server: "+err.Error(), http.StatusInternalServerError)
 			return
 		}
@@ -65,7 +68,8 @@ func handleStopProxy(systemService app.SystemService) http.HandlerFunc {
 
 func handleGetGlobalMetrics(systemService app.SystemService) http.HandlerFunc {
 	return func(writer http.ResponseWriter, request *http.Request) {
-		zap.S().Infof("Fetching global proxy metrics")
+		logger := middleware.GetRequestLoggerFromContext(request)
+		logger.Info("Fetching global proxy metrics")
 		globalMetrics := systemService.GetGlobalMetricsManager().GetGlobalMetrics()
 		WriteResponseAsJSON(globalMetrics, writer)
 	}
@@ -73,12 +77,10 @@ func handleGetGlobalMetrics(systemService app.SystemService) http.HandlerFunc {
 
 func handleGetMetricForConnection(systemService app.SystemService) http.HandlerFunc {
 	return func(writer http.ResponseWriter, request *http.Request) {
-		connectionId := request.PathValue("connectionId")
-		zap.S().Infof("Fetching metric for connection %s", connectionId)
-		metric := systemService.GetGlobalMetricsManager().GetMetricForConnection(connectionId)
-		if metric == nil {
-			metric = &metrics.Metric{}
-		}
-		WriteResponseAsJSON(metric, writer)
+		logger := middleware.GetRequestLoggerFromContext(request)
+		serverId := request.PathValue("serverId")
+		logger.Info("Fetching metric for connection", zap.String("serverId", serverId))
+		metrics := systemService.GetGlobalMetricsManager().GetAllMetricsByServer(serverId)
+		WriteResponseAsJSON(metrics, writer)
 	}
 }

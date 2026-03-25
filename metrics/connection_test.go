@@ -28,7 +28,7 @@ func TestUpdateConnectionMetrics(t *testing.T) {
 		BytesReceived:  100,
 		BytesSent:      200,
 	}
-	reportTestMetrics := h.TrackMetricsForConnection("test")
+	reportTestMetrics := h.TrackMetricsForConnection("test-server", "test")
 	reportTestMetrics(metric)
 
 	deadLine := time.Now().Add(1 * time.Second)
@@ -77,7 +77,7 @@ func TestGlobalAccumulatesFromSeveralConMetrics(t *testing.T) {
 		BytesReceived:  100,
 		BytesSent:      200,
 	}
-	reportTestMetrics := h.TrackMetricsForConnection("test")
+	reportTestMetrics := h.TrackMetricsForConnection("test-server", "test")
 
 	reportTestMetrics(metricForTest)
 
@@ -86,7 +86,7 @@ func TestGlobalAccumulatesFromSeveralConMetrics(t *testing.T) {
 		BytesReceived:  102,
 		BytesSent:      201,
 	}
-	reportTestMetrics2 := h.TrackMetricsForConnection("test2")
+	reportTestMetrics2 := h.TrackMetricsForConnection("test-server", "test2")
 
 	reportTestMetrics2(metricForTest2)
 
@@ -150,7 +150,7 @@ func TestListenerReceivesSnapshotOnMetricUpdate(t *testing.T) {
 	})
 
 	time.Sleep(100 * time.Millisecond)
-	report := h.TrackMetricsForConnection("test")
+	report := h.TrackMetricsForConnection("test-server", "test")
 	report(&RequestMetric{BytesReceived: 50, BytesSent: 75})
 
 	deadline := time.Now().Add(2 * time.Second)
@@ -190,7 +190,7 @@ func TestGlobalListenerReceivesUpdates(t *testing.T) {
 	})
 
 	time.Sleep(100 * time.Millisecond)
-	report := h.TrackMetricsForConnection("conn1")
+	report := h.TrackMetricsForConnection("conn1-server", "conn1")
 	report(&RequestMetric{BytesReceived: 10, BytesSent: 20})
 
 	deadline := time.Now().Add(2 * time.Second)
@@ -229,7 +229,7 @@ func TestRemovedListenerStopsReceiving(t *testing.T) {
 	})
 
 	time.Sleep(100 * time.Millisecond)
-	report := h.TrackMetricsForConnection("test")
+	report := h.TrackMetricsForConnection("test-server", "test")
 	report(&RequestMetric{BytesReceived: 1, BytesSent: 1})
 
 	// Wait for the first callback.
@@ -258,4 +258,81 @@ func TestRemovedListenerStopsReceiving(t *testing.T) {
 	mu.Lock()
 	defer mu.Unlock()
 	assert.Equal(t, 1, callCount, "listener should not be called after removal")
+}
+
+func TestPathMetricAutoCreatesParent(t *testing.T) {
+	ctx := context.Background()
+	h := NewGlobalMetricsHandler(2, ctx)
+
+	// Register a path-level metric — the port-level parent should be auto-created.
+	h.TrackMetricsForConnection("http-8081", "metric-port-8081-path-/api/v1/users")
+
+	parent := h.GetMetricForConnection("metric-port-8081")
+	assert.NotNil(t, parent, "port-level parent should be auto-created")
+	assert.Equal(t, "metric-port-8081", parent.ConnectionName)
+}
+
+func TestHierarchyPropagation(t *testing.T) {
+	ctx := context.Background()
+	h := NewGlobalMetricsHandler(2, ctx)
+	h.StartCollectingMetrics()
+	time.Sleep(100 * time.Millisecond)
+
+	// Register two path-level metrics under the same port.
+	report1 := h.TrackMetricsForConnection("http-8081", "metric-port-8081-path-/api/v1/users")
+	report2 := h.TrackMetricsForConnection("http-8081", "metric-port-8081-path-/api/v2/users")
+
+	report1(&RequestMetric{BytesReceived: 100, BytesSent: 200})
+	report2(&RequestMetric{BytesReceived: 50, BytesSent: 75})
+
+	// Wait for both to propagate.
+	deadline := time.Now().Add(2 * time.Second)
+	for {
+		global := h.GetMetricForConnection(globalMetricsConName)
+		if global != nil && global.RequestCount >= 2 {
+			break
+		}
+		if time.Now().After(deadline) {
+			assert.Fail(t, "timeout waiting for global metrics")
+			return
+		}
+		time.Sleep(10 * time.Millisecond)
+	}
+
+	// Each leaf should have its own count.
+	leaf1 := h.GetMetricForConnection("metric-port-8081-path-/api/v1/users")
+	assert.Equal(t, int64(1), leaf1.RequestCount)
+	assert.Equal(t, int64(100), leaf1.BytesReceived)
+
+	leaf2 := h.GetMetricForConnection("metric-port-8081-path-/api/v2/users")
+	assert.Equal(t, int64(1), leaf2.RequestCount)
+	assert.Equal(t, int64(50), leaf2.BytesReceived)
+
+	// Parent should aggregate both children.
+	parent := h.GetMetricForConnection("metric-port-8081")
+	assert.NotNil(t, parent)
+	assert.Equal(t, int64(2), parent.RequestCount)
+	assert.Equal(t, int64(150), parent.BytesReceived)
+	assert.Equal(t, int64(275), parent.BytesSent)
+
+	// Global should equal parent (only one port).
+	global := h.GetMetricForConnection(globalMetricsConName)
+	assert.Equal(t, int64(2), global.RequestCount)
+	assert.Equal(t, int64(150), global.BytesReceived)
+	assert.Equal(t, int64(275), global.BytesSent)
+}
+
+func TestGetRegisteredConnectionNames(t *testing.T) {
+	ctx := context.Background()
+	h := NewGlobalMetricsHandler(2, ctx)
+
+	h.TrackMetricsForConnection("http-8081", "metric-port-8081-path-/api/v1/users")
+	h.TrackMetricsForConnection("http-9090", "metric-port-9090")
+
+	names := h.GetRegisteredConnectionNames()
+	assert.Contains(t, names, "global")
+	assert.Contains(t, names, "metric-port-8081")                    // auto-created parent
+	assert.Contains(t, names, "metric-port-8081-path-/api/v1/users") // leaf
+	assert.Contains(t, names, "metric-port-9090")                    // standalone port
+	assert.Len(t, names, 4)
 }

@@ -135,9 +135,10 @@ func (m *mockProxyMetricsStore) UpdateGlobalProxyMetrics(ctx context.Context, me
 // ---------------------------------------------------------------------------
 
 type testSystemService struct {
-	serviceStore *app.ServiceStore
-	sessions     *session.Registry
-	proxies      []*proxy.ProxySnapshot
+	serviceStore   *app.ServiceStore
+	sessions       *session.Registry
+	proxies        []*proxy.ProxySnapshot
+	metricsManager *metrics.ConnectionMetricsManager
 }
 
 func (t *testSystemService) Start() error                                      { return nil }
@@ -146,7 +147,7 @@ func (t *testSystemService) SessionRegistry() *session.Registry                {
 func (t *testSystemService) GetServiceStore() *app.ServiceStore                { return t.serviceStore }
 func (t *testSystemService) GetConfiguredProxyServers() []*proxy.ProxySnapshot { return t.proxies }
 func (t *testSystemService) GetGlobalMetricsManager() *metrics.ConnectionMetricsManager {
-	return nil
+	return t.metricsManager
 }
 func (t *testSystemService) GetSSEBroker() *app.SSEBroker { return nil }
 func (t *testSystemService) StartProxy(port int) error    { return nil }
@@ -203,9 +204,16 @@ func newTestFixture(t *testing.T) *testFixture {
 	}
 	serviceStore := app.NewServiceStore(dataStore)
 
+	ctx, cancel := context.WithCancel(context.Background())
+	t.Cleanup(cancel)
+	mgr := metrics.NewGlobalMetricsHandler(1, ctx)
+	mgr.StartCollectingMetrics()
+	t.Cleanup(func() { mgr.StopCollectingMetrics() })
+
 	svc := &testSystemService{
-		serviceStore: serviceStore,
-		sessions:     reg,
+		serviceStore:   serviceStore,
+		sessions:       reg,
+		metricsManager: mgr,
 	}
 
 	return &testFixture{

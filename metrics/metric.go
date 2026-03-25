@@ -154,6 +154,13 @@ func (m *Metric) String() string {
 	)
 }
 
+func ProxyPathMetricsName(port, path string) string {
+	if path == "" {
+		return ProxyMetricsName(port)
+	}
+	return fmt.Sprintf("metric-port-%s-path-%s", port, path)
+}
+
 func ProxyMetricsName(port string) string {
 	return fmt.Sprintf("metric-port-%s", port)
 }

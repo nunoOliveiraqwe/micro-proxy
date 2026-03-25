@@ -15,6 +15,7 @@ import (
 
 type MicroProxyHttpServer struct {
 	httpServer        *http.Server
+	serverId          string
 	handler           http.Handler
 	readTimeout       time.Duration
 	readHeaderTimeout time.Duration
@@ -25,11 +26,11 @@ type MicroProxyHttpServer struct {
 	iPV4BindInterface string
 	iPV6BindInterface string
 	middlewareChain   []string
-	metricsName       string
 	backends          []string
+	routes            []RouteSnapshot
 }
 
-func (m *MicroProxyHttpServer) GetProxySnapshot(metric *metrics.Metric) *ProxySnapshot {
+func (m *MicroProxyHttpServer) GetProxySnapshot(metrics []*metrics.Metric) *ProxySnapshot {
 	return &ProxySnapshot{
 		Port:            m.bindPort,
 		Interface:       fmt.Sprintf("ipv4=%s, ipv6=%s", m.iPV4BindInterface, m.iPV6BindInterface),
@@ -37,14 +38,14 @@ func (m *MicroProxyHttpServer) GetProxySnapshot(metric *metrics.Metric) *ProxySn
 		IsStarted:       m.isStarted.Load(),
 		IsUsingHTTPS:    false,
 		IsUsingACME:     false,
-		MetricsName:     m.metricsName,
-		Metric:          metric,
+		Metrics:         metrics,
 		Backends:        m.backends,
+		Routes:          m.routes,
 	}
 }
 
-func (m *MicroProxyHttpServer) GetMetricsName() string {
-	return m.metricsName
+func (m *MicroProxyHttpServer) GetServerId() string {
+	return m.serverId
 }
 
 func (m *MicroProxyHttpServer) start(_ *MicroProxyAcmeManager) error {

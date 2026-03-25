@@ -2,6 +2,7 @@ package metrics
 
 import (
 	"context"
+	"strings"
 	"sync"
 	"time"
 
@@ -32,8 +33,10 @@ type ConnectionMetricsManager struct {
 }
 
 type ConnectionMetric struct {
+	serverId           string
 	accumulatedMetrics *Metric
 	connectionName     string
+	parentName         string // port-level parent for path metrics; empty for top-level
 	metricsLock        sync.RWMutex
 }
 
@@ -55,54 +58,34 @@ func NewGlobalMetricsHandler(numberOfWorkers int, ctx context.Context) *Connecti
 		requestLog:           NewRequestLog(200),
 	}
 	zap.S().Info("Creating a new global connection metric")
-	h.TrackMetricsForConnection(globalMetricsConName)
+	h.TrackMetricsForConnection(globalMetricsConName, globalMetricsConName)
 	return &h
 }
 
-func (h *ConnectionMetricsManager) addConnectionMetric(c *ConnectionMetric) {
-	zap.S().Debugf("Adding connection metric for connection %s", c.connectionName)
-	h.connectionMetricsMap[c.connectionName] = c
-}
-
-func (h *ConnectionMetricsManager) startCollectingMetrics() {
-	waitG := sync.WaitGroup{}
-	waitG.Add(h.numberOfWorkers)
-	for i := 0; i < h.numberOfWorkers; i++ {
-		go func() {
-			h.collectGlobalMetrics()
-			waitG.Done()
-		}()
-	}
-	waitG.Wait()
-	close(h.metricsChan)
-}
-
-func (h *ConnectionMetricsManager) collectGlobalMetrics() {
-	for {
-		select {
-		case metric, ok := <-h.metricsChan:
-			if !ok {
-				return
-			}
-			h.updateConnectionMetrics(metric)
-		case <-h.context.Done():
-			return
-		}
-	}
-}
-
 func (h *ConnectionMetricsManager) updateConnectionMetrics(metric *RequestMetric) {
-	zap.S().Infof("Updating connection metric for connection %s", metric.connectionName)
+	zap.S().Debugf("Updating connection metric for connection %s", metric.connectionName)
 	conMetrics, ok := h.connectionMetricsMap[metric.connectionName]
 	if !ok {
 		zap.S().Warnf("Connection metric for connection %s not found", metric.connectionName)
 		return
 	}
+
 	conMetrics.metricsLock.Lock()
 	conMetrics.accumulatedMetrics.AddRequestMetric(metric)
 	conSnapshot := conMetrics.accumulatedMetrics.Copy()
 	conMetrics.metricsLock.Unlock()
 	h.notifyListeners(metric.connectionName, conSnapshot)
+
+	// propagate to the parent so it aggregates all children.
+	if conMetrics.parentName != "" {
+		if parentMetrics, ok2 := h.connectionMetricsMap[conMetrics.parentName]; ok2 {
+			parentMetrics.metricsLock.Lock()
+			parentMetrics.accumulatedMetrics.AddRequestMetric(metric)
+			parentSnapshot := parentMetrics.accumulatedMetrics.Copy()
+			parentMetrics.metricsLock.Unlock()
+			h.notifyListeners(conMetrics.parentName, parentSnapshot)
+		}
+	}
 
 	if metric.connectionName != globalMetricsConName {
 		globalConMetrics, ok2 := h.connectionMetricsMap[globalMetricsConName]
@@ -143,20 +126,53 @@ func (h *ConnectionMetricsManager) updateConnectionMetrics(metric *RequestMetric
 	}
 }
 
-func (h *ConnectionMetricsManager) TrackMetricsForConnection(connectionName string) MetricsReportFunc {
+func (h *ConnectionMetricsManager) TrackMetricsForConnection(serverId, connectionName string) MetricsReportFunc {
 	zap.S().Debugf("Creating a new connection metric for connection %s", connectionName)
 	m := NewMetric()
 	m.ConnectionName = connectionName
+	parentName := deriveParentMetricName(connectionName)
 	connMetric := &ConnectionMetric{
+		serverId:           serverId,
 		accumulatedMetrics: m,
 		metricsLock:        sync.RWMutex{},
 		connectionName:     connectionName,
+		parentName:         parentName,
 	}
 	h.addConnectionMetric(connMetric)
+
+	if parentName != "" {
+		h.ensureParentMetric(serverId, parentName)
+	}
+
 	return func(metric *RequestMetric) {
 		metric.connectionName = connectionName
 		h.metricsChan <- metric
 	}
+}
+
+func (h *ConnectionMetricsManager) ensureParentMetric(serverId, parentName string) {
+	if _, exists := h.connectionMetricsMap[parentName]; exists {
+		return
+	}
+	zap.S().Infof("Auto-creating parent metric %s for server %s", parentName, serverId)
+	m := NewMetric()
+	m.ConnectionName = parentName
+	parent := &ConnectionMetric{
+		serverId:           serverId,
+		accumulatedMetrics: m,
+		metricsLock:        sync.RWMutex{},
+		connectionName:     parentName,
+		parentName:         "", // port-level has no parent (besides global)
+	}
+	h.addConnectionMetric(parent)
+}
+
+func deriveParentMetricName(connectionName string) string {
+	idx := strings.Index(connectionName, "-path-")
+	if idx == -1 {
+		return ""
+	}
+	return connectionName[:idx]
 }
 
 func (h *ConnectionMetricsManager) GetErrorLog() *ErrorLog {
@@ -171,12 +187,27 @@ func (h *ConnectionMetricsManager) GetMetricForConnection(connectionName string)
 	zap.S().Debugf("Getting connection metrics for connection %s", connectionName)
 	conMetrics, ok := h.connectionMetricsMap[connectionName]
 	if !ok {
-		zap.S().Infof("Connection metric for connection %s not found", connectionName)
+		zap.S().Debugf("Connection metric for connection %s not found", connectionName)
 		return nil
 	}
 	conMetrics.metricsLock.RLock()
 	defer conMetrics.metricsLock.RUnlock()
 	return conMetrics.accumulatedMetrics.Copy()
+}
+
+func (h *ConnectionMetricsManager) GetAllMetricsByServer(serverId string) []*Metric {
+	zap.S().Infof("Getting all connection metrics for server %s", serverId)
+	metrics := make([]*Metric, 0, len(h.connectionMetricsMap))
+	for _, conMetrics := range h.connectionMetricsMap {
+		conMetrics.metricsLock.RLock()
+		if conMetrics.serverId != serverId {
+			conMetrics.metricsLock.RUnlock()
+			continue
+		}
+		metrics = append(metrics, conMetrics.accumulatedMetrics.Copy())
+		conMetrics.metricsLock.RUnlock()
+	}
+	return metrics
 }
 
 func (h *ConnectionMetricsManager) GetAllMetrics() []*Metric {
@@ -244,4 +275,44 @@ func (h *ConnectionMetricsManager) notifyListeners(connectionName string, snapsh
 
 func (h *ConnectionMetricsManager) AddWildcardListener(fn MetricListenerFunc) int {
 	return h.AddListener("", fn)
+}
+
+func (h *ConnectionMetricsManager) addConnectionMetric(c *ConnectionMetric) {
+	zap.S().Debugf("Adding connection metric for connection %s", c.connectionName)
+	h.connectionMetricsMap[c.connectionName] = c
+}
+
+func (h *ConnectionMetricsManager) startCollectingMetrics() {
+	waitG := sync.WaitGroup{}
+	waitG.Add(h.numberOfWorkers)
+	for i := 0; i < h.numberOfWorkers; i++ {
+		go func() {
+			h.collectGlobalMetrics()
+			waitG.Done()
+		}()
+	}
+	waitG.Wait()
+	close(h.metricsChan)
+}
+
+func (h *ConnectionMetricsManager) collectGlobalMetrics() {
+	for {
+		select {
+		case metric, ok := <-h.metricsChan:
+			if !ok {
+				return
+			}
+			h.updateConnectionMetrics(metric)
+		case <-h.context.Done():
+			return
+		}
+	}
+}
+
+func (h *ConnectionMetricsManager) GetRegisteredConnectionNames() []string {
+	names := make([]string, 0, len(h.connectionMetricsMap))
+	for name := range h.connectionMetricsMap {
+		names = append(names, name)
+	}
+	return names
 }
