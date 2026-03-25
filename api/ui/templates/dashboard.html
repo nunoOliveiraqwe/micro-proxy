@@ -369,6 +369,7 @@
     var metricsEventSource = null;
     var latestSnapshot = null;
     var perConnectionSnapshots = {};
+    var knownConnectionNames = {};
     var chartTickInterval = null;
     var CHART_TICK_MS = 1000;
     var lastSnapshotTime = null;
@@ -383,6 +384,11 @@
             var connName = snap.connection_name || '';
             // Store every per-connection snapshot
             perConnectionSnapshots[connName] = snap;
+            // Rebuild dropdown when a previously-unseen connection name arrives
+            if (!knownConnectionNames[connName]) {
+                knownConnectionNames[connName] = true;
+                updateConnectionSelector();
+            }
             // Update dashboard cards only for the selected connection
             if (selectedConnection === 'global' && connName === 'global') {
                 applySnapshot(snap);
@@ -798,7 +804,7 @@
             .then(function (proxies) {
                 if (proxies === null) return;
                 cachedProxySnapshots = proxies || [];
-                updateConnectionSelector(cachedProxySnapshots);
+                updateConnectionSelector();
                 renderProxyRoutes(proxies);
                 ensureSparklineBuffers(proxies);
             })
@@ -807,15 +813,43 @@
             });
     }
 
-    function updateConnectionSelector(proxies) {
+    function updateConnectionSelector() {
         var sel = document.getElementById('connection-selector');
         var current = sel.value;
-        var html = '<option value="global">Global (all proxies)</option>';
-        proxies.forEach(function (p) {
-            var key = connectionKey(p);
-            var label = 'Port ' + p.port + (p.is_using_https ? ' (HTTPS)' : ' (HTTP)');
-            html += '<option value="' + key + '">' + label + '</option>';
+
+        // Build the dropdown from all connection names discovered via SSE.
+        var names = Object.keys(perConnectionSnapshots).sort();
+
+        // Group: port-level → [path-level children]
+        var ports = {};    // portKey → [childKey, …]
+        names.forEach(function (name) {
+            if (name === 'global') return;
+            var pathIdx = name.indexOf('-path-');
+            if (pathIdx !== -1) {
+                var parent = name.substring(0, pathIdx);
+                if (!ports[parent]) ports[parent] = [];
+                ports[parent].push(name);
+            } else {
+                // port-level (or any non-path metric)
+                if (!ports[name]) ports[name] = [];
+            }
         });
+
+        var html = '<option value="global">Global (all proxies)</option>';
+        Object.keys(ports).sort().forEach(function (portKey) {
+            var portLabel = portKey.replace(/^metric-port-/, ':');
+            var children = ports[portKey];
+            if (children.length > 0) {
+                html += '<option value="' + portKey + '">' + portLabel + ' (all paths)</option>';
+                children.sort().forEach(function (childKey) {
+                    var path = childKey.substring(childKey.indexOf('-path-') + 6);
+                    html += '<option value="' + childKey + '">\u00A0\u00A0\u2514 ' + portLabel + ' ' + path + '</option>';
+                });
+            } else {
+                html += '<option value="' + portKey + '">' + portLabel + '</option>';
+            }
+        });
+
         sel.innerHTML = html;
         if (current && sel.querySelector('option[value="' + current + '"]')) sel.value = current;
     }
@@ -883,12 +917,9 @@
 
         // Fast path: if the route structure hasn't changed, just update metrics cells in-place.
         if (fp === lastRouteFingerprint) {
-            var rows = el.querySelectorAll('tbody tr');
-            proxies.forEach(function (p, i) {
-                if (!rows[i]) return;
-                var cells = rows[i].querySelectorAll('td');
-                // cells[7] = Metrics column
-                if (cells[7]) cells[7].innerHTML = metricsHtmlFor(p.metric);
+            proxies.forEach(function (p) {
+                var metricsCell = el.querySelector('[data-metrics-port="' + p.port + '"]');
+                if (metricsCell) metricsCell.innerHTML = metricsHtmlFor(p.metric);
             });
             return;
         }
@@ -897,7 +928,7 @@
         lastRouteFingerprint = fp;
         var h = '<div class="overflow-auto"><table class="striped"><thead><tr>' +
             '<th>Port</th><th>Interface</th><th>Backends</th><th>HTTPS</th>' +
-            '<th>ACME</th><th>Status</th><th>Traffic</th><th>Metrics</th><th>Middleware</th><th>Actions</th>' +
+            '<th>ACME</th><th>Status</th><th>Traffic</th><th>Metrics</th><th>Actions</th>' +
             '</tr></thead><tbody>';
         proxies.forEach(function (p) {
             var actionBtn = p.is_started
@@ -906,6 +937,11 @@
             var sparkHtml = p.is_started
                 ? '<canvas class="sparkline" data-connection="' + connectionKey(p) + '" width="60" height="30"></canvas>'
                 : '<span style="color:var(--pico-muted-color);font-size:0.75rem">–</span>';
+            var routeCount = (p.routes && p.routes.length) || 0;
+            var pathCount = 0;
+            if (p.routes) p.routes.forEach(function (r) { pathCount += (r.paths && r.paths.length) || 0; });
+            var toggleLabel = routeCount + ' route' + (routeCount !== 1 ? 's' : '');
+            if (pathCount > 0) toggleLabel += ', ' + pathCount + ' path' + (pathCount !== 1 ? 's' : '');
             h += '<tr>' +
                 '<td><code>' + p.port + '</code></td>' +
                 '<td>' + (p.interface || '<em>all</em>') + '</td>' +
@@ -918,11 +954,23 @@
                     ? '<span class="badge badge-success">Running</span>'
                     : '<span class="badge badge-danger">Stopped</span>') + '</td>' +
                 '<td>' + sparkHtml + '</td>' +
-                '<td>' + metricsHtmlFor(p.metric) + '</td>' +
-                '<td>' + (p.middleware_chain && p.middleware_chain.length
-                    ? p.middleware_chain.join(', ') : '<em>none</em>') + '</td>' +
+                '<td data-metrics-port="' + p.port + '">' + metricsHtmlFor(p.metric) + '</td>' +
                 '<td>' + actionBtn + '</td>' +
                 '</tr>';
+            // Expandable detail row for routes
+            if (routeCount > 0) {
+                h += '<tr class="route-detail-row" data-detail-port="' + p.port + '" style="display:none;">' +
+                    '<td colspan="9" style="padding:0.5rem 1rem;background:var(--pico-card-background-color,#1a1a2e);">' +
+                    renderRouteDetail(p.routes) +
+                    '</td></tr>';
+                // Insert toggle into the Port cell of the main row above
+                h = h.replace(
+                    '<td><code>' + p.port + '</code></td>',
+                    '<td><code>' + p.port + '</code><br>' +
+                    '<a href="#" class="route-toggle-btn" data-toggle-port="' + p.port +
+                    '" style="font-size:0.7rem;cursor:pointer;">▶ ' + toggleLabel + '</a></td>'
+                );
+            }
         });
         h += '</tbody></table></div>';
         el.innerHTML = h;
@@ -931,8 +979,41 @@
                 toggleProxy(this.getAttribute('data-port'), this.getAttribute('data-action'));
             });
         });
+        el.querySelectorAll('.route-toggle-btn').forEach(function (btn) {
+            btn.addEventListener('click', function (e) {
+                e.preventDefault();
+                var port = this.getAttribute('data-toggle-port');
+                var detailRow = el.querySelector('[data-detail-port="' + port + '"]');
+                if (!detailRow) return;
+                var isHidden = detailRow.style.display === 'none';
+                detailRow.style.display = isHidden ? 'table-row' : 'none';
+                this.textContent = (isHidden ? '▼ ' : '▶ ') + this.textContent.substring(2);
+            });
+        });
         // Immediately redraw sparklines so canvases aren't blank after rebuild
         redrawAllSparklines();
+    }
+
+    function renderRouteDetail(routes) {
+        if (!routes || routes.length === 0) return '<em>No routes</em>';
+        var h = '<table style="width:100%;margin:0;font-size:0.8rem;">' +
+            '<thead><tr><th>Host</th><th>Backend</th><th>Middleware</th></tr></thead><tbody>';
+        routes.forEach(function (r) {
+            var host = r.host || '<em>default</em>';
+            var mw = (r.middlewares && r.middlewares.length) ? r.middlewares.join(', ') : '<em>none</em>';
+            h += '<tr><td>' + host + '</td><td><code>' + r.backend + '</code></td><td>' + mw + '</td></tr>';
+            if (r.paths && r.paths.length > 0) {
+                r.paths.forEach(function (p) {
+                    var pmw = (p.middlewares && p.middlewares.length) ? p.middlewares.join(', ') : '<em>none</em>';
+                    h += '<tr style="color:var(--pico-muted-color);">' +
+                        '<td style="padding-left:1.5rem;">↳ <code>' + p.pattern + '</code></td>' +
+                        '<td></td>' +
+                        '<td>' + pmw + '</td></tr>';
+                });
+            }
+        });
+        h += '</tbody></table>';
+        return h;
     }
 
     function toggleProxy(port, action) {
