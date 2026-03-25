@@ -5,7 +5,6 @@ import (
 	"net/http"
 	"strconv"
 
-	"github.com/nunoOliveiraqwe/micro-proxy/metrics"
 	"go.uber.org/zap"
 )
 
