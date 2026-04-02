@@ -29,6 +29,7 @@ type Metric struct {
 
 type RequestMetric struct {
 	RemoteAddress  string
+	Country        string
 	connectionName string
 	LatencyMs      int64
 	IsTimedOut     bool

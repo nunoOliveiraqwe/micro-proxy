@@ -104,6 +104,7 @@ func (h *ConnectionMetricsManager) updateConnectionMetrics(metric *RequestMetric
 	h.requestLog.Add(RequestLogEntry{
 		Timestamp:      time.Now(),
 		RemoteAddress:  metric.RemoteAddress,
+		Country:        metric.Country,
 		ConnectionName: metric.connectionName,
 		StatusCode:     metric.StatusCode,
 		Method:         metric.Method,

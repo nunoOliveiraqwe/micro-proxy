@@ -7,6 +7,7 @@ import (
 
 type RequestLogEntry struct {
 	RemoteAddress  string    `json:"remote_address"`
+	Country        string    `json:"country"`
 	Timestamp      time.Time `json:"timestamp"`
 	ConnectionName string    `json:"connection_name"`
 	StatusCode     int       `json:"status_code"`

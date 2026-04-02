@@ -97,6 +97,12 @@ func (h *headersConfig) compareHeadersInRequest(r *http.Request) bool {
 
 func HeadersMiddleware(_ context.Context, next http.HandlerFunc, conf Config) http.HandlerFunc {
 	h := parseConfiguration(conf)
+	if h == nil {
+		zap.S().Errorf("HeadersMiddleware: failed to initialize header writer. Failing closed.")
+		return func(w http.ResponseWriter, request *http.Request) {
+			http.Error(w, "HeadersMiddleware misconfigured", http.StatusServiceUnavailable)
+		}
+	}
 	hasElements := len(h.setHeadersReq) > 0 ||
 		len(h.setHeadersRes) > 0 ||
 		len(h.stripHeadersReq) > 0 ||

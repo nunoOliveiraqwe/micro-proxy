@@ -552,47 +552,59 @@
             animation: none;
         }
         .req-entry .req-time {
+            flex: 0 0 58px;
             font-size: 0.68rem;
             color: var(--pico-muted-color);
             white-space: nowrap;
-            min-width: 58px;
         }
         .req-entry .req-remote {
+            flex: 0 0 110px;
             font-size: 0.68rem;
             color: var(--pico-muted-color);
             white-space: nowrap;
-            min-width: 110px;
+            overflow: hidden;
+            text-overflow: ellipsis;
         }
-        .req-entry .req-route {
+        .req-entry .req-country {
+            flex: 0 0 56px;
             font-size: 0.68rem;
             color: var(--pico-muted-color);
-            min-width: 52px;
+            white-space: nowrap;
+            text-align: center;
+        }
+        .req-entry .req-route {
+            flex: 0 0 52px;
+            font-size: 0.68rem;
+            color: var(--pico-muted-color);
             white-space: nowrap;
         }
         .req-entry .req-path {
+            flex: 1 1 0;
             color: var(--pico-muted-color);
             overflow: hidden;
             text-overflow: ellipsis;
             white-space: nowrap;
-            flex: 1;
+            min-width: 0;
         }
         .req-entry .req-method {
+            flex: 0 0 52px;
             font-weight: 600;
-            min-width: 36px;
+            white-space: nowrap;
         }
         .req-entry .req-status {
+            flex: 0 0 36px;
             font-weight: 700;
-            min-width: 28px;
+            white-space: nowrap;
         }
         .req-status.s2xx { color: #2ecc71; }
         .req-status.s3xx { color: #3498db; }
         .req-status.s4xx { color: #f39c12; }
         .req-status.s5xx { color: #e74c3c; }
         .req-entry .req-latency {
+            flex: 0 0 60px;
             color: var(--pico-muted-color);
             font-size: 0.68rem;
             white-space: nowrap;
-            min-width: 48px;
             text-align: right;
         }
     </style>

@@ -803,6 +803,7 @@
         row.innerHTML =
             '<span class="req-time">' + time + '</span>' +
             '<span class="req-remote">' + (e.remote_address || '–') + '</span>' +
+            '<span class="req-country">' + (e.country || '–') + '</span>' +
             '<span class="req-route">:' + parsePort(e.connection_name) + '</span>' +
             '<span class="req-path" title="' + (e.path || '').replace(/"/g,'&quot;') + '">' + (e.path || '/') + '</span>' +
             '<span class="req-method">' + (e.method || '?') + '</span>' +
@@ -814,6 +815,7 @@
     var requestFeedHeader = '<div class="req-entry req-header">' +
         '<span class="req-time">Time</span>' +
         '<span class="req-remote">Remote</span>' +
+        '<span class="req-country">Country</span>' +
         '<span class="req-route">Route</span>' +
         '<span class="req-path">Path</span>' +
         '<span class="req-method">Method</span>' +

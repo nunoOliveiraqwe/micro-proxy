@@ -83,7 +83,7 @@ func GetNetworkBindAddressesFromInterface(ifName string) (ipv4, ipv6 string, err
 	return ipv4, ipv6, nil
 }
 
-func GetIpFromRequest(r *http.Request) (string, error) {
+func GetIpFromRequestFromXForwarded(r *http.Request) (string, error) {
 	zap.S().Debug("Fetching IP address from request")
 	ips := r.Header.Get("X-Forwarded-For")
 	splitIps := strings.Split(ips, ",")
@@ -95,16 +95,16 @@ func GetIpFromRequest(r *http.Request) (string, error) {
 			return netIP.String(), nil
 		}
 	}
-	zap.S().Debug("No valid IP found in X-Forwarded-For header, falling back to RemoteAddr: %s", r.RemoteAddr)
+	return GetClientIP(r)
+}
+
+func GetClientIP(r *http.Request) (string, error) {
 	ip, _, err := net.SplitHostPort(r.RemoteAddr)
 	if err != nil {
-		return "", err
+		return "", fmt.Errorf("failed to parse RemoteAddr %q: %w", r.RemoteAddr, err)
 	}
-
-	netIP := net.ParseIP(ip)
-	if netIP != nil {
-		return netIP.String(), nil
+	if net.ParseIP(ip) == nil {
+		return "", fmt.Errorf("invalid IP address: %s", ip)
 	}
-
-	return "", fmt.Errorf("IP not found")
+	return ip, nil
 }

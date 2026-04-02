@@ -74,6 +74,13 @@ func MetricsMiddleware(ctx context.Context, next http.HandlerFunc, _ Config) htt
 			metric.IsTimedOut = true
 		}
 		metric.LatencyMs = elapsedTime.Milliseconds()
+		countryCode := r.Context().Value("country-code")
+		if countryCode != nil {
+			countryStr, ok := countryCode.(string)
+			if ok {
+				metric.Country = countryStr
+			}
+		}
 		reportFunc(metric)
 	}
 }
