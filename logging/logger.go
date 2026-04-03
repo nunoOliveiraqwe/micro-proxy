@@ -3,8 +3,8 @@ package logging
 import (
 	"strings"
 
-	"github.com/nunoOliveiraqwe/micro-proxy/config"
-	"github.com/nunoOliveiraqwe/micro-proxy/internal/fsutil"
+	"github.com/nunoOliveiraqwe/torii/config"
+	"github.com/nunoOliveiraqwe/torii/internal/fsutil"
 	"go.uber.org/zap"
 	"go.uber.org/zap/zapcore"
 )

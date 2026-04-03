@@ -8,30 +8,30 @@ import (
 	"syscall"
 	"time"
 
-	microproxy "github.com/nunoOliveiraqwe/micro-proxy"
+	"github.com/nunoOliveiraqwe/torii"
 	"go.uber.org/zap"
 )
 
 const banner = `
-           _                ____                       
- _ __ ___ (_) ___ _ __ ___ |  _ \ _ __ _____  ___   _ 
-| '_ ` + "`" + ` _ \| |/ __| '__/ _ \| |_) | '__/ _ \ \/ / | | |
-| | | | | | | (__| | | (_) |  __/| | | (_) >  <| |_| |
-|_| |_| |_|_|\___|_|  \___/|_|   |_|  \___/_/\_\\__, |
-                                                  |___/ `
+  _              _ _ 
+ | |_ ___  _ __ (_|_)
+ | __/ _ \| '_ \| | |
+ | || (_) | |   | | |
+  \__\___/|_|   |_|_|
+`
 
 func printBanner() {
-	fmt.Println(banner)
-	fmt.Printf("  Version:    %s\n", microproxy.Version)
-	fmt.Printf("  Build:      %s\n", microproxy.Build)
-	fmt.Printf("  Build Time: %s\n", microproxy.BuildTime)
+	fmt.Print(banner)
+	fmt.Printf("  Version:    %s\n", torii.Version)
+	fmt.Printf("  Build:      %s\n", torii.Build)
+	fmt.Printf("  Build Time: %s\n", torii.BuildTime)
 	fmt.Println()
 }
 
 func main() {
 	printBanner()
 
-	app := microproxy.NewApplication()
+	app := torii.NewApplication()
 	app.ParseFlags()
 
 	if err := app.LoadConfiguration(); err != nil {

@@ -3,7 +3,7 @@ package api
 import (
 	"net/http"
 
-	"github.com/nunoOliveiraqwe/micro-proxy/internal/app"
+	"github.com/nunoOliveiraqwe/torii/internal/app"
 )
 
 func handleHealthCheck(_ app.SystemService) http.HandlerFunc {

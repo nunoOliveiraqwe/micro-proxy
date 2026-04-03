@@ -6,7 +6,7 @@ import (
 	"fmt"
 	"net/http"
 
-	"github.com/nunoOliveiraqwe/micro-proxy/config"
+	"github.com/nunoOliveiraqwe/torii/config"
 	"go.uber.org/zap"
 )
 

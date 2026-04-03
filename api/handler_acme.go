@@ -5,10 +5,10 @@ import (
 	"time"
 
 	"github.com/go-acme/lego/v4/log"
-	"github.com/nunoOliveiraqwe/micro-proxy/internal/app"
-	"github.com/nunoOliveiraqwe/micro-proxy/internal/domain"
-	"github.com/nunoOliveiraqwe/micro-proxy/middleware"
-	"github.com/nunoOliveiraqwe/micro-proxy/proxy/acme"
+	"github.com/nunoOliveiraqwe/torii/internal/app"
+	"github.com/nunoOliveiraqwe/torii/internal/domain"
+	"github.com/nunoOliveiraqwe/torii/middleware"
+	"github.com/nunoOliveiraqwe/torii/proxy/acme"
 	"go.uber.org/zap"
 )
 

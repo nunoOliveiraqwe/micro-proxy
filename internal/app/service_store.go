@@ -1,6 +1,6 @@
 package app
 
-import "github.com/nunoOliveiraqwe/micro-proxy/internal/store"
+import "github.com/nunoOliveiraqwe/torii/internal/store"
 
 type ServiceStore struct {
 	userService                *UserService

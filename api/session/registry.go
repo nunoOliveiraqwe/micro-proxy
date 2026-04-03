@@ -6,12 +6,12 @@ import (
 
 	"github.com/alexedwards/scs/sqlite3store"
 	"github.com/alexedwards/scs/v2"
-	"github.com/nunoOliveiraqwe/micro-proxy/config"
-	"github.com/nunoOliveiraqwe/micro-proxy/internal/sqlite"
+	"github.com/nunoOliveiraqwe/torii/config"
+	"github.com/nunoOliveiraqwe/torii/internal/sqlite"
 	"go.uber.org/zap"
 )
 
-const cookieName = "micro-proxy-id"
+const cookieName = "torii-id"
 const cookiePath = "/"
 
 type Registry struct {

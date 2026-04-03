@@ -5,7 +5,7 @@ import (
 	"fmt"
 	"sync"
 
-	"github.com/nunoOliveiraqwe/micro-proxy/metrics"
+	"github.com/nunoOliveiraqwe/torii/metrics"
 	"go.uber.org/zap"
 )
 

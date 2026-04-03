@@ -5,9 +5,9 @@ import (
 	"testing"
 	"time"
 
-	"github.com/nunoOliveiraqwe/micro-proxy/internal/domain"
-	"github.com/nunoOliveiraqwe/micro-proxy/internal/sqlite"
-	"github.com/nunoOliveiraqwe/micro-proxy/proxy/acme"
+	"github.com/nunoOliveiraqwe/torii/internal/domain"
+	"github.com/nunoOliveiraqwe/torii/internal/sqlite"
+	"github.com/nunoOliveiraqwe/torii/proxy/acme"
 )
 
 func openTestDB(t *testing.T) *sqlite.DB {

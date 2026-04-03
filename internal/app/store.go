@@ -1,8 +1,8 @@
 package app
 
 import (
-	"github.com/nunoOliveiraqwe/micro-proxy/internal/sqlite"
-	"github.com/nunoOliveiraqwe/micro-proxy/internal/store"
+	"github.com/nunoOliveiraqwe/torii/internal/sqlite"
+	"github.com/nunoOliveiraqwe/torii/internal/store"
 )
 
 type DataStore struct {

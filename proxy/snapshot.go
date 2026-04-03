@@ -1,6 +1,6 @@
 package proxy
 
-import "github.com/nunoOliveiraqwe/micro-proxy/metrics"
+import "github.com/nunoOliveiraqwe/torii/metrics"
 
 type PathSnapshot struct {
 	Pattern     string   `json:"pattern"`

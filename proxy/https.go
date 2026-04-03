@@ -10,13 +10,13 @@ import (
 	"sync/atomic"
 	"time"
 
-	"github.com/nunoOliveiraqwe/micro-proxy/internal/fsutil"
-	"github.com/nunoOliveiraqwe/micro-proxy/metrics"
-	"github.com/nunoOliveiraqwe/micro-proxy/proxy/acme"
+	"github.com/nunoOliveiraqwe/torii/internal/fsutil"
+	"github.com/nunoOliveiraqwe/torii/metrics"
+	"github.com/nunoOliveiraqwe/torii/proxy/acme"
 	"go.uber.org/zap"
 )
 
-type MicroProxyHttpsServer struct {
+type ToriiHttpsServer struct {
 	httpServer        *http.Server
 	serverId          string
 	handler           http.Handler
@@ -36,7 +36,7 @@ type MicroProxyHttpsServer struct {
 	routes            []RouteSnapshot
 }
 
-func (m *MicroProxyHttpsServer) GetProxySnapshot(metrics []*metrics.Metric) *ProxySnapshot {
+func (m *ToriiHttpsServer) GetProxySnapshot(metrics []*metrics.Metric) *ProxySnapshot {
 	return &ProxySnapshot{
 		Port:            m.bindPort,
 		Interface:       fmt.Sprintf("ipv4=%s, ipv6=%s", m.iPV4BindInterface, m.iPV6BindInterface),
@@ -50,11 +50,11 @@ func (m *MicroProxyHttpsServer) GetProxySnapshot(metrics []*metrics.Metric) *Pro
 	}
 }
 
-func (m *MicroProxyHttpsServer) GetServerId() string {
+func (m *ToriiHttpsServer) GetServerId() string {
 	return m.serverId
 }
 
-func (m *MicroProxyHttpsServer) start(acmeManager *acme.LegoAcmeManager) error {
+func (m *ToriiHttpsServer) start(acmeManager *acme.LegoAcmeManager) error {
 	zap.S().Infof("Starting HTTPS server on %d, ipv4 = %s, ipv6 = %s", m.bindPort, m.iPV4BindInterface, m.iPV6BindInterface)
 	listeners := buildNetListeners(m.iPV4BindInterface, m.iPV6BindInterface, m.bindPort)
 	if len(listeners) == 0 {
@@ -105,7 +105,7 @@ func (m *MicroProxyHttpsServer) start(acmeManager *acme.LegoAcmeManager) error {
 	return fmt.Errorf("HTTPS server cannot start: no ACME manager and no valid certificate/key files provided")
 }
 
-func (m *MicroProxyHttpsServer) stop() error {
+func (m *ToriiHttpsServer) stop() error {
 	zap.S().Infof("Stopping HTTP server")
 	if m.httpServer == nil {
 		return nil
@@ -114,11 +114,11 @@ func (m *MicroProxyHttpsServer) stop() error {
 	return m.httpServer.Shutdown(context.Background())
 }
 
-func (m *MicroProxyHttpsServer) getHandler() http.Handler {
+func (m *ToriiHttpsServer) getHandler() http.Handler {
 	return m.handler
 }
 
-func (m *MicroProxyHttpsServer) updateHandler(handler http.Handler) error {
+func (m *ToriiHttpsServer) updateHandler(handler http.Handler) error {
 	if m.isStarted.Load() {
 		return fmt.Errorf("HTTPS server is already started, cannot update handler")
 	}

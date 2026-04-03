@@ -3,7 +3,7 @@ package api
 import (
 	"net/http"
 
-	"github.com/nunoOliveiraqwe/micro-proxy/internal/app"
+	"github.com/nunoOliveiraqwe/torii/internal/app"
 )
 
 var APPLICATION_ROUTE_BASE_PATH = "/api/v1"

@@ -7,8 +7,8 @@ import (
 	"os"
 	"time"
 
-	"github.com/nunoOliveiraqwe/micro-proxy/internal/fsutil"
-	"github.com/nunoOliveiraqwe/micro-proxy/internal/util"
+	"github.com/nunoOliveiraqwe/torii/internal/fsutil"
+	"github.com/nunoOliveiraqwe/torii/internal/util"
 	"go.uber.org/zap"
 )
 

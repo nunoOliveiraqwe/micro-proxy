@@ -3,7 +3,7 @@ package store
 import (
 	"context"
 
-	"github.com/nunoOliveiraqwe/micro-proxy/internal/domain"
+	"github.com/nunoOliveiraqwe/torii/internal/domain"
 )
 
 type ProxyMetricsStore interface {

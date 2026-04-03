@@ -5,8 +5,8 @@ import (
 	"net/http"
 	"time"
 
-	"github.com/nunoOliveiraqwe/micro-proxy/internal/app"
-	"github.com/nunoOliveiraqwe/micro-proxy/middleware"
+	"github.com/nunoOliveiraqwe/torii/internal/app"
+	"github.com/nunoOliveiraqwe/torii/middleware"
 	"go.uber.org/zap"
 )
 

@@ -7,9 +7,9 @@ import (
 	"strconv"
 	"time"
 
-	"github.com/nunoOliveiraqwe/micro-proxy/config"
-	"github.com/nunoOliveiraqwe/micro-proxy/internal/app"
-	"github.com/nunoOliveiraqwe/micro-proxy/middleware"
+	"github.com/nunoOliveiraqwe/torii/config"
+	"github.com/nunoOliveiraqwe/torii/internal/app"
+	"github.com/nunoOliveiraqwe/torii/middleware"
 	"go.uber.org/zap"
 )
 

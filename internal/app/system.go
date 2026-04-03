@@ -6,13 +6,13 @@ import (
 	"runtime"
 	"time"
 
-	"github.com/nunoOliveiraqwe/micro-proxy/api/session"
-	"github.com/nunoOliveiraqwe/micro-proxy/config"
-	"github.com/nunoOliveiraqwe/micro-proxy/internal/sqlite"
-	"github.com/nunoOliveiraqwe/micro-proxy/internal/store"
-	"github.com/nunoOliveiraqwe/micro-proxy/metrics"
-	"github.com/nunoOliveiraqwe/micro-proxy/proxy"
-	"github.com/nunoOliveiraqwe/micro-proxy/proxy/acme"
+	"github.com/nunoOliveiraqwe/torii/api/session"
+	"github.com/nunoOliveiraqwe/torii/config"
+	"github.com/nunoOliveiraqwe/torii/internal/sqlite"
+	"github.com/nunoOliveiraqwe/torii/internal/store"
+	"github.com/nunoOliveiraqwe/torii/metrics"
+	"github.com/nunoOliveiraqwe/torii/proxy"
+	"github.com/nunoOliveiraqwe/torii/proxy/acme"
 	"go.uber.org/zap"
 )
 
@@ -44,7 +44,7 @@ type SystemService interface {
 }
 
 type systemService struct {
-	micro                *proxy.MicroProxy
+	micro                *proxy.Torii
 	db                   *sqlite.DB
 	sessions             *session.Registry
 	serviceStore         *ServiceStore
@@ -58,7 +58,7 @@ func NewSystemService(conf config.AppConfig) (SystemService, error) {
 	zap.S().Info("Initializing system service")
 	mgr := metrics.NewGlobalMetricsHandler(2, context.Background())
 
-	db := sqlite.NewDB("micro-proxy.db")
+	db := sqlite.NewDB("torii.db")
 	if err := db.Open(); err != nil {
 		return nil, fmt.Errorf("failed to open database: %w", err)
 	}
@@ -78,7 +78,7 @@ func NewSystemService(conf config.AppConfig) (SystemService, error) {
 		}
 	}
 
-	m, err := proxy.NewMicroProxy(conf.NetConfig, mgr, acmeMgr)
+	m, err := proxy.NewTorii(conf.NetConfig, mgr, acmeMgr)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create micro proxy: %w", err)
 	}

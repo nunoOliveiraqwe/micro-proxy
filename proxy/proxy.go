@@ -6,9 +6,9 @@ import (
 	"net/http"
 	"sync"
 
-	"github.com/nunoOliveiraqwe/micro-proxy/config"
-	"github.com/nunoOliveiraqwe/micro-proxy/metrics"
-	"github.com/nunoOliveiraqwe/micro-proxy/proxy/acme"
+	"github.com/nunoOliveiraqwe/torii/config"
+	"github.com/nunoOliveiraqwe/torii/metrics"
+	"github.com/nunoOliveiraqwe/torii/proxy/acme"
 	"go.uber.org/zap"
 )
 
@@ -21,7 +21,7 @@ type MicroHttpServer interface {
 	stop() error
 }
 
-type MicroProxy struct {
+type Torii struct {
 	stoppedHttpServers map[int]MicroHttpServer
 	startedHttpServers map[int]MicroHttpServer
 	lock               sync.Mutex
@@ -29,9 +29,9 @@ type MicroProxy struct {
 	metricsManager     *metrics.ConnectionMetricsManager
 }
 
-func NewMicroProxy(conf config.NetworkConfig, mgr *metrics.ConnectionMetricsManager, acmeMgr *acme.LegoAcmeManager) (*MicroProxy, error) {
-	zap.S().Info("Initializing MicroProxy with configuration: ", conf)
-	m := MicroProxy{
+func NewTorii(conf config.NetworkConfig, mgr *metrics.ConnectionMetricsManager, acmeMgr *acme.LegoAcmeManager) (*Torii, error) {
+	zap.S().Info("Initializing torii with configuration: ", conf)
+	m := Torii{
 		stoppedHttpServers: make(map[int]MicroHttpServer),
 		startedHttpServers: make(map[int]MicroHttpServer),
 		lock:               sync.Mutex{},
@@ -51,8 +51,8 @@ func NewMicroProxy(conf config.NetworkConfig, mgr *metrics.ConnectionMetricsMana
 	return &m, nil
 }
 
-func (m *MicroProxy) StartAll() error {
-	zap.S().Infof("Starting MicroProxy with %d HTTP servers", len(m.stoppedHttpServers))
+func (m *Torii) StartAll() error {
+	zap.S().Infof("Starting torii with %d HTTP servers", len(m.stoppedHttpServers))
 	for port, _ := range m.stoppedHttpServers {
 		//hmmm, i can't lock here, because i wanto to call start
 		err := m.StartProxy(port)
@@ -66,8 +66,8 @@ func (m *MicroProxy) StartAll() error {
 	return nil
 }
 
-func (m *MicroProxy) StopAll() error {
-	zap.S().Infof("Stopping MicroProxy with %d HTTP servers", len(m.startedHttpServers))
+func (m *Torii) StopAll() error {
+	zap.S().Infof("Stopping torii with %d HTTP servers", len(m.startedHttpServers))
 	for port, _ := range m.startedHttpServers {
 		err := m.StopProxy(port)
 		if err != nil {
@@ -78,7 +78,7 @@ func (m *MicroProxy) StopAll() error {
 	return nil
 }
 
-func (m *MicroProxy) StartProxy(port int) error {
+func (m *Torii) StartProxy(port int) error {
 	zap.S().Infof("Starting proxy server on port %d", port)
 	if port <= 0 {
 		return fmt.Errorf("invalid port number: %d", port)
@@ -103,7 +103,7 @@ func (m *MicroProxy) StartProxy(port int) error {
 	return nil
 }
 
-func (m *MicroProxy) StopProxy(port int) error {
+func (m *Torii) StopProxy(port int) error {
 	zap.S().Infof("Stopping proxy server on port %d", port)
 	if port <= 0 {
 		return fmt.Errorf("invalid port number: %d", port)
@@ -130,13 +130,13 @@ func (m *MicroProxy) StopProxy(port int) error {
 	return nil
 }
 
-func (m *MicroProxy) StopAcme() {
+func (m *Torii) StopAcme() {
 	if m.acmeManager != nil {
 		m.acmeManager.Stop()
 	}
 }
 
-func (m *MicroProxy) SwapAcmeManager(newMgr *acme.LegoAcmeManager) {
+func (m *Torii) SwapAcmeManager(newMgr *acme.LegoAcmeManager) {
 	m.lock.Lock()
 	defer m.lock.Unlock()
 	if m.acmeManager != nil {
@@ -150,7 +150,7 @@ func (m *MicroProxy) SwapAcmeManager(newMgr *acme.LegoAcmeManager) {
 	}
 }
 
-func (m *MicroProxy) AddHttpServer(ctx context.Context, conf config.HTTPListener, globalConf *config.GlobalConfig) error {
+func (m *Torii) AddHttpServer(ctx context.Context, conf config.HTTPListener, globalConf *config.GlobalConfig) error {
 	zap.S().Debugf("Adding HTTP server for listener configuration: %+v", conf)
 	m.lock.Lock()
 	defer m.lock.Unlock()
@@ -163,11 +163,11 @@ func (m *MicroProxy) AddHttpServer(ctx context.Context, conf config.HTTPListener
 	return nil
 }
 
-func (m *MicroProxy) AddTcpServer(conf config.TCPListener) {
+func (m *Torii) AddTcpServer(conf config.TCPListener) {
 	//TODO
 }
 
-func (m *MicroProxy) GetProxyConfSnapshots() []*ProxySnapshot {
+func (m *Torii) GetProxyConfSnapshots() []*ProxySnapshot {
 	proxySnapshots := make([]*ProxySnapshot, 0)
 	m.lock.Lock()
 	defer m.lock.Unlock()
@@ -186,7 +186,7 @@ func (m *MicroProxy) GetProxyConfSnapshots() []*ProxySnapshot {
 	return proxySnapshots
 }
 
-func (m *MicroProxy) initializeHttpNetworkStackFromConf(ctx context.Context, conf config.NetworkConfig) error {
+func (m *Torii) initializeHttpNetworkStackFromConf(ctx context.Context, conf config.NetworkConfig) error {
 	zap.S().Infof("Initializing HTTP servers")
 	if (conf.HTTPListeners == nil || len(conf.HTTPListeners) == 0) &&
 		(len(conf.TCPListeners) == 0 || conf.TCPListeners == nil) &&
@@ -201,7 +201,7 @@ func (m *MicroProxy) initializeHttpNetworkStackFromConf(ctx context.Context, con
 	return nil
 }
 
-func (m *MicroProxy) collectWorkingDomains() []string {
+func (m *Torii) collectWorkingDomains() []string {
 	zap.S().Debugf("Collecting working domains from HTTP servers")
 	domains := make([]string, 0)
 	domains = appendDomainsFromServers(m.stoppedHttpServers, domains)

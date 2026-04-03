@@ -9,12 +9,12 @@ import (
 	"sync/atomic"
 	"time"
 
-	"github.com/nunoOliveiraqwe/micro-proxy/metrics"
-	"github.com/nunoOliveiraqwe/micro-proxy/proxy/acme"
+	"github.com/nunoOliveiraqwe/torii/metrics"
+	"github.com/nunoOliveiraqwe/torii/proxy/acme"
 	"go.uber.org/zap"
 )
 
-type MicroProxyHttpServer struct {
+type ToriiHttpServer struct {
 	httpServer        *http.Server
 	serverId          string
 	handler           http.Handler
@@ -31,7 +31,7 @@ type MicroProxyHttpServer struct {
 	routes            []RouteSnapshot
 }
 
-func (m *MicroProxyHttpServer) GetProxySnapshot(metrics []*metrics.Metric) *ProxySnapshot {
+func (m *ToriiHttpServer) GetProxySnapshot(metrics []*metrics.Metric) *ProxySnapshot {
 	return &ProxySnapshot{
 		Port:            m.bindPort,
 		Interface:       fmt.Sprintf("ipv4=%s, ipv6=%s", m.iPV4BindInterface, m.iPV6BindInterface),
@@ -45,11 +45,11 @@ func (m *MicroProxyHttpServer) GetProxySnapshot(metrics []*metrics.Metric) *Prox
 	}
 }
 
-func (m *MicroProxyHttpServer) GetServerId() string {
+func (m *ToriiHttpServer) GetServerId() string {
 	return m.serverId
 }
 
-func (m *MicroProxyHttpServer) start(_ *acme.LegoAcmeManager) error {
+func (m *ToriiHttpServer) start(_ *acme.LegoAcmeManager) error {
 	zap.S().Infof("Starting HTTP server on %d, ipv4 = %s, ipv6 = %s", m.bindPort, m.iPV4BindInterface, m.iPV6BindInterface)
 	listeners := buildNetListeners(m.iPV4BindInterface, m.iPV6BindInterface, m.bindPort)
 	if len(listeners) == 0 {
@@ -77,7 +77,7 @@ func (m *MicroProxyHttpServer) start(_ *acme.LegoAcmeManager) error {
 	return nil
 }
 
-func (m *MicroProxyHttpServer) stop() error {
+func (m *ToriiHttpServer) stop() error {
 	zap.S().Infof("Stopping HTTP server")
 	if m.httpServer == nil {
 		return nil
@@ -86,11 +86,11 @@ func (m *MicroProxyHttpServer) stop() error {
 	return m.httpServer.Shutdown(context.Background())
 }
 
-func (m *MicroProxyHttpServer) getHandler() http.Handler {
+func (m *ToriiHttpServer) getHandler() http.Handler {
 	return m.handler
 }
 
-func (m *MicroProxyHttpServer) updateHandler(handler http.Handler) error {
+func (m *ToriiHttpServer) updateHandler(handler http.Handler) error {
 	if m.isStarted.Load() {
 		return fmt.Errorf("HTTP server is already started, cannot update handler")
 	}

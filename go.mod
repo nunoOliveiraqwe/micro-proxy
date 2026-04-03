@@ -1,4 +1,4 @@
-module github.com/nunoOliveiraqwe/micro-proxy
+module github.com/nunoOliveiraqwe/torii
 
 go 1.25.0
 

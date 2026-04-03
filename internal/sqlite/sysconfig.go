@@ -3,8 +3,8 @@ package sqlite
 import (
 	"context"
 
-	"github.com/nunoOliveiraqwe/micro-proxy/internal/domain"
-	"github.com/nunoOliveiraqwe/micro-proxy/internal/store"
+	"github.com/nunoOliveiraqwe/torii/internal/domain"
+	"github.com/nunoOliveiraqwe/torii/internal/store"
 )
 
 // Ensure service implements interface.

@@ -4,7 +4,7 @@ import (
 	"context"
 	"fmt"
 
-	"github.com/nunoOliveiraqwe/micro-proxy/internal/auth"
+	"github.com/nunoOliveiraqwe/torii/internal/auth"
 	"go.uber.org/zap"
 )
 

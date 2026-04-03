@@ -1,7 +1,7 @@
 package store
 
 import (
-	"github.com/nunoOliveiraqwe/micro-proxy/internal/domain"
+	"github.com/nunoOliveiraqwe/torii/internal/domain"
 )
 
 type SystemConfigStore interface {

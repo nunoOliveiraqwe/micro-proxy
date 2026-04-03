@@ -5,7 +5,7 @@ import (
 	"net/http"
 	"strings"
 
-	"github.com/nunoOliveiraqwe/micro-proxy/internal/resolve"
+	"github.com/nunoOliveiraqwe/torii/internal/resolve"
 	"go.uber.org/zap"
 )
 

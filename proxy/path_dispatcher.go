@@ -6,7 +6,7 @@ import (
 	"net/http"
 	"strings"
 
-	"github.com/nunoOliveiraqwe/micro-proxy/config"
+	"github.com/nunoOliveiraqwe/torii/config"
 	"go.uber.org/zap"
 )
 

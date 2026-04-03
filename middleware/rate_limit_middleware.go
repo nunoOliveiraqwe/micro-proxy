@@ -11,8 +11,8 @@ import (
 	"sync"
 	"time"
 
-	"github.com/nunoOliveiraqwe/micro-proxy/internal/netutil"
-	"github.com/nunoOliveiraqwe/micro-proxy/internal/util"
+	"github.com/nunoOliveiraqwe/torii/internal/netutil"
+	"github.com/nunoOliveiraqwe/torii/internal/util"
 	"go.uber.org/zap"
 	"golang.org/x/time/rate"
 )

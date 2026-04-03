@@ -3,7 +3,7 @@ package config
 import (
 	"time"
 
-	"github.com/nunoOliveiraqwe/micro-proxy/middleware"
+	"github.com/nunoOliveiraqwe/torii/middleware"
 )
 
 type IpFlag byte

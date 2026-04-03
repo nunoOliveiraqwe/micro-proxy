@@ -5,8 +5,8 @@ import (
 	"fmt"
 	"sync/atomic"
 
-	"github.com/nunoOliveiraqwe/micro-proxy/config"
-	"github.com/nunoOliveiraqwe/micro-proxy/internal/netutil"
+	"github.com/nunoOliveiraqwe/torii/config"
+	"github.com/nunoOliveiraqwe/torii/internal/netutil"
 	"go.uber.org/zap"
 )
 
@@ -48,7 +48,7 @@ func buildHttpServer(ctx context.Context, conf config.HTTPListener, global *conf
 	zap.S().Infof("Built HTTP server IPv4=%s IPv6=%s Port=%d", ipv4, ipv6, conf.Port)
 
 	if conf.TLS != nil {
-		return &MicroProxyHttpsServer{
+		return &ToriiHttpsServer{
 			handler:           handler,
 			serverId:          serverId,
 			readTimeout:       conf.ReadTimeout,
@@ -68,7 +68,7 @@ func buildHttpServer(ctx context.Context, conf config.HTTPListener, global *conf
 		}, nil
 	}
 
-	return &MicroProxyHttpServer{
+	return &ToriiHttpServer{
 		handler:           handler,
 		serverId:          serverId,
 		readTimeout:       conf.ReadTimeout,

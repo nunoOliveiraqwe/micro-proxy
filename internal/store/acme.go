@@ -1,6 +1,6 @@
 package store
 
-import "github.com/nunoOliveiraqwe/micro-proxy/internal/domain"
+import "github.com/nunoOliveiraqwe/torii/internal/domain"
 
 type AcmeStore interface {
 	GetConfiguration() (*domain.AcmeConfiguration, error)

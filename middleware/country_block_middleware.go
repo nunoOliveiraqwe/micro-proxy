@@ -8,9 +8,9 @@ import (
 	"strings"
 	"time"
 
-	"github.com/nunoOliveiraqwe/micro-proxy/internal/netutil"
-	"github.com/nunoOliveiraqwe/micro-proxy/internal/util"
-	"github.com/nunoOliveiraqwe/micro-proxy/middleware/country"
+	"github.com/nunoOliveiraqwe/torii/internal/netutil"
+	"github.com/nunoOliveiraqwe/torii/internal/util"
+	"github.com/nunoOliveiraqwe/torii/middleware/country"
 	"go.uber.org/zap"
 )
 

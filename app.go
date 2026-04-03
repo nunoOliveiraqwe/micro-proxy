@@ -1,4 +1,4 @@
-package microproxy
+package torii
 
 import (
 	"context"
@@ -6,10 +6,10 @@ import (
 	"fmt"
 	"net/http"
 
-	"github.com/nunoOliveiraqwe/micro-proxy/api"
-	"github.com/nunoOliveiraqwe/micro-proxy/config"
-	"github.com/nunoOliveiraqwe/micro-proxy/internal/app"
-	"github.com/nunoOliveiraqwe/micro-proxy/logging"
+	"github.com/nunoOliveiraqwe/torii/api"
+	"github.com/nunoOliveiraqwe/torii/config"
+	"github.com/nunoOliveiraqwe/torii/internal/app"
+	"github.com/nunoOliveiraqwe/torii/logging"
 	"go.uber.org/zap"
 )
 

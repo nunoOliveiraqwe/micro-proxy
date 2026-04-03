@@ -7,7 +7,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/nunoOliveiraqwe/micro-proxy/internal/util"
+	"github.com/nunoOliveiraqwe/torii/internal/util"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"golang.org/x/time/rate"

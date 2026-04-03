@@ -1,4 +1,4 @@
-package microproxy
+package torii
 
 import (
 	"flag"

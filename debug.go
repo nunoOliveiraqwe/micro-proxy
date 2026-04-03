@@ -1,4 +1,4 @@
-package microproxy
+package torii
 
 import (
 	"context"
@@ -8,7 +8,7 @@ import (
 	"net/url"
 	"strings"
 
-	"github.com/nunoOliveiraqwe/micro-proxy/config"
+	"github.com/nunoOliveiraqwe/torii/config"
 	"go.uber.org/zap"
 )
 

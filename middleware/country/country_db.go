@@ -9,7 +9,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/nunoOliveiraqwe/micro-proxy/internal/util"
+	"github.com/nunoOliveiraqwe/torii/internal/util"
 	"github.com/oschwald/maxminddb-golang/v2"
 	"go.uber.org/zap"
 )

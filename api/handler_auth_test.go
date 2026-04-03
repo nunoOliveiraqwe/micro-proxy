@@ -6,8 +6,8 @@ import (
 	"net/http/httptest"
 	"testing"
 
-	"github.com/nunoOliveiraqwe/micro-proxy/internal/auth"
-	"github.com/nunoOliveiraqwe/micro-proxy/internal/domain"
+	"github.com/nunoOliveiraqwe/torii/internal/auth"
+	"github.com/nunoOliveiraqwe/torii/internal/domain"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 )
