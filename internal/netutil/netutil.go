@@ -57,7 +57,7 @@ func GetNetworkBindAddressesFromInterface(ifName string) (ipv4, ipv6 string, err
 			continue
 		}
 
-		if ip == nil {
+		if ip == nil || ip.IsLinkLocalUnicast() {
 			continue
 		}
 		if v4 := ip.To4(); v4 != nil {

@@ -246,6 +246,37 @@
             flex-shrink: 0;
             font-size: 1.05em;
         }
+
+        /* Inner page tabs (used on ACME page) */
+        .inner-tabs {
+            display: flex;
+            gap: 0;
+            margin-bottom: 1.5rem;
+            border-bottom: 2px solid rgba(255,255,255,0.08);
+        }
+        .inner-tab {
+            background: none;
+            border: none;
+            border-bottom: 2px solid transparent;
+            margin-bottom: -2px;
+            padding: 0.6rem 1.25rem;
+            font-size: 0.88rem;
+            font-weight: 500;
+            color: rgba(255,255,255,0.45);
+            cursor: pointer;
+            transition: color 0.15s, border-color 0.15s;
+        }
+        .inner-tab:hover {
+            color: rgba(255,255,255,0.8);
+        }
+        .inner-tab.active {
+            color: #7c6ef0;
+            border-bottom-color: #7c6ef0;
+            font-weight: 600;
+        }
+        .inner-tab-panel {
+            animation: fadeIn 0.2s ease-out;
+        }
         .sidebar-footer {
             border-top: 1px solid rgba(255,255,255,0.07);
             padding: 1rem 1.25rem;

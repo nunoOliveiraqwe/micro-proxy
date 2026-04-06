@@ -1,12 +1,11 @@
 package api
 
 import (
+	"errors"
 	"net/http"
 	"time"
 
-	"github.com/go-acme/lego/v4/log"
 	"github.com/nunoOliveiraqwe/torii/internal/app"
-	"github.com/nunoOliveiraqwe/torii/internal/domain"
 	"github.com/nunoOliveiraqwe/torii/middleware"
 	"github.com/nunoOliveiraqwe/torii/proxy/acme"
 	"go.uber.org/zap"
@@ -19,7 +18,7 @@ func handleGetAcmeProviders(_ app.SystemService) http.HandlerFunc {
 		for _, f := range factories {
 			provider, err := acme.GetDNSProvider(f)
 			if err != nil {
-				log.Warnf("Failed to get DNS-01 provider for string %s", f)
+				zap.S().Warnf("Failed to get DNS-01 provider for string %s", f)
 				continue
 			}
 			fields := make([]AcmeProviderField, 0, len(provider.Fields()))
@@ -43,23 +42,20 @@ func handleGetAcmeConfig(svc app.SystemService) http.HandlerFunc {
 		logger := middleware.GetRequestLoggerFromContext(r)
 		logger.Debug("Fetching ACME configuration")
 
-		conf, err := svc.GetServiceStore().GetAcmeStore().GetConfiguration()
+		result, err := svc.GetServiceStore().GetAcmeService().GetConfiguration()
 		if err != nil {
 			logger.Error("Failed to fetch ACME configuration", zap.Error(err))
 			http.Error(w, "Failed to fetch ACME configuration", http.StatusInternalServerError)
 			return
 		}
-		if conf == nil {
-			WriteResponseAsJSON(AcmeConfigResponse{Enabled: false}, w)
-			return
-		}
 
 		WriteResponseAsJSON(AcmeConfigResponse{
-			Email:                conf.Email,
-			DNSProvider:          conf.DNSProvider,
-			CADirURL:             conf.CADirURL,
-			RenewalCheckInterval: conf.RenewalCheckInterval.String(),
-			Enabled:              conf.Enabled,
+			Email:                result.Email,
+			DNSProvider:          result.DNSProvider,
+			CADirURL:             result.CADirURL,
+			RenewalCheckInterval: result.RenewalCheckInterval,
+			Enabled:              result.Enabled,
+			Configured:           result.Configured,
 		}, w)
 	}
 }
@@ -76,79 +72,37 @@ func handleSaveAcmeConfig(svc app.SystemService) http.HandlerFunc {
 			return
 		}
 
-		if req.Email == "" {
-			http.Error(w, "Email is required", http.StatusBadRequest)
-			return
-		}
-		if req.DnsProviderConfigRequest == nil {
-			http.Error(w, "DNS provider is required", http.StatusBadRequest)
-			return
-		} else if req.DnsProviderConfigRequest.DNSProvider == "" {
-			http.Error(w, "DNS provider name is required", http.StatusBadRequest)
-			return
+		dnsProvider := ""
+		var credMap map[string]string
+		if req.DnsProviderConfigRequest != nil {
+			dnsProvider = req.DnsProviderConfigRequest.DNSProvider
+			credMap = req.DnsProviderConfigRequest.ConfigMap
 		}
 
-		provider, err := acme.GetDNSProvider(req.DnsProviderConfigRequest.DNSProvider)
-		if err != nil {
-			logger.Warn("Failed to get DNS-01 provider for string %s", zap.String("dns_provider", req.DnsProviderConfigRequest.DNSProvider))
-			http.Error(w, "Invalid DNS provider", http.StatusBadRequest)
-			return
-		}
-
-		err = provider.IsValidMap(req.DnsProviderConfigRequest.ConfigMap)
-		if err != nil {
-			logger.Warn("Invalid configuration for DNS provider %s: %s", zap.String("dns_provider", req.DnsProviderConfigRequest.DNSProvider))
-			http.Error(w, "Invalid DNS provider configuration", http.StatusBadRequest)
-			return
-		}
-
-		renewalInterval := 12 * time.Hour
-		if req.RenewalCheckInterval != "" {
-			parsed, err := time.ParseDuration(req.RenewalCheckInterval)
-			if err != nil {
-				http.Error(w, "Invalid renewal interval format (use Go duration, e.g. 12h, 6h30m)", http.StatusBadRequest)
-				return
-			}
-			if parsed < 1*time.Hour {
-				http.Error(w, "Renewal interval must be at least 1h", http.StatusBadRequest)
-				return
-			}
-			renewalInterval = parsed
-		}
-
-		sf, err := provider.Serialize(req.DnsProviderConfigRequest.ConfigMap)
-		if err != nil {
-			log.Warnf("Failed to serialize configuration for DNS provider %s: %s", req.DnsProviderConfigRequest.DNSProvider, err)
-			http.Error(w, "Failed to serialize DNS provider configuration", http.StatusInternalServerError)
-			return
-		}
-
-		conf := &domain.AcmeConfiguration{
+		err = svc.GetServiceStore().GetAcmeService().SaveConfiguration(&app.SaveAcmeConfigRequest{
 			Email:                req.Email,
-			DNSProvider:          provider.Name(),
 			CADirURL:             req.CADirURL,
-			RenewalCheckInterval: renewalInterval,
+			RenewalCheckInterval: req.RenewalCheckInterval,
 			Enabled:              req.Enabled,
-			SerializedFields:     sf,
-		}
-
-		if err := svc.GetServiceStore().GetAcmeStore().SaveConfiguration(conf); err != nil {
+			DNSProvider:          dnsProvider,
+			CredentialMap:        credMap,
+		})
+		if err != nil {
+			status := http.StatusInternalServerError
+			if errors.Is(err, app.ErrAcmeAlreadyConfigured) {
+				status = http.StatusConflict
+			} else if errors.Is(err, app.ErrEmailRequired) ||
+				errors.Is(err, app.ErrDNSProviderRequired) ||
+				errors.Is(err, app.ErrInvalidDNSProvider) ||
+				errors.Is(err, app.ErrInvalidDNSProviderCfg) ||
+				errors.Is(err, app.ErrInvalidRenewalFmt) ||
+				errors.Is(err, app.ErrRenewalTooShort) {
+				status = http.StatusBadRequest
+			}
 			logger.Error("Failed to save ACME configuration", zap.Error(err))
-			http.Error(w, "Failed to save ACME configuration", http.StatusInternalServerError)
+			http.Error(w, err.Error(), status)
 			return
 		}
-
-		if err := svc.ReloadAcme(); err != nil {
-			logger.Error("ACME configuration saved but reload failed", zap.Error(err))
-			http.Error(w, "Configuration saved but failed to apply: "+err.Error(), http.StatusInternalServerError)
-			return
-		}
-
-		logger.Info("ACME configuration saved and applied",
-			zap.String("email", req.Email),
-			zap.String("dnsProvider", provider.Name()),
-			zap.Bool("enabled", req.Enabled),
-		)
 	}
 }
 
@@ -157,7 +111,7 @@ func handleGetAcmeCertificates(svc app.SystemService) http.HandlerFunc {
 		logger := middleware.GetRequestLoggerFromContext(r)
 		logger.Debug("Fetching ACME certificates")
 
-		certs, err := svc.GetServiceStore().GetAcmeStore().ListCertificates()
+		certs, err := svc.GetServiceStore().GetAcmeService().ListCertificates()
 		if err != nil {
 			logger.Error("Failed to fetch ACME certificates", zap.Error(err))
 			http.Error(w, "Failed to fetch ACME certificates", http.StatusInternalServerError)
@@ -170,8 +124,54 @@ func handleGetAcmeCertificates(svc app.SystemService) http.HandlerFunc {
 				Domain:    c.Domain,
 				ExpiresAt: c.ExpiresAt.Format(time.RFC3339),
 				CreatedAt: c.CreatedAt.Format(time.RFC3339),
+				Active:    c.Active,
 			})
 		}
 		WriteResponseAsJSON(resp, w)
+	}
+}
+
+func handleToggleAcmeEnabled(svc app.SystemService) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		logger := middleware.GetRequestLoggerFromContext(r)
+
+		req, err := DecodeJSONBody[AcmeToggleRequest](r)
+		if err != nil {
+			http.Error(w, "Invalid request body", http.StatusBadRequest)
+			return
+		}
+
+		if err := svc.GetServiceStore().GetAcmeService().ToggleEnabled(req.Enabled); err != nil {
+			status := http.StatusInternalServerError
+			if errors.Is(err, app.ErrAcmeNotConfigured) {
+				status = http.StatusNotFound
+			}
+			logger.Error("Failed to toggle ACME enabled state", zap.Error(err))
+			http.Error(w, err.Error(), status)
+			return
+		}
+
+		state := "disabled"
+		if req.Enabled {
+			state = "enabled"
+		}
+		logger.Info("ACME " + state)
+		WriteResponseAsJSON(map[string]string{"status": "ACME " + state + " successfully."}, w)
+	}
+}
+
+func handleResetAcme(svc app.SystemService) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		logger := middleware.GetRequestLoggerFromContext(r)
+		logger.Warn("Resetting all ACME data")
+
+		if err := svc.GetServiceStore().GetAcmeService().ResetAll(); err != nil {
+			logger.Error("Failed to reset ACME data", zap.Error(err))
+			http.Error(w, "Failed to reset ACME data", http.StatusInternalServerError)
+			return
+		}
+
+		logger.Info("ACME data reset successfully")
+		w.WriteHeader(http.StatusNoContent)
 	}
 }

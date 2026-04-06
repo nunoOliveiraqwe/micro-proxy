@@ -125,6 +125,7 @@ func (m *LegoAcmeManager) loadOrCreateAccount() error {
 				return fmt.Errorf("parse stored registration: %w", err)
 			}
 		}
+
 		m.user = &acmeUser{
 			email:        existing.Email,
 			registration: &reg,

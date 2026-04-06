@@ -63,8 +63,6 @@ func NewSystemService(conf config.AppConfig) (SystemService, error) {
 		return nil, fmt.Errorf("failed to open database: %w", err)
 	}
 
-	// Check the DB for an ACME configuration and, if enabled, create the
-	// lego-based ACME manager with DNS-01 challenges.
 	acmeStore := sqlite.NewAcmeStore(db)
 	var acmeMgr *acme.LegoAcmeManager
 	acmeConf, err := acmeStore.GetConfiguration()
@@ -84,16 +82,17 @@ func NewSystemService(conf config.AppConfig) (SystemService, error) {
 	}
 
 	sessions := session.NewRegistry(db, conf.Session)
-	return &systemService{
+	svc := &systemService{
 		micro:                m,
 		db:                   db,
 		sessions:             sessions,
-		serviceStore:         NewServiceStore(NewDataStore(db)),
 		acmeStore:            acmeStore,
 		globalMetricsManager: mgr,
 		sseBroker:            NewSSEBroker(mgr),
 		startTime:            time.Now(),
-	}, nil
+	}
+	svc.serviceStore = NewServiceStore(NewDataStore(db), svc.ReloadAcme, svc.GetConfiguredProxyServers)
+	return svc, nil
 }
 
 func (sm *systemService) GetServiceStore() *ServiceStore {

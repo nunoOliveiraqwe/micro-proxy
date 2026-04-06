@@ -57,9 +57,19 @@ func (m *ToriiHttpsServer) GetServerId() string {
 func (m *ToriiHttpsServer) start(acmeManager *acme.LegoAcmeManager) error {
 	zap.S().Infof("Starting HTTPS server on %d, ipv4 = %s, ipv6 = %s", m.bindPort, m.iPV4BindInterface, m.iPV6BindInterface)
 	listeners := buildNetListeners(m.iPV4BindInterface, m.iPV6BindInterface, m.bindPort)
+	numberOfRequiredListeners := 0
+	if m.iPV4BindInterface != "" {
+		numberOfRequiredListeners++
+	}
+	if m.iPV6BindInterface != "" {
+		numberOfRequiredListeners++
+	}
 	if len(listeners) == 0 {
 		zap.S().Errorf("No listeners available to start HTTPS server")
 		return fmt.Errorf("no listeners available for port %d", m.bindPort)
+	} else if len(listeners) != numberOfRequiredListeners {
+		zap.S().Errorf("Expected %d listeners based on configuration but got %d, cannot start HTTPS server", numberOfRequiredListeners, len(listeners))
+		return fmt.Errorf("expected %d listeners based on configuration but got %d", numberOfRequiredListeners, len(listeners))
 	}
 	m.httpServer = &http.Server{
 		Handler:           m.handler,

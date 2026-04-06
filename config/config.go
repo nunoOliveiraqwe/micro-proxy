@@ -45,6 +45,25 @@ type LogConfig struct {
 	LogConfDebug bool   `yaml:"logDebug" json:"LogDebug"`
 	LogPath      string `yaml:"logPath" json:"logPath"`
 	LogLevel     string `yaml:"logLevel" json:"logLevel"`
+	Encoding     string `yaml:"encoding" json:"encoding"`
+	ColorEnabled *bool  `yaml:"color" json:"color"`
+}
+
+func (c LogConfig) GetEncoding() string {
+	if strings.EqualFold(c.Encoding, "json") {
+		return "json"
+	}
+	return "console"
+}
+
+func (c LogConfig) IsColorEnabled() bool {
+	if c.GetEncoding() == "json" {
+		return false
+	}
+	if c.ColorEnabled == nil {
+		return true
+	}
+	return *c.ColorEnabled
 }
 
 type APIServerConfig struct {

@@ -10,4 +10,5 @@ type AcmeStore interface {
 	GetCertificate(domainName string) (*domain.AcmeCertificate, error)
 	SaveCertificate(cert *domain.AcmeCertificate) error
 	ListCertificates() ([]*domain.AcmeCertificate, error)
+	ResetAll() error
 }

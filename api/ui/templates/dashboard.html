@@ -145,111 +145,175 @@
                 <h2>System</h2>
                 <p>Process health, request log and errors</p>
             </hgroup>
-            <!-- System Health -->
-            <div class="stat-card" style="text-align:left;max-width:560px;margin-bottom:1.5rem;">
-                <p class="stat-label" style="margin-bottom:0.75rem;">Runtime Health</p>
-                <div class="health-gauges">
-                    <div class="gauge-row">
-                        <span class="gauge-label">Memory</span>
-                        <div class="gauge-bar"><div class="gauge-fill" id="gauge-memory-fill" style="width:0%"></div></div>
-                        <span class="gauge-value" id="gauge-memory-text">–</span>
+
+            <!-- Inner tab bar -->
+            <div class="inner-tabs" id="system-tabs">
+                <button class="inner-tab active" data-system-tab="system-tab-health">Health</button>
+                <button class="inner-tab" data-system-tab="system-tab-requests">Requests</button>
+                <button class="inner-tab" data-system-tab="system-tab-errors">Errors</button>
+            </div>
+
+            <!-- Tab: Health -->
+            <div class="inner-tab-panel" id="system-tab-health">
+                <!-- Stat cards row -->
+                <div class="stats-grid" style="margin-bottom:1.5rem;">
+                    <div class="stat-card">
+                        <p class="stat-value" id="health-uptime-val">–</p>
+                        <p class="stat-label">Uptime</p>
                     </div>
-                    <div class="gauge-row">
-                        <span class="gauge-label">Goroutines</span>
-                        <div class="gauge-bar"><div class="gauge-fill" id="gauge-goroutine-fill" style="width:0%"></div></div>
-                        <span class="gauge-value" id="gauge-goroutine-text">–</span>
+                    <div class="stat-card">
+                        <p class="stat-value" id="health-goroutines-val">–</p>
+                        <p class="stat-label">Goroutines</p>
                     </div>
-                    <div class="gauge-row">
-                        <span class="gauge-label">GC Pause</span>
-                        <div class="gauge-bar"><div class="gauge-fill" id="gauge-gc-fill" style="width:0%"></div></div>
-                        <span class="gauge-value" id="gauge-gc-text">–</span>
+                    <div class="stat-card">
+                        <p class="stat-value" id="health-heap-val">–</p>
+                        <p class="stat-label">Heap Usage</p>
+                        <p class="stat-sub" id="health-heap-sub"></p>
                     </div>
-                    <div style="font-size:0.75rem;color:var(--pico-muted-color);margin-top:0.5rem;">
-                        Uptime: <span id="health-uptime">–</span>
+                    <div class="stat-card">
+                        <p class="stat-value" id="health-mem-val">–</p>
+                        <p class="stat-label">System Memory</p>
+                        <p class="stat-sub" id="health-mem-sub"></p>
+                    </div>
+                    <div class="stat-card">
+                        <p class="stat-value" id="health-gc-pause-val">–</p>
+                        <p class="stat-label">GC Pause Total</p>
+                    </div>
+                    <div class="stat-card">
+                        <p class="stat-value" id="health-gc-cycles-val">–</p>
+                        <p class="stat-label">GC Cycles</p>
+                    </div>
+                </div>
+                <!-- Gauge bars -->
+                <div class="stat-card" style="text-align:left;">
+                    <p class="stat-label" style="margin-bottom:0.75rem;">Resource Gauges</p>
+                    <div class="health-gauges" style="max-width:100%;">
+                        <div class="gauge-row">
+                            <span class="gauge-label">Heap</span>
+                            <div class="gauge-bar"><div class="gauge-fill" id="gauge-memory-fill" style="width:0%"></div></div>
+                            <span class="gauge-value" id="gauge-memory-text">–</span>
+                        </div>
+                        <div class="gauge-row">
+                            <span class="gauge-label">Goroutines</span>
+                            <div class="gauge-bar"><div class="gauge-fill" id="gauge-goroutine-fill" style="width:0%"></div></div>
+                            <span class="gauge-value" id="gauge-goroutine-text">–</span>
+                        </div>
+                        <div class="gauge-row">
+                            <span class="gauge-label">GC Pause</span>
+                            <div class="gauge-bar"><div class="gauge-fill" id="gauge-gc-fill" style="width:0%"></div></div>
+                            <span class="gauge-value" id="gauge-gc-text">–</span>
+                        </div>
                     </div>
                 </div>
             </div>
-            <!-- Request Log -->
-            <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:0.5rem;">
-                <h4 style="margin:0;">Request Log</h4>
-                <select id="request-log-filter" aria-label="Filter requests" style="width:auto;min-width:180px;margin:0;padding:0.3rem 0.5rem;font-size:0.8rem;">
-                    <option value="">All connections</option>
-                </select>
-            </div>
-            <div class="stat-card" style="text-align:left;padding:0;">
-                <div class="request-feed" id="request-feed">
-                    <div class="error-empty">No requests recorded</div>
+
+            <!-- Tab: Requests -->
+            <div class="inner-tab-panel" id="system-tab-requests" style="display:none;">
+                <div style="display:flex;justify-content:flex-end;margin-bottom:0.5rem;">
+                    <select id="request-log-filter" aria-label="Filter requests" style="width:auto;min-width:180px;margin:0;padding:0.3rem 0.5rem;font-size:0.8rem;">
+                        <option value="">All connections</option>
+                    </select>
+                </div>
+                <div class="stat-card" style="text-align:left;padding:0;">
+                    <div class="request-feed" id="request-feed">
+                        <div class="error-empty">No requests recorded</div>
+                    </div>
                 </div>
             </div>
-            <!-- Recent Errors -->
-            <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:0.5rem;margin-top:1.5rem;">
-                <h4 style="margin:0;">Recent Errors</h4>
-                <select id="error-log-filter" aria-label="Filter errors" style="width:auto;min-width:180px;margin:0;padding:0.3rem 0.5rem;font-size:0.8rem;">
-                    <option value="">All connections</option>
-                </select>
-            </div>
-            <div class="stat-card" style="text-align:left;padding:0;">
-                <div class="error-feed" id="error-feed">
-                    <div class="error-empty">No errors recorded</div>
+
+            <!-- Tab: Errors -->
+            <div class="inner-tab-panel" id="system-tab-errors" style="display:none;">
+                <div style="display:flex;justify-content:flex-end;margin-bottom:0.5rem;">
+                    <select id="error-log-filter" aria-label="Filter errors" style="width:auto;min-width:180px;margin:0;padding:0.3rem 0.5rem;font-size:0.8rem;">
+                        <option value="">All connections</option>
+                    </select>
+                </div>
+                <div class="stat-card" style="text-align:left;padding:0;">
+                    <div class="error-feed" id="error-feed">
+                        <div class="error-empty">No errors recorded</div>
+                    </div>
                 </div>
             </div>
         </section>
 
         <!-- PAGE: ACME / TLS -->
         <section class="page" data-page="acme" style="display:none;">
-            <hgroup>
-                <h2>ACME / TLS</h2>
-                <p>Manage automatic TLS certificates via DNS-01 challenges</p>
-            </hgroup>
-
-            <div class="stat-card" style="text-align:left;margin-bottom:1.5rem;">
-                <p class="stat-label" style="margin-bottom:0.75rem;">Configuration</p>
-                <form id="acme-config-form" autocomplete="off">
-                    <fieldset style="margin:0 0 0.75rem;padding:0;border:none;">
-                        <label style="display:inline-flex;align-items:center;gap:0.4rem;font-size:0.85rem;cursor:pointer;">
-                            <input type="checkbox" id="acme-enabled" role="switch">
-                            <span id="acme-enabled-label">Disabled</span>
-                        </label>
-                    </fieldset>
-                    <div style="display:grid;grid-template-columns:1fr 1fr;gap:0 1.5rem;">
-                        <label for="acme-email" style="font-size:0.85rem;margin-bottom:0.25rem;">
-                            Email
-                            <input type="email" id="acme-email" name="email" placeholder="admin@example.com" required style="margin-bottom:0.5rem;">
-                        </label>
-                        <label for="acme-dns-provider" style="font-size:0.85rem;margin-bottom:0.25rem;">
-                            DNS Provider
-                            <select id="acme-dns-provider" required style="margin-bottom:0.5rem;">
-                                <option value="">Select a provider…</option>
-                            </select>
-                        </label>
-                    </div>
-                    <div id="acme-credential-fields"></div>
-                    <div style="display:grid;grid-template-columns:1fr 1fr;gap:0 1.5rem;">
-                        <label for="acme-ca-dir-url" style="font-size:0.85rem;margin-bottom:0.25rem;">
-                            CA Directory URL <small>(leave empty for Let's Encrypt production)</small>
-                            <input type="text" id="acme-ca-dir-url" name="caDirUrl" placeholder="https://acme-v02.api.letsencrypt.org/directory" style="margin-bottom:0.5rem;">
-                        </label>
-                        <label for="acme-renewal-interval" style="font-size:0.85rem;margin-bottom:0.25rem;">
-                            Renewal Check Interval <small>(Go duration, e.g. 12h, 6h30m)</small>
-                            <input type="text" id="acme-renewal-interval" name="renewalCheckInterval" placeholder="12h" style="margin-bottom:0.75rem;">
-                        </label>
-                    </div>
-                    <button type="submit">Save Configuration</button>
-                </form>
-                <div id="acme-config-result"></div>
+            <div style="display:flex;justify-content:space-between;align-items:flex-start;flex-wrap:wrap;gap:1rem;margin-bottom:1.5rem;">
+                <hgroup style="margin:0;">
+                    <h2>ACME / TLS</h2>
+                    <p>Manage automatic TLS certificates via DNS-01 challenges</p>
+                </hgroup>
+                <button type="button" id="acme-reset-btn" style="display:none;background:none;border:1px solid #e74c3c;color:#e74c3c;padding:0.4rem 1rem;font-size:0.8rem;border-radius:0.35rem;cursor:pointer;white-space:nowrap;transition:background 0.15s,color 0.15s;"
+                    onmouseover="this.style.background='#e74c3c';this.style.color='#fff';"
+                    onmouseout="this.style.background='none';this.style.color='#e74c3c';">
+                    Reset ACME
+                </button>
             </div>
 
-            <h4>Managed Certificates</h4>
-            <div class="stat-card" style="text-align:left;padding:0;">
-                <div class="overflow-auto">
-                    <table id="acme-certs-table" style="margin:0;">
-                        <thead>
-                            <tr><th>Domain</th><th>Expires</th><th>Issued</th></tr>
-                        </thead>
-                        <tbody id="acme-certs-body">
-                            <tr><td colspan="3" class="text-center" style="padding:1.5rem;color:var(--pico-muted-color);">Loading…</td></tr>
-                        </tbody>
-                    </table>
+            <!-- Inner tab bar -->
+            <div class="inner-tabs" id="acme-tabs">
+                <button class="inner-tab active" data-acme-tab="acme-tab-config">Configuration</button>
+                <button class="inner-tab" data-acme-tab="acme-tab-certs">Certificates</button>
+            </div>
+
+            <!-- Tab: Configuration -->
+            <div class="inner-tab-panel" id="acme-tab-config">
+                <!-- Locked notice (shown when config exists) -->
+                <div id="acme-locked-notice" style="display:none;margin-bottom:1rem;">
+                    <div style="background:rgba(124,110,240,0.1);border:1px solid rgba(124,110,240,0.25);border-radius:0.35rem;padding:0.6rem 1rem;font-size:0.85rem;color:rgba(255,255,255,0.7);">
+                        🔒 Configuration is locked. Use <strong>Reset ACME</strong> to start fresh.
+                    </div>
+                </div>
+                <div class="stat-card" style="text-align:left;">
+                    <form id="acme-config-form" autocomplete="off">
+                        <fieldset style="margin:0 0 0.75rem;padding:0;border:none;">
+                            <label style="display:inline-flex;align-items:center;gap:0.4rem;font-size:0.85rem;cursor:pointer;">
+                                <input type="checkbox" id="acme-enabled" role="switch">
+                                <span id="acme-enabled-label">Disabled</span>
+                            </label>
+                        </fieldset>
+                        <div style="display:grid;grid-template-columns:1fr 1fr;gap:0 1.5rem;">
+                            <label for="acme-email" style="font-size:0.85rem;margin-bottom:0.25rem;">
+                                Email
+                                <input type="email" id="acme-email" name="email" placeholder="admin@example.com" required style="margin-bottom:0.5rem;">
+                            </label>
+                            <label for="acme-dns-provider" style="font-size:0.85rem;margin-bottom:0.25rem;">
+                                DNS Provider
+                                <select id="acme-dns-provider" required style="margin-bottom:0.5rem;">
+                                    <option value="">Select a provider…</option>
+                                </select>
+                            </label>
+                        </div>
+                        <div id="acme-credential-fields"></div>
+                        <div style="display:grid;grid-template-columns:1fr 1fr;gap:0 1.5rem;">
+                            <label for="acme-ca-dir-url" style="font-size:0.85rem;margin-bottom:0.25rem;">
+                                CA Directory URL <small>(leave empty for Let's Encrypt production)</small>
+                                <input type="text" id="acme-ca-dir-url" name="caDirUrl" placeholder="https://acme-v02.api.letsencrypt.org/directory" style="margin-bottom:0.5rem;">
+                            </label>
+                            <label for="acme-renewal-interval" style="font-size:0.85rem;margin-bottom:0.25rem;">
+                                Renewal Check Interval <small>(Go duration, e.g. 12h, 6h30m)</small>
+                                <input type="text" id="acme-renewal-interval" name="renewalCheckInterval" placeholder="12h" style="margin-bottom:0.75rem;">
+                            </label>
+                        </div>
+                        <button type="submit" id="acme-save-btn">Save Configuration</button>
+                    </form>
+                    <div id="acme-config-result"></div>
+                </div>
+            </div>
+
+            <!-- Tab: Certificates -->
+            <div class="inner-tab-panel" id="acme-tab-certs" style="display:none;">
+                <div class="stat-card" style="text-align:left;padding:0;">
+                    <div class="overflow-auto">
+                        <table id="acme-certs-table" style="margin:0;">
+                            <thead>
+                                <tr><th>Domain</th><th>Status</th><th>Expires</th><th>Issued</th></tr>
+                            </thead>
+                            <tbody id="acme-certs-body">
+                                <tr><td colspan="4" class="text-center" style="padding:1.5rem;color:var(--pico-muted-color);">Loading…</td></tr>
+                            </tbody>
+                        </table>
+                    </div>
                 </div>
             </div>
         </section>
@@ -272,49 +336,57 @@
                 </div>
             </div>
 
-            <!-- Create form -->
-            <div class="stat-card" style="text-align:left;margin-bottom:1.5rem;">
-                <p class="stat-label" style="margin-bottom:0.75rem;">Create New Key</p>
-                <form id="api-key-create-form" autocomplete="off">
-                    <div style="display:grid;grid-template-columns:1fr 1fr;gap:0 1.5rem;">
-                        <label for="api-key-alias" style="font-size:0.85rem;margin-bottom:0.25rem;">
-                            Alias
-                            <input type="text" id="api-key-alias" placeholder="e.g. monitoring-key" required style="margin-bottom:0.5rem;">
-                        </label>
-                        <label for="api-key-expiry" style="font-size:0.85rem;margin-bottom:0.25rem;">
-                            Expires <small>(optional)</small>
-                            <input type="datetime-local" id="api-key-expiry" style="margin-bottom:0.5rem;">
-                        </label>
-                    </div>
-                    <label style="font-size:0.85rem;margin-bottom:0.25rem;">Scopes</label>
-                    <fieldset style="margin:0 0 0.75rem;padding:0;border:none;display:flex;gap:1.5rem;flex-wrap:wrap;">
-                        <label style="display:inline-flex;align-items:center;gap:0.4rem;font-size:0.85rem;cursor:pointer;">
-                            <input type="checkbox" name="api-key-scope" value="read_stats"> Read Stats
-                        </label>
-                        <label style="display:inline-flex;align-items:center;gap:0.4rem;font-size:0.85rem;cursor:pointer;">
-                            <input type="checkbox" name="api-key-scope" value="read_config"> Read Config
-                        </label>
-                        <label style="display:inline-flex;align-items:center;gap:0.4rem;font-size:0.85rem;cursor:pointer;">
-                            <input type="checkbox" name="api-key-scope" value="write_config"> Write Config
-                        </label>
-                    </fieldset>
-                    <button type="submit">Create API Key</button>
-                </form>
-                <div id="api-key-create-result"></div>
+            <!-- Inner tab bar -->
+            <div class="inner-tabs" id="api-keys-tabs">
+                <button class="inner-tab active" data-apikeys-tab="apikeys-tab-create">Create Key</button>
+                <button class="inner-tab" data-apikeys-tab="apikeys-tab-list">Existing Keys</button>
             </div>
 
-            <!-- Keys table -->
-            <h4>Existing Keys</h4>
-            <div class="stat-card" style="text-align:left;padding:0;">
-                <div class="overflow-auto">
-                    <table style="margin:0;">
-                        <thead>
-                            <tr><th>Alias</th><th>Scopes</th><th>Expires</th><th>Created</th><th></th></tr>
-                        </thead>
-                        <tbody id="api-keys-body">
-                            <tr><td colspan="5" class="text-center" style="padding:1.5rem;color:var(--pico-muted-color);">Loading…</td></tr>
-                        </tbody>
-                    </table>
+            <!-- Tab: Create Key -->
+            <div class="inner-tab-panel" id="apikeys-tab-create">
+                <div class="stat-card" style="text-align:left;">
+                    <form id="api-key-create-form" autocomplete="off">
+                        <div style="display:grid;grid-template-columns:1fr 1fr;gap:0 1.5rem;">
+                            <label for="api-key-alias" style="font-size:0.85rem;margin-bottom:0.25rem;">
+                                Alias
+                                <input type="text" id="api-key-alias" placeholder="e.g. monitoring-key" required style="margin-bottom:0.5rem;">
+                            </label>
+                            <label for="api-key-expiry" style="font-size:0.85rem;margin-bottom:0.25rem;">
+                                Expires <small>(optional)</small>
+                                <input type="date" id="api-key-expiry" style="margin-bottom:0.5rem;">
+                            </label>
+                        </div>
+                        <label style="font-size:0.85rem;margin-bottom:0.25rem;">Scopes</label>
+                        <fieldset style="margin:0 0 0.75rem;padding:0;border:none;display:flex;gap:1.5rem;flex-wrap:wrap;">
+                            <label style="display:inline-flex;align-items:center;gap:0.4rem;font-size:0.85rem;cursor:pointer;">
+                                <input type="checkbox" name="api-key-scope" value="read_stats"> Read Stats
+                            </label>
+                            <label style="display:inline-flex;align-items:center;gap:0.4rem;font-size:0.85rem;cursor:pointer;">
+                                <input type="checkbox" name="api-key-scope" value="read_config"> Read Config
+                            </label>
+                            <label style="display:inline-flex;align-items:center;gap:0.4rem;font-size:0.85rem;cursor:pointer;">
+                                <input type="checkbox" name="api-key-scope" value="write_config"> Write Config
+                            </label>
+                        </fieldset>
+                        <button type="submit">Create API Key</button>
+                    </form>
+                    <div id="api-key-create-result"></div>
+                </div>
+            </div>
+
+            <!-- Tab: Existing Keys -->
+            <div class="inner-tab-panel" id="apikeys-tab-list" style="display:none;">
+                <div class="stat-card" style="text-align:left;padding:0;">
+                    <div class="overflow-auto">
+                        <table style="margin:0;">
+                            <thead>
+                                <tr><th>Alias</th><th>Scopes</th><th>Expires</th><th>Created</th><th></th></tr>
+                            </thead>
+                            <tbody id="api-keys-body">
+                                <tr><td colspan="5" class="text-center" style="padding:1.5rem;color:var(--pico-muted-color);">Loading…</td></tr>
+                            </tbody>
+                        </table>
+                    </div>
                 </div>
             </div>
         </section>
@@ -372,6 +444,60 @@
     var currentPage = 'dashboard';
     var healthInterval = null;
 
+    // ACME inner tabs
+    document.querySelectorAll('#acme-tabs .inner-tab').forEach(function (tab) {
+        tab.addEventListener('click', function () {
+            var targetId = this.getAttribute('data-acme-tab');
+            document.querySelectorAll('#acme-tabs .inner-tab').forEach(function (t) {
+                t.classList.remove('active');
+            });
+            this.classList.add('active');
+            document.querySelectorAll('.inner-tab-panel[id^="acme-tab-"]').forEach(function (panel) {
+                panel.style.display = panel.id === targetId ? '' : 'none';
+            });
+            if (targetId === 'acme-tab-certs') {
+                loadAcmeCertificates();
+            }
+        });
+    });
+
+    // System inner tabs
+    document.querySelectorAll('#system-tabs .inner-tab').forEach(function (tab) {
+        tab.addEventListener('click', function () {
+            var targetId = this.getAttribute('data-system-tab');
+            document.querySelectorAll('#system-tabs .inner-tab').forEach(function (t) {
+                t.classList.remove('active');
+            });
+            this.classList.add('active');
+            document.querySelectorAll('.inner-tab-panel[id^="system-tab-"]').forEach(function (panel) {
+                panel.style.display = panel.id === targetId ? '' : 'none';
+            });
+            if (targetId === 'system-tab-requests') {
+                loadRecentRequests();
+            }
+            if (targetId === 'system-tab-errors') {
+                loadRecentErrors();
+            }
+        });
+    });
+
+    // API Keys inner tabs
+    document.querySelectorAll('#api-keys-tabs .inner-tab').forEach(function (tab) {
+        tab.addEventListener('click', function () {
+            var targetId = this.getAttribute('data-apikeys-tab');
+            document.querySelectorAll('#api-keys-tabs .inner-tab').forEach(function (t) {
+                t.classList.remove('active');
+            });
+            this.classList.add('active');
+            document.querySelectorAll('.inner-tab-panel[id^="apikeys-tab-"]').forEach(function (panel) {
+                panel.style.display = panel.id === targetId ? '' : 'none';
+            });
+            if (targetId === 'apikeys-tab-list') {
+                loadApiKeys();
+            }
+        });
+    });
+
     function showPage(pageId) {
         currentPage = pageId;
         pages.forEach(function (p) {
@@ -393,24 +519,21 @@
         // Start/stop system health polling based on page
         if (pageId === 'system') {
             fetchSystemHealth();
-            loadRecentErrors();
-            loadRecentRequests();
             if (!healthInterval) healthInterval = setInterval(fetchSystemHealth, 5000);
         } else {
             if (healthInterval) { clearInterval(healthInterval); healthInterval = null; }
         }
 
-        // Load ACME data when the page is shown
+        // Load ACME config when the page is shown (certs load on tab click)
         if (pageId === 'acme') {
             loadAcmeProviders().then(function () {
                 loadAcmeConfig();
-                loadAcmeCertificates();
             });
         }
 
-        // Load API keys when the page is shown
+        // Load API keys page
         if (pageId === 'api-keys') {
-            loadApiKeys();
+            // Keys load on Existing Keys tab click; nothing to preload
         } else {
             // Hide the created-key banner and clear the secret when navigating away
             document.getElementById('api-key-created-banner').style.display = 'none';
@@ -726,6 +849,41 @@
             })
             .then(function (h) {
                 if (!h) return;
+
+                // --- Stat cards ---
+                // Uptime
+                var secs = Math.floor(h.uptime_seconds);
+                var days = Math.floor(secs / 86400); secs %= 86400;
+                var hrs  = Math.floor(secs / 3600);  secs %= 3600;
+                var mins = Math.floor(secs / 60);    secs %= 60;
+                var parts = [];
+                if (days) parts.push(days + 'd');
+                if (hrs)  parts.push(hrs + 'h');
+                if (mins) parts.push(mins + 'm');
+                parts.push(secs + 's');
+                document.getElementById('health-uptime-val').textContent = parts.join(' ');
+
+                // Goroutines
+                var grEl = document.getElementById('health-goroutines-val');
+                grEl.textContent = h.goroutines;
+                grEl.style.color = h.goroutines > 150 ? '#e74c3c' : h.goroutines > 80 ? '#f39c12' : '#7c6ef0';
+
+                // Heap
+                document.getElementById('health-heap-val').textContent = fmtBytes(h.heap_alloc_bytes);
+                document.getElementById('health-heap-sub').textContent = fmtBytes(h.heap_alloc_bytes) + ' / ' + fmtBytes(h.heap_sys_bytes) + ' reserved';
+
+                // System memory
+                document.getElementById('health-mem-val').textContent = fmtBytes(h.mem_alloc_bytes);
+                document.getElementById('health-mem-sub').textContent = fmtBytes(h.mem_sys_bytes) + ' total from OS';
+
+                // GC pause
+                var gcMs = h.gc_pause_total_ns / 1e6;
+                document.getElementById('health-gc-pause-val').textContent = gcMs < 1000 ? gcMs.toFixed(1) + ' ms' : (gcMs / 1000).toFixed(2) + ' s';
+
+                // GC cycles
+                document.getElementById('health-gc-cycles-val').textContent = fmtNum(h.num_gc);
+
+                // --- Gauge bars ---
                 var memPct = h.heap_sys_bytes > 0 ? (h.heap_alloc_bytes / h.heap_sys_bytes) * 100 : 0;
                 var memFill = document.getElementById('gauge-memory-fill');
                 memFill.style.width = Math.min(memPct, 100).toFixed(1) + '%';
@@ -739,23 +897,11 @@
                 grFill.className = 'gauge-fill' + (h.goroutines > 150 ? ' danger' : h.goroutines > 80 ? ' warn' : '');
                 document.getElementById('gauge-goroutine-text').textContent = h.goroutines;
 
-                var gcMs = h.gc_pause_total_ns / 1e6;
                 var gcPct = Math.min((gcMs / 100) * 100, 100);
                 var gcFill = document.getElementById('gauge-gc-fill');
                 gcFill.style.width = gcPct.toFixed(1) + '%';
                 gcFill.className = 'gauge-fill' + (gcMs > 80 ? ' danger' : gcMs > 30 ? ' warn' : '');
                 document.getElementById('gauge-gc-text').textContent = gcMs.toFixed(1) + ' ms (' + h.num_gc + ' cycles)';
-
-                var secs = Math.floor(h.uptime_seconds);
-                var days = Math.floor(secs / 86400); secs %= 86400;
-                var hrs  = Math.floor(secs / 3600);  secs %= 3600;
-                var mins = Math.floor(secs / 60);    secs %= 60;
-                var parts = [];
-                if (days) parts.push(days + 'd');
-                if (hrs)  parts.push(hrs + 'h');
-                if (mins) parts.push(mins + 'm');
-                parts.push(secs + 's');
-                document.getElementById('health-uptime').textContent = parts.join(' ');
             })
             .catch(function () {});
     }
@@ -1347,7 +1493,17 @@
     });
 
     // ---------- ACME / TLS ----------
-    var acmeProviders = [];   // [{name, fields:[{key,label,required,sensitive,placeholder}]}]
+    var acmeProviders = [];
+    var acmeConfigExists = false;
+
+    function lockAcmeForm(locked) {
+        var fields = ['acme-email', 'acme-dns-provider', 'acme-ca-dir-url', 'acme-renewal-interval'];
+        fields.forEach(function (id) { document.getElementById(id).disabled = locked; });
+        document.querySelectorAll('#acme-credential-fields input').forEach(function (inp) { inp.disabled = locked; });
+        document.getElementById('acme-save-btn').style.display = locked ? 'none' : '';
+        document.getElementById('acme-locked-notice').style.display = locked ? '' : 'none';
+        document.getElementById('acme-reset-btn').style.display = locked ? '' : 'none';
+    }
 
     function loadAcmeProviders() {
         return fetch('/api/v1/acme/providers', { credentials: 'same-origin' })
@@ -1373,12 +1529,14 @@
         provider.fields.forEach(function (f) {
             var val = (values && values[f.key]) || '';
             var inputType = f.sensitive ? 'password' : 'text';
+            var requiredAttr = f.required ? 'required ' : '';
+            var placeholder = f.placeholder || '';
             var html = '<label for="acme-cred-' + f.key + '" style="font-size:0.85rem;margin-bottom:0.25rem;">' +
                 f.label + (f.required ? '' : ' <small>(optional)</small>') +
                 '<input type="' + inputType + '" id="acme-cred-' + f.key + '" ' +
                 'data-cred-key="' + f.key + '" ' +
-                'placeholder="' + (f.placeholder || '') + '" ' +
-                (f.required ? 'required ' : '') +
+                'placeholder="' + placeholder + '" ' +
+                requiredAttr +
                 'value="' + val.replace(/"/g, '&quot;') + '" ' +
                 'style="margin-bottom:0.5rem;" autocomplete="off">' +
                 '</label>';
@@ -1399,15 +1557,15 @@
             })
             .then(function (conf) {
                 if (!conf) return;
+                acmeConfigExists = conf.configured;
                 document.getElementById('acme-enabled').checked = conf.enabled;
                 document.getElementById('acme-enabled-label').textContent = conf.enabled ? 'Enabled' : 'Disabled';
                 document.getElementById('acme-email').value = conf.email || '';
                 document.getElementById('acme-dns-provider').value = conf.dnsProvider || '';
                 document.getElementById('acme-ca-dir-url').value = conf.caDirUrl || '';
                 document.getElementById('acme-renewal-interval').value = conf.renewalCheckInterval || '12h';
-                // Credentials are not returned by GET (they are serialized server-side).
-                // Render empty fields so the user can fill them in when changing provider.
                 renderCredentialFields(conf.dnsProvider, {});
+                lockAcmeForm(acmeConfigExists);
             })
             .catch(function (err) { console.error('Failed to load ACME config', err); });
     }
@@ -1423,7 +1581,7 @@
                 if (!certs) return;
                 var tbody = document.getElementById('acme-certs-body');
                 if (!certs.length) {
-                    tbody.innerHTML = '<tr><td colspan="3" class="text-center" style="padding:1.5rem;color:var(--pico-muted-color);">No certificates yet.</td></tr>';
+                    tbody.innerHTML = '<tr><td colspan="4" class="text-center" style="padding:1.5rem;color:var(--pico-muted-color);">No certificates yet.</td></tr>';
                     return;
                 }
                 var html = '';
@@ -1433,8 +1591,12 @@
                     var now = new Date();
                     var daysLeft = Math.ceil((expires - now) / (1000 * 60 * 60 * 24));
                     var badgeClass = daysLeft <= 7 ? 'badge-danger' : daysLeft <= 30 ? 'badge-info' : 'badge-success';
+                    var statusBadge = c.active
+                        ? '<span class="badge badge-success">Active</span>'
+                        : '<span class="badge badge-muted">Orphaned</span>';
                     html += '<tr>' +
                         '<td><code>' + c.domain + '</code></td>' +
+                        '<td>' + statusBadge + '</td>' +
                         '<td><span class="badge ' + badgeClass + '">' + daysLeft + 'd</span> ' + expires.toLocaleDateString() + '</td>' +
                         '<td>' + created.toLocaleDateString() + '</td>' +
                         '</tr>';
@@ -1444,8 +1606,21 @@
             .catch(function (err) { console.error('Failed to load ACME certificates', err); });
     }
 
+    // Enabled toggle — uses PATCH endpoint (only mutation allowed post-setup)
     document.getElementById('acme-enabled').addEventListener('change', function () {
-        document.getElementById('acme-enabled-label').textContent = this.checked ? 'Enabled' : 'Disabled';
+        var enabled = this.checked;
+        document.getElementById('acme-enabled-label').textContent = enabled ? 'Enabled' : 'Disabled';
+        if (!acmeConfigExists) return; // toggle is part of the form for first-time setup
+        fetch('/api/v1/acme/config', {
+            method: 'PATCH', credentials: 'same-origin',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ enabled: enabled })
+        })
+        .then(function (resp) {
+            if (!resp.ok) return resp.text().then(function (t) { showToast(t || 'Failed to toggle ACME.', 'error'); });
+            showToast('ACME ' + (enabled ? 'enabled' : 'disabled') + '.', 'success');
+        })
+        .catch(function () { showToast('Failed to toggle ACME state.', 'error'); });
     });
 
     document.getElementById('acme-config-form').addEventListener('submit', function (e) {
@@ -1482,11 +1657,30 @@
                 resultEl.innerHTML = '<div class="error-alert">' + (t || 'Failed to save configuration.') + '</div>';
             });
             showToast('ACME configuration saved and applied.', 'success');
-            resultEl.innerHTML = '<div class="success-alert" style="margin-top:0.75rem;">Configuration saved and applied.</div>';
             loadAcmeConfig();
-            loadAcmeCertificates();
         })
         .catch(function () { resultEl.innerHTML = '<div class="error-alert">An error occurred. Please try again.</div>'; });
+    });
+
+    document.getElementById('acme-reset-btn').addEventListener('click', function () {
+        if (!confirm('This will permanently delete ALL ACME data:\n\n• Configuration\n• Account keys\n• Certificates\n\nThis cannot be undone. Continue?')) return;
+        fetch('/api/v1/acme', { method: 'DELETE', credentials: 'same-origin' })
+            .then(function (resp) {
+                if (resp.status === 401) { window.location.href = '/ui/login'; return; }
+                if (!resp.ok) return resp.text().then(function (t) { showToast(t || 'Failed to reset ACME data.', 'error'); });
+                showToast('All ACME data has been reset.', 'success');
+                acmeConfigExists = false;
+                document.getElementById('acme-enabled').checked = false;
+                document.getElementById('acme-enabled-label').textContent = 'Disabled';
+                document.getElementById('acme-email').value = '';
+                document.getElementById('acme-dns-provider').value = '';
+                document.getElementById('acme-ca-dir-url').value = '';
+                document.getElementById('acme-renewal-interval').value = '';
+                document.getElementById('acme-credential-fields').innerHTML = '';
+                document.getElementById('acme-config-result').innerHTML = '';
+                lockAcmeForm(false);
+            })
+            .catch(function () { showToast('An error occurred while resetting ACME data.', 'error'); });
     });
 
     // ---------- API Keys ----------
@@ -1576,7 +1770,8 @@
         var body = { alias: alias, scopes: scopes };
         var expiryVal = document.getElementById('api-key-expiry').value;
         if (expiryVal) {
-            body.ExpiryDate = new Date(expiryVal).toISOString();
+            var d = new Date(expiryVal + 'T23:59:59');
+            body.ExpiryDate = d.toISOString();
         }
 
         fetch('/api/v1/apiKeys', {

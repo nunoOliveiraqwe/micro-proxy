@@ -3,6 +3,7 @@ package sqlite
 import (
 	"context"
 	"database/sql"
+	"fmt"
 	"time"
 
 	"github.com/nunoOliveiraqwe/torii/internal/domain"
@@ -244,4 +245,20 @@ func (s *AcmeStore) ListCertificates() ([]*domain.AcmeCertificate, error) {
 		certs = append(certs, &cert)
 	}
 	return certs, rows.Err()
+}
+
+func (s *AcmeStore) ResetAll() error {
+	ctx := context.Background()
+	tx, err := s.db.BeginTx(ctx, nil)
+	if err != nil {
+		return err
+	}
+	defer tx.Rollback()
+
+	for _, table := range []string{"acme_certificate", "acme_account", "acme_configuration"} {
+		if _, err := tx.ExecContext(ctx, "DELETE FROM "+table); err != nil {
+			return fmt.Errorf("failed to clear %s: %w", table, err)
+		}
+	}
+	return tx.Commit()
 }

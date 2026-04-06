@@ -205,7 +205,7 @@ func newTestFixture(t *testing.T) *testFixture {
 		AcmeStore:         sqlite.NewAcmeStore(db),
 		ApiKeyStore:       sqlite.NewApiKeyStore(db),
 	}
-	serviceStore := app.NewServiceStore(dataStore)
+	serviceStore := app.NewServiceStore(dataStore, func() error { return nil }, func() []*proxy.ProxySnapshot { return nil })
 
 	ctx, cancel := context.WithCancel(context.Background())
 	t.Cleanup(cancel)

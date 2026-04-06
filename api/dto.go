@@ -32,6 +32,7 @@ type AcmeConfigResponse struct {
 	CADirURL             string `json:"caDirUrl"`
 	RenewalCheckInterval string `json:"renewalCheckInterval"`
 	Enabled              bool   `json:"enabled"`
+	Configured           bool   `json:"configured"`
 }
 
 type AcmeConfigRequest struct {
@@ -47,10 +48,15 @@ type DnsProviderConfigRequest struct {
 	ConfigMap   map[string]string `json:"configurationMap"`
 }
 
+type AcmeToggleRequest struct {
+	Enabled bool `json:"enabled"`
+}
+
 type AcmeCertificateResponse struct {
 	Domain    string `json:"domain"`
 	ExpiresAt string `json:"expiresAt"`
 	CreatedAt string `json:"createdAt"`
+	Active    bool   `json:"active"`
 }
 
 type AcmeProviderResponse struct {

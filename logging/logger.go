@@ -33,8 +33,14 @@ func InitLogger(conf config.LogConfig) {
 		}
 	}
 
+	cfg.Encoding = conf.GetEncoding()
 	cfg.EncoderConfig.TimeKey = "timestamp"
 	cfg.EncoderConfig.EncodeTime = zapcore.ISO8601TimeEncoder
+	if conf.IsColorEnabled() {
+		cfg.EncoderConfig.EncodeLevel = zapcore.CapitalColorLevelEncoder
+	} else {
+		cfg.EncoderConfig.EncodeLevel = zapcore.CapitalLevelEncoder
+	}
 	log, err := cfg.Build()
 	if err != nil {
 		log = zap.NewNop()
