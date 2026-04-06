@@ -6,6 +6,7 @@ import (
 	"net/http/httputil"
 	"net/url"
 
+	"github.com/nunoOliveiraqwe/torii/middleware"
 	"go.uber.org/zap"
 )
 
@@ -26,14 +27,15 @@ func rewriteProxyRequest(proxyUrl *url.URL) func(r *httputil.ProxyRequest) {
 		r.SetURL(proxyUrl)
 		r.SetXForwarded()
 		r.Out.Header.Set("X-Origin-Host", proxyUrl.Host)
-		zap.S().Debugf("Rewriting request to target: %s, X-Forwarded-For: %s", proxyUrl.String(), r.Out.Header.Get("X-Forwarded-For"))
+		logger := middleware.GetRequestLoggerFromContext(r.In)
+		logger.Debug("Rewriting request to target", zap.String("target", proxyUrl.String()), zap.String("x-forwarded-for", r.Out.Header.Get("X-Forwarded-For")))
 	}
 }
 
 func buildDefaultHttpHandler(proxy *httputil.ReverseProxy) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		zap.S().Debugf("Proxying request to target: %s, X-Forwarded-For: %s",
-			r.URL.String(), r.Header.Get("X-Forwarded-For"))
+		logger := middleware.GetRequestLoggerFromContext(r)
+		logger.Debug("Proxying request to target", zap.String("target", r.URL.String()), zap.String("x-forwarded-for", r.Header.Get("X-Forwarded-For")))
 		proxy.ServeHTTP(w, r)
 	}
 }

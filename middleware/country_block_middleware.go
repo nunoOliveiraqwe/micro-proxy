@@ -84,6 +84,23 @@ func initCountryFilter(middlewareConf Config) (*country.Filter, error) {
 		return nil, fmt.Errorf("'source.path' must be a string")
 	}
 
+	countryFieldRaw, ok := sourceMap["country-field"]
+	if !ok {
+		return nil, fmt.Errorf("missing required 'source.country-field' option")
+	}
+	countryField, ok := countryFieldRaw.(string)
+	if !ok {
+		return nil, fmt.Errorf("'source.country-field' must be a string")
+	}
+
+	var continentField string
+	if cfRaw, ok := sourceMap["continent-field"]; ok {
+		continentField, ok = cfRaw.(string)
+		if !ok {
+			return nil, fmt.Errorf("'source.continent-field' must be a string")
+		}
+	}
+
 	var loader country.DbLoader
 	var refreshInterval time.Duration
 	switch strings.ToLower(mode) {
@@ -119,43 +136,92 @@ func initCountryFilter(middlewareConf Config) (*country.Filter, error) {
 		return nil, fmt.Errorf("invalid 'source.mode' value %q, must be 'remote' or 'local'", mode)
 	}
 
-	// Parse list-mode
-	listModeRaw, ok := middlewareConf.Options["list-mode"]
-	if !ok {
-		return nil, fmt.Errorf("missing required 'list-mode' option")
-	}
-	listModeStr, ok := listModeRaw.(string)
-	if !ok {
-		return nil, fmt.Errorf("'list-mode' must be a string")
+	// Parse on-unknown (optional, defaults to block)
+	onUnknown := false // default: block unknown
+	if ouRaw, ok := middlewareConf.Options["on-unknown"]; ok {
+		ouStr, ok := ouRaw.(string)
+		if !ok {
+			return nil, fmt.Errorf("'on-unknown' must be a string")
+		}
+		switch strings.ToLower(ouStr) {
+		case "allow":
+			onUnknown = true
+		case "block":
+			onUnknown = false
+		default:
+			return nil, fmt.Errorf("invalid 'on-unknown' value %q, must be 'allow' or 'block'", ouStr)
+		}
 	}
 
-	var listMode country.ListMode
-	switch strings.ToLower(listModeStr) {
+	// Parse country-list-mode and country-list (optional, but at least one of country or continent must be set)
+	var countryListMode country.ListMode
+	var countryCodes []string
+	if _, hasCountryList := middlewareConf.Options["country-list"]; hasCountryList {
+		countryListMode, err = parseListMode(middlewareConf.Options, "country-list-mode")
+		if err != nil {
+			return nil, err
+		}
+		countryCodes, err = parseCodeList(middlewareConf.Options, "country-list")
+		if err != nil {
+			return nil, err
+		}
+	}
+
+	// Parse continent-list-mode and continent-list (optional, requires continent-field in source)
+	var continentListMode country.ListMode
+	var continentCodes []string
+	if _, hasContinentList := middlewareConf.Options["continent-list"]; hasContinentList {
+		if continentField == "" {
+			return nil, fmt.Errorf("'continent-list' requires 'source.continent-field' to be set")
+		}
+		continentListMode, err = parseListMode(middlewareConf.Options, "continent-list-mode")
+		if err != nil {
+			return nil, err
+		}
+		continentCodes, err = parseCodeList(middlewareConf.Options, "continent-list")
+		if err != nil {
+			return nil, err
+		}
+	}
+
+	return country.NewFilter(cacheOpts, loader, countryListMode, countryCodes, continentListMode, continentCodes, refreshInterval, countryField, continentField, onUnknown)
+}
+
+func parseListMode(options map[string]interface{}, key string) (country.ListMode, error) {
+	raw, ok := options[key]
+	if !ok {
+		return 0, fmt.Errorf("missing required '%s' option", key)
+	}
+	str, ok := raw.(string)
+	if !ok {
+		return 0, fmt.Errorf("'%s' must be a string", key)
+	}
+	switch strings.ToLower(str) {
 	case "allow":
-		listMode = country.AllowList
+		return country.AllowList, nil
 	case "block":
-		listMode = country.BlockList
+		return country.BlockList, nil
 	default:
-		return nil, fmt.Errorf("invalid 'list-mode' value %q, must be 'allow' or 'block'", listModeStr)
+		return 0, fmt.Errorf("invalid '%s' value %q, must be 'allow' or 'block'", key, str)
 	}
+}
 
-	// Parse list (country codes)
-	listRaw, ok := middlewareConf.Options["list"]
+func parseCodeList(options map[string]interface{}, key string) ([]string, error) {
+	raw, ok := options[key]
 	if !ok {
-		return nil, fmt.Errorf("missing required 'list' option")
+		return nil, fmt.Errorf("missing required '%s' option", key)
 	}
-	listSlice, ok := listRaw.([]interface{})
+	slice, ok := raw.([]interface{})
 	if !ok {
-		return nil, fmt.Errorf("'list' option must be an array of country code strings")
+		return nil, fmt.Errorf("'%s' option must be an array of strings", key)
 	}
-	countryCodes := make([]string, 0, len(listSlice))
-	for _, item := range listSlice {
+	codes := make([]string, 0, len(slice))
+	for _, item := range slice {
 		code, ok := item.(string)
 		if !ok {
-			return nil, fmt.Errorf("each entry in 'list' must be a string, got %T", item)
+			return nil, fmt.Errorf("each entry in '%s' must be a string, got %T", key, item)
 		}
-		countryCodes = append(countryCodes, strings.ToUpper(code))
+		codes = append(codes, strings.ToUpper(code))
 	}
-
-	return country.NewFilter(cacheOpts, loader, listMode, countryCodes, refreshInterval)
+	return codes, nil
 }

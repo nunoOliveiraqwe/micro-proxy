@@ -21,6 +21,8 @@ func buildHttpServer(ctx context.Context, conf config.HTTPListener, global *conf
 			return nil, fmt.Errorf("failed to get loopback interface: %w", err)
 		}
 		ifFace = i.Name
+	} else {
+		ifFace = conf.Interface
 	}
 
 	ipv4, ipv6, err := netutil.GetNetworkBindAddressesFromInterface(ifFace)

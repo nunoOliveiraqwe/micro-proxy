@@ -44,7 +44,7 @@ func NewTorii(conf config.NetworkConfig, mgr *metrics.ConnectionMetricsManager, 
 		return nil, err
 	}
 	if acmeMgr != nil {
-		domains := m.collectWorkingDomains()
+		domains := m.collectWorkingDomains() //this is bugged. only do this for use-acme HTTPS servers
 		acmeMgr.SetDomains(domains)
 		acmeMgr.StartRenewalLoop()
 	}

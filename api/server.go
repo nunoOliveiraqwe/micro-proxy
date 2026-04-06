@@ -56,8 +56,8 @@ func buildMux(port int, svc app.SystemService) *http.ServeMux {
 		}
 		routeHandlerFunc = checkIfRouteIsAllowedIfFtsIsNotDone(routeHandlerFunc, route.IsAllowedBeforeFts, route.IsAllowedAfterFts, svc)
 		routeHandlerFunc = middleware.MetricsMiddleware(ctx, routeHandlerFunc, middleware.Config{})
-		routeHandlerFunc = middleware.RequestLoggerMiddleware(ctx, routeHandlerFunc, middleware.Config{})
-		routeHandlerFunc = middleware.RequestIDMiddleware(ctx, routeHandlerFunc, middleware.Config{})
+		//routeHandlerFunc = middleware.RequestLoggerMiddleware(ctx, routeHandlerFunc, middleware.Config{}) TODO -> decide if i want this, it can be noisy, but maybe it's worth it for debugging. maybe only enable if debug is enabled?
+		//routeHandlerFunc = middleware.RequestIDMiddleware(ctx, routeHandlerFunc, middleware.Config{})
 		mux.HandleFunc(fullPathWithMethod, routeHandlerFunc)
 		zap.S().Debugf("Route %s initialized", route.Name)
 	}
