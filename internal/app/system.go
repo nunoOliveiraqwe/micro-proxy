@@ -30,7 +30,7 @@ type SystemHealth struct {
 type SystemService interface {
 	Start() error
 	Stop() error
-	ReloadAcme() error
+	StartStopAcme() error
 	SessionRegistry() *session.Registry
 	GetServiceStore() *ServiceStore
 	GetConfiguredProxyServers() []*proxy.ProxySnapshot
@@ -91,7 +91,7 @@ func NewSystemService(conf config.AppConfig) (SystemService, error) {
 		sseBroker:            NewSSEBroker(mgr),
 		startTime:            time.Now(),
 	}
-	svc.serviceStore = NewServiceStore(NewDataStore(db), svc.ReloadAcme, svc.GetConfiguredProxyServers)
+	svc.serviceStore = NewServiceStore(NewDataStore(db), svc.StartStopAcme, svc.GetConfiguredProxyServers)
 	return svc, nil
 }
 
@@ -156,7 +156,7 @@ func (sm *systemService) Stop() error {
 	return nil
 }
 
-func (sm *systemService) ReloadAcme() error {
+func (sm *systemService) StartStopAcme() error {
 	zap.S().Info("Reloading ACME manager from DB configuration")
 	conf, err := sm.acmeStore.GetConfiguration()
 	if err != nil {
