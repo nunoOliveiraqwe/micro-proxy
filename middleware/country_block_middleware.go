@@ -24,23 +24,23 @@ func CountryBlockMiddleware(ctx context.Context, next http.HandlerFunc, middlewa
 	}
 
 	return func(w http.ResponseWriter, r *http.Request) {
+		logger := GetRequestLoggerFromContext(r)
 		clientIP, err := netutil.GetClientIP(r)
 		if err != nil {
-			zap.S().Errorf("CountryBlockMiddleware: failed to get client IP: %v", err)
+			logger.Warn("CountryBlockMiddleware: failed to get client IP:", zap.Error(err))
 			http.Error(w, "Forbidden", http.StatusForbidden)
 			return
 		}
 
 		addr, err := netip.ParseAddr(clientIP)
 		if err != nil {
-			zap.S().Errorf("CountryBlockMiddleware: failed to parse client IP %q: %v", clientIP, err)
+			logger.Warn("CountryBlockMiddleware: failed to parse client IP", zap.String("clientIp", clientIP), zap.Error(err))
 			http.Error(w, "Forbidden", http.StatusForbidden)
 			return
 		}
 
-		logger := GetRequestLoggerFromContext(r)
 		if !filter.IsFromAllowedCountry(logger, r, addr) {
-			zap.S().Infof("CountryBlockMiddleware: blocked request from IP %s", clientIP)
+			logger.Warn("CountryBlockMiddleware: blocked request from IP", zap.String("clientIp", clientIP))
 			http.Error(w, "Forbidden", http.StatusForbidden)
 			return
 		}
@@ -66,40 +66,22 @@ func initCountryFilter(middlewareConf Config) (*country.Filter, error) {
 		return nil, fmt.Errorf("'source' option must be a map")
 	}
 
-	modeRaw, ok := sourceMap["mode"]
-	if !ok {
-		return nil, fmt.Errorf("missing required 'source.mode' option")
-	}
-	mode, ok := modeRaw.(string)
-	if !ok {
-		return nil, fmt.Errorf("'source.mode' must be a string")
+	mode, err := ParseStringRequired(sourceMap, "mode")
+	if err != nil {
+		return nil, err
 	}
 
-	pathRaw, ok := sourceMap["path"]
-	if !ok {
-		return nil, fmt.Errorf("missing required 'source.path' option")
-	}
-	path, ok := pathRaw.(string)
-	if !ok {
-		return nil, fmt.Errorf("'source.path' must be a string")
+	path, err := ParseStringRequired(sourceMap, "path")
+	if err != nil {
+		return nil, err
 	}
 
-	countryFieldRaw, ok := sourceMap["country-field"]
-	if !ok {
-		return nil, fmt.Errorf("missing required 'source.country-field' option")
-	}
-	countryField, ok := countryFieldRaw.(string)
-	if !ok {
-		return nil, fmt.Errorf("'source.country-field' must be a string")
+	countryField, err := ParseStringRequired(sourceMap, "country-field")
+	if err != nil {
+		return nil, err
 	}
 
-	var continentField string
-	if cfRaw, ok := sourceMap["continent-field"]; ok {
-		continentField, ok = cfRaw.(string)
-		if !ok {
-			return nil, fmt.Errorf("'source.continent-field' must be a string")
-		}
-	}
+	continentField, _ := ParseStringOpt(sourceMap, "continent-field", "")
 
 	var loader country.DbLoader
 	var refreshInterval time.Duration
@@ -107,13 +89,9 @@ func initCountryFilter(middlewareConf Config) (*country.Filter, error) {
 	case "local":
 		loader = country.NewStaticFileDbLoader(path)
 	case "remote":
-		maxSizeStr := "300m" // default
-		if ms, ok := sourceMap["max-size"]; ok {
-			if s, ok := ms.(string); ok {
-				maxSizeStr = s
-			} else {
-				return nil, fmt.Errorf("'source.max-size' must be a string")
-			}
+		maxSizeStr, err := ParseStringOpt(sourceMap, "max-size", "300m")
+		if err != nil {
+			return nil, err
 		}
 		loader, err = country.NewDownloadDbLoader(path, maxSizeStr)
 		if err != nil {
@@ -138,19 +116,17 @@ func initCountryFilter(middlewareConf Config) (*country.Filter, error) {
 
 	// Parse on-unknown (optional, defaults to block)
 	onUnknown := false // default: block unknown
-	if ouRaw, ok := middlewareConf.Options["on-unknown"]; ok {
-		ouStr, ok := ouRaw.(string)
-		if !ok {
-			return nil, fmt.Errorf("'on-unknown' must be a string")
-		}
-		switch strings.ToLower(ouStr) {
-		case "allow":
-			onUnknown = true
-		case "block":
-			onUnknown = false
-		default:
-			return nil, fmt.Errorf("invalid 'on-unknown' value %q, must be 'allow' or 'block'", ouStr)
-		}
+	ouStr, err := ParseStringOpt(middlewareConf.Options, "on-unknown", "block")
+	if err != nil {
+		return nil, err
+	}
+	switch strings.ToLower(ouStr) {
+	case "allow":
+		onUnknown = true
+	case "block":
+		onUnknown = false
+	default:
+		return nil, fmt.Errorf("invalid 'on-unknown' value %q, must be 'allow' or 'block'", ouStr)
 	}
 
 	// Parse country-list-mode and country-list (optional, but at least one of country or continent must be set)
@@ -188,13 +164,9 @@ func initCountryFilter(middlewareConf Config) (*country.Filter, error) {
 }
 
 func parseListMode(options map[string]interface{}, key string) (country.ListMode, error) {
-	raw, ok := options[key]
-	if !ok {
-		return 0, fmt.Errorf("missing required '%s' option", key)
-	}
-	str, ok := raw.(string)
-	if !ok {
-		return 0, fmt.Errorf("'%s' must be a string", key)
+	str, err := ParseStringRequired(options, key)
+	if err != nil {
+		return 0, err
 	}
 	switch strings.ToLower(str) {
 	case "allow":

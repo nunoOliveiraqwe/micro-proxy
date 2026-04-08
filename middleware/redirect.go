@@ -58,27 +58,21 @@ func parseRedirectConf(conf Config) (*redirectOptions, error) {
 	if conf.Options == nil {
 		return nil, fmt.Errorf("options cannot be nil")
 	}
-	statusCodeStr, ok := conf.Options["status-code"]
+
+	statusCodeRaw, ok := conf.Options["status-code"]
 	if !ok {
 		return nil, fmt.Errorf("missing required option 'status-code'")
 	}
-	statusCode, err := strconv.Atoi(fmt.Sprintf("%v", statusCodeStr))
+	statusCode, err := strconv.Atoi(fmt.Sprintf("%v", statusCodeRaw))
 	if err != nil || statusCode < 300 || statusCode > 399 {
-		return nil, fmt.Errorf("invalid 'status-code' option: %v", statusCodeStr)
-	}
-	targetStr, ok := conf.Options["target"]
-
-	if !ok {
-		return nil, fmt.Errorf("missing required option 'target'")
+		return nil, fmt.Errorf("invalid 'status-code' option: %v", statusCodeRaw)
 	}
 
-	target, isStr := targetStr.(string)
-	if !isStr {
-		return nil, fmt.Errorf("'target' option must be a string")
+	target, err := ParseStringRequired(conf.Options, "target")
+	if err != nil {
+		return nil, err
 	}
-	if target == "" {
-		return nil, fmt.Errorf("'target' option cannot be empty")
-	}
+
 	zap.S().Debugf("RedirectMiddleware: successfully parsed configuration with status code %d and target %q", statusCode, target)
 
 	parsed, err := url.Parse(target)
@@ -93,28 +87,7 @@ func parseRedirectConf(conf Config) (*redirectOptions, error) {
 	return &redirectOptions{
 		statusCode: statusCode,
 		target:     target,
-		dropPath:   parseBoolOption(conf, "drop-path", true),
-		dropQuery:  parseBoolOption(conf, "drop-query", true),
+		dropPath:   ParseBoolOpt(conf.Options, "drop-path", true),
+		dropQuery:  ParseBoolOpt(conf.Options, "drop-query", true),
 	}, nil
-}
-
-func parseBoolOption(conf Config, key string, defaultVal bool) bool {
-	val, ok := conf.Options[key]
-	if !ok {
-		return defaultVal
-	}
-	switch v := val.(type) {
-	case bool:
-		return v
-	case string:
-		parsed, err := strconv.ParseBool(v)
-		if err != nil {
-			zap.S().Warnf("RedirectMiddleware: invalid '%s' value %q, using default %v", key, v, defaultVal)
-			return defaultVal
-		}
-		return parsed
-	default:
-		zap.S().Warnf("RedirectMiddleware: '%s' option has unexpected type, using default %v", key, defaultVal)
-		return defaultVal
-	}
 }

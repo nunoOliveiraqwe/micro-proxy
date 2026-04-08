@@ -51,28 +51,28 @@ func TestComputeRetryAfter_VerySmallRate(t *testing.T) {
 
 func TestParseIntOption_Float64(t *testing.T) {
 	m := map[string]interface{}{"burst": float64(10)}
-	v, err := parseIntOption(m, "burst")
+	v, err := ParseIntOptRequired(m, "burst")
 	require.NoError(t, err)
 	assert.Equal(t, 10, v)
 }
 
 func TestParseIntOption_Int(t *testing.T) {
 	m := map[string]interface{}{"burst": 5}
-	v, err := parseIntOption(m, "burst")
+	v, err := ParseIntOptRequired(m, "burst")
 	require.NoError(t, err)
 	assert.Equal(t, 5, v)
 }
 
 func TestParseIntOption_Missing(t *testing.T) {
 	m := map[string]interface{}{}
-	_, err := parseIntOption(m, "burst")
+	_, err := ParseIntOptRequired(m, "burst")
 	assert.Error(t, err)
 	assert.Contains(t, err.Error(), "missing required option")
 }
 
 func TestParseIntOption_WrongType(t *testing.T) {
 	m := map[string]interface{}{"burst": "not-a-number"}
-	_, err := parseIntOption(m, "burst")
+	_, err := ParseIntOptRequired(m, "burst")
 	assert.Error(t, err)
 	assert.Contains(t, err.Error(), "must be a number")
 }
@@ -83,28 +83,28 @@ func TestParseIntOption_WrongType(t *testing.T) {
 
 func TestParseFloatOption_Float64(t *testing.T) {
 	m := map[string]interface{}{"rate-per-second": float64(2.5)}
-	v, err := parseFloatOption(m, "rate-per-second")
+	v, err := ParseFloatOptRequired(m, "rate-per-second")
 	require.NoError(t, err)
 	assert.Equal(t, 2.5, v)
 }
 
 func TestParseFloatOption_Int(t *testing.T) {
 	m := map[string]interface{}{"rate-per-second": 3}
-	v, err := parseFloatOption(m, "rate-per-second")
+	v, err := ParseFloatOptRequired(m, "rate-per-second")
 	require.NoError(t, err)
 	assert.Equal(t, 3.0, v)
 }
 
 func TestParseFloatOption_Missing(t *testing.T) {
 	m := map[string]interface{}{}
-	_, err := parseFloatOption(m, "rate-per-second")
+	_, err := ParseFloatOptRequired(m, "rate-per-second")
 	assert.Error(t, err)
 	assert.Contains(t, err.Error(), "missing required option")
 }
 
 func TestParseFloatOption_WrongType(t *testing.T) {
 	m := map[string]interface{}{"rate-per-second": "bad"}
-	_, err := parseFloatOption(m, "rate-per-second")
+	_, err := ParseFloatOptRequired(m, "rate-per-second")
 	assert.Error(t, err)
 	assert.Contains(t, err.Error(), "must be a number")
 }
@@ -143,7 +143,7 @@ func validPerClientConfig() Config {
 }
 
 func TestParseConfig_ValidGlobal(t *testing.T) {
-	conf, err := parseConfig(validGlobalConfig())
+	conf, err := parseRateLimitConfig(validGlobalConfig())
 	require.NoError(t, err)
 	assert.Equal(t, 5, conf.Burst)
 	assert.Equal(t, 10.0, conf.RatePerSecond)
@@ -152,7 +152,7 @@ func TestParseConfig_ValidGlobal(t *testing.T) {
 }
 
 func TestParseConfig_ValidPerClient(t *testing.T) {
-	conf, err := parseConfig(validPerClientConfig())
+	conf, err := parseRateLimitConfig(validPerClientConfig())
 	require.NoError(t, err)
 	assert.Equal(t, 3, conf.Burst)
 	assert.Equal(t, 5.0, conf.RatePerSecond)
@@ -162,7 +162,7 @@ func TestParseConfig_ValidPerClient(t *testing.T) {
 
 func TestParseConfig_MissingLimiterReq(t *testing.T) {
 	conf := Config{Options: map[string]interface{}{"mode": "global"}}
-	_, err := parseConfig(conf)
+	_, err := parseRateLimitConfig(conf)
 	assert.Error(t, err)
 	assert.Contains(t, err.Error(), "limiter-req")
 }
@@ -172,7 +172,7 @@ func TestParseConfig_LimiterReqBadType(t *testing.T) {
 		"mode":        "global",
 		"limiter-req": "not-a-map",
 	}}
-	_, err := parseConfig(conf)
+	_, err := parseRateLimitConfig(conf)
 	assert.Error(t, err)
 	assert.Contains(t, err.Error(), "map")
 }
@@ -184,7 +184,7 @@ func TestParseConfig_MissingBurst(t *testing.T) {
 			"rate-per-second": float64(1),
 		},
 	}}
-	_, err := parseConfig(conf)
+	_, err := parseRateLimitConfig(conf)
 	assert.Error(t, err)
 	assert.Contains(t, err.Error(), "burst")
 }
@@ -197,7 +197,7 @@ func TestParseConfig_ZeroBurst(t *testing.T) {
 			"rate-per-second": float64(1),
 		},
 	}}
-	_, err := parseConfig(conf)
+	_, err := parseRateLimitConfig(conf)
 	assert.Error(t, err)
 	assert.Contains(t, err.Error(), "positive integer")
 }
@@ -210,7 +210,7 @@ func TestParseConfig_NegativeBurst(t *testing.T) {
 			"rate-per-second": float64(1),
 		},
 	}}
-	_, err := parseConfig(conf)
+	_, err := parseRateLimitConfig(conf)
 	assert.Error(t, err)
 	assert.Contains(t, err.Error(), "positive integer")
 }
@@ -222,7 +222,7 @@ func TestParseConfig_MissingRatePerSecond(t *testing.T) {
 			"burst": float64(5),
 		},
 	}}
-	_, err := parseConfig(conf)
+	_, err := parseRateLimitConfig(conf)
 	assert.Error(t, err)
 	assert.Contains(t, err.Error(), "rate-per-second")
 }
@@ -235,7 +235,7 @@ func TestParseConfig_ZeroRatePerSecond(t *testing.T) {
 			"rate-per-second": float64(0),
 		},
 	}}
-	_, err := parseConfig(conf)
+	_, err := parseRateLimitConfig(conf)
 	assert.Error(t, err)
 	assert.Contains(t, err.Error(), "positive number")
 }
@@ -248,7 +248,7 @@ func TestParseConfig_NegativeRatePerSecond(t *testing.T) {
 			"rate-per-second": float64(-2),
 		},
 	}}
-	_, err := parseConfig(conf)
+	_, err := parseRateLimitConfig(conf)
 	assert.Error(t, err)
 	assert.Contains(t, err.Error(), "positive number")
 }
@@ -261,7 +261,7 @@ func TestParseConfig_InvalidMode(t *testing.T) {
 			"rate-per-second": float64(1),
 		},
 	}}
-	_, err := parseConfig(conf)
+	_, err := parseRateLimitConfig(conf)
 	assert.Error(t, err)
 	assert.Contains(t, err.Error(), "invalid 'mode'")
 }
@@ -274,7 +274,7 @@ func TestParseConfig_ModeNotString(t *testing.T) {
 			"rate-per-second": float64(1),
 		},
 	}}
-	_, err := parseConfig(conf)
+	_, err := parseRateLimitConfig(conf)
 	assert.Error(t, err)
 	assert.Contains(t, err.Error(), "string")
 }
@@ -286,7 +286,7 @@ func TestParseConfig_DefaultModeIsGlobal(t *testing.T) {
 			"rate-per-second": float64(1),
 		},
 	}}
-	result, err := parseConfig(conf)
+	result, err := parseRateLimitConfig(conf)
 	require.NoError(t, err)
 	assert.Equal(t, "global", result.Mode)
 }

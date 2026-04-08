@@ -23,14 +23,18 @@ var registry Registry
 
 func init() {
 	registry = map[string]Func{
-		"Metrics":      MetricsMiddleware,
-		"RequestId":    RequestIDMiddleware,
-		"RequestLog":   RequestLoggerMiddleware,
-		"Headers":      HeadersMiddleware,
-		"RateLimiter":  RateLimitMiddleware,
-		"CountryBlock": CountryBlockMiddleware,
-		"IpBlock":      IpBlockMiddleware,
-		"Redirect":     RedirectMiddleware,
+		"Metrics":        MetricsMiddleware,
+		"RequestId":      RequestIDMiddleware,
+		"RequestLog":     RequestLoggerMiddleware,
+		"Headers":        HeadersMiddleware,
+		"RateLimiter":    RateLimitMiddleware,
+		"CountryBlock":   CountryBlockMiddleware,
+		"IpBlock":        IpBlockMiddleware,
+		"Redirect":       RedirectMiddleware,
+		"BodySizeLimit":  BodySizeLimitMiddleware,
+		"Timeout":        TimeoutMiddleware,
+		"HoneyPot":       HoneyPotMiddleware,
+		"CircuitBreaker": CircuitBreakerMiddleware,
 	}
 }
 

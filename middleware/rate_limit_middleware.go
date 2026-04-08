@@ -64,9 +64,10 @@ func (g *globalLimiter) limit(_ *http.Request, w http.ResponseWriter) bool {
 }
 
 func (l *perClientLimiter) limit(r *http.Request, w http.ResponseWriter) bool {
+	logger := GetRequestLoggerFromContext(r)
 	ipAddr, err := netutil.GetClientIP(r)
 	if err != nil {
-		zap.S().Warnf("RateLimitMiddleware: failed to extract client IP: %v", err)
+		logger.Warn("RateLimitMiddleware: failed to extract client IP", zap.Error(err))
 		w.Header().Set("Retry-After", l.retryAfter)
 		http.Error(w, http.StatusText(http.StatusTooManyRequests), http.StatusTooManyRequests)
 		return false
@@ -78,7 +79,7 @@ func (l *perClientLimiter) limit(r *http.Request, w http.ResponseWriter) bool {
 		}
 		l.clientCache.CacheValue(ipAddr, entry)
 	} else if err != nil {
-		zap.S().Errorf("RateLimitMiddleware: failed to get client entry from cache for IP %s: %v", ipAddr, err)
+		logger.Warn("RateLimitMiddleware: failed to get client entry from cache for IP", zap.String("Ip", ipAddr), zap.Error(err))
 		w.Header().Set("Retry-After", l.retryAfter)
 		http.Error(w, http.StatusText(http.StatusTooManyRequests), http.StatusTooManyRequests)
 		return false
@@ -159,7 +160,7 @@ func parseRateLimitConfig(conf Config) (*rateLimitConf, error) {
 		return nil, fmt.Errorf("'limiter-req' option must be a map[string]interface{}")
 	}
 
-	burstInt, err := parseIntOption(reqLimitMap, "burst")
+	burstInt, err := ParseIntOptRequired(reqLimitMap, "burst")
 	if err != nil {
 		return nil, err
 	}
@@ -167,7 +168,7 @@ func parseRateLimitConfig(conf Config) (*rateLimitConf, error) {
 		return nil, fmt.Errorf("'burst' must be a positive integer, got %d", burstInt)
 	}
 
-	ratePsF, err := parseFloatOption(reqLimitMap, "rate-per-second")
+	ratePsF, err := ParseFloatOptRequired(reqLimitMap, "rate-per-second")
 	if err != nil {
 		return nil, err
 	}
@@ -175,15 +176,9 @@ func parseRateLimitConfig(conf Config) (*rateLimitConf, error) {
 		return nil, fmt.Errorf("'rate-per-second' must be a positive number, got %f", ratePsF)
 	}
 
-	mode, ok := conf.Options["mode"]
-	if !ok {
-		zap.S().Warn("RateLimitMiddleware: 'mode' option not specified, defaulting to 'global'")
-		mode = "global"
-	}
-	modeStr, ok := mode.(string)
-	if !ok {
-		zap.S().Errorf("RateLimitMiddleware: 'mode' option must be a string")
-		return nil, fmt.Errorf("'mode' option must be a string")
+	modeStr, err := ParseStringOpt(conf.Options, "mode", "global")
+	if err != nil {
+		return nil, err
 	}
 
 	if !strings.EqualFold(modeStr, "global") && !strings.EqualFold(modeStr, "per-client") {
@@ -205,34 +200,4 @@ func parseRateLimitConfig(conf Config) (*rateLimitConf, error) {
 		RatePerSecond: ratePsF,
 		Mode:          modeStr,
 	}, nil
-}
-
-func parseIntOption(m map[string]interface{}, key string) (int, error) {
-	v, ok := m[key]
-	if !ok {
-		return 0, fmt.Errorf("missing required option '%s' in 'limiter-req'", key)
-	}
-	switch val := v.(type) {
-	case float64:
-		return int(val), nil
-	case int:
-		return val, nil
-	default:
-		return 0, fmt.Errorf("'%s' option in 'limiter-req' must be a number", key)
-	}
-}
-
-func parseFloatOption(m map[string]interface{}, key string) (float64, error) {
-	v, ok := m[key]
-	if !ok {
-		return 0, fmt.Errorf("missing required option '%s' in 'limiter-req'", key)
-	}
-	switch val := v.(type) {
-	case float64:
-		return val, nil
-	case int:
-		return float64(val), nil
-	default:
-		return 0, fmt.Errorf("'%s' option in 'limiter-req' must be a number", key)
-	}
 }
