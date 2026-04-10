@@ -26,13 +26,13 @@ No Docker. No dependencies. Just the binary and a config file.
 
 ## Screenshots
 
-| Dashboard | Proxy Routes |
-|:---------:|:------------:|
+|                  Dashboard                   |                    Proxy Routes                    |
+|:--------------------------------------------:|:--------------------------------------------------:|
 | ![Dashboard](docs/screenshots/dashboard.png) | ![Proxy Routes](docs/screenshots/proxy-routes.png) |
 
-| Create HTTP Proxy | System |
-|:-----------------:|:------:|
-| ![Create Proxy](docs/screenshots/create-proxy.png) | ![System](docs/screenshots/system.png) |
+|                    System Requests                    |                 System Health                 |
+|:-----------------------------------------------------:|:---------------------------------------------:|
+| ![Create Proxy](docs/screenshots/system-requests.png) | ![System](docs/screenshots/system-health.png) |
 
 ## What You Get
 
