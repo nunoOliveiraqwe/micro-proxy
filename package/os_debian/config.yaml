@@ -1,0 +1,24 @@
+# Default Torii configuration — installed by the .deb package.
+# Edit this file to configure your proxy routes, middlewares, and TLS settings.
+# Full reference: https://github.com/nunoOliveiraqwe/torii/blob/main/docs/configuration.md
+
+log:
+  logLevel: INFO
+  encoding: console
+  color: false
+
+apiServer:
+  host: 0.0.0.0
+  port: 27000
+
+netConfig:
+  http:
+    - port: 80
+      bind: 3
+      default:
+        backend: http://localhost:8080
+        middlewares:
+          - type: "RequestId"
+          - type: "RequestLog"
+          - type: "Metrics"
+

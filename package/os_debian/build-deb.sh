@@ -58,8 +58,9 @@ for script in preinst postinst prerm; do
   chmod 0755 "${BUILD_DIR}/DEBIAN/${script}"
 done
 
-# Copy copyright
+# Copy copyright and conffiles
 cp "${SCRIPT_DIR}/DEBIAN/copyright" "${BUILD_DIR}/DEBIAN/copyright"
+cp "${SCRIPT_DIR}/DEBIAN/conffiles" "${BUILD_DIR}/DEBIAN/conffiles"
 
 # -- Binary --
 mkdir -p "${BUILD_DIR}/usr/local/bin"
@@ -71,8 +72,12 @@ mkdir -p "${BUILD_DIR}/etc/systemd/system"
 cp "${SCRIPT_DIR}/torii.service" "${BUILD_DIR}/etc/systemd/system/torii.service"
 chmod 0644 "${BUILD_DIR}/etc/systemd/system/torii.service"
 
-# -- Config directory (empty, created by postinst but included for visibility) --
+# -- Config directory --
 mkdir -p "${BUILD_DIR}/etc/torii"
+cp "${SCRIPT_DIR}/config.yaml" "${BUILD_DIR}/etc/torii/config.yaml"
+cp "${SCRIPT_DIR}/config.yaml.example" "${BUILD_DIR}/etc/torii/config.yaml.example"
+chmod 0644 "${BUILD_DIR}/etc/torii/config.yaml"
+chmod 0644 "${BUILD_DIR}/etc/torii/config.yaml.example"
 
 # -- Data directory --
 mkdir -p "${BUILD_DIR}/var/lib/torii"

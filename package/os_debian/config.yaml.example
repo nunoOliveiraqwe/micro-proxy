@@ -1,0 +1,416 @@
+# =================================================================
+# Torii — example configuration
+# =================================================================
+#
+# See the full reference at:
+#   https://github.com/nunoOliveiraqwe/torii/blob/main/docs/configuration.md
+#
+# Lines beginning with # are comments and are ignored.
+# To use an option, remove the leading # and adjust the value.
+#
+# After editing, restart the service:
+#   sudo systemctl restart torii
+#
+
+# -----------------------------------------------------------------
+# Logging
+# -----------------------------------------------------------------
+
+# Log level: DEBUG, INFO, WARN, ERROR
+#log.logLevel INFO
+
+# Log encoding format: "console" (human-readable) or "json" (structured)
+#log.encoding console
+
+# Colored log levels (only applies when encoding is "console")
+#log.color false
+
+# File path to write logs to (in addition to stdout)
+#log.logPath /var/log/torii/torii.log
+
+# Enable development-mode logging
+#log.debug false
+
+log:
+  logLevel: INFO
+  encoding: console
+  color: false
+
+# -----------------------------------------------------------------
+# API / Management Server
+# -----------------------------------------------------------------
+
+# The web dashboard and REST API bind to this address and port.
+# On first launch, open http://<host>:<port>/ui to set the admin password.
+
+# Bind address. Use 0.0.0.0 to listen on all interfaces.
+#apiServer.host 0.0.0.0
+
+# Bind port.
+#apiServer.port 27000
+
+apiServer:
+  host: 0.0.0.0
+  port: 27000
+
+# -----------------------------------------------------------------
+# Session (management UI)
+# -----------------------------------------------------------------
+
+# Maximum session lifetime.
+#session.lifetime 16h
+
+# Session idle timeout.
+#session.idleTimeout 60m
+
+# Expired session cleanup interval.
+#session.cleanupInterval 1h
+
+# Set the Secure flag on session cookies (disable if not using HTTPS for the UI).
+#session.cookieSecure true
+
+# Set the HttpOnly flag on session cookies.
+#session.cookieHttpOnly true
+
+# SameSite cookie attribute: strict, lax, or none.
+#session.cookieSameSite lax
+
+#session:
+#  lifetime: 16h
+#  idleTimeout: 60m
+#  cleanupInterval: 1h
+#  cookieSecure: true
+#  cookieHttpOnly: true
+#  cookieSameSite: lax
+
+# -----------------------------------------------------------------
+# Network — HTTP listeners
+# -----------------------------------------------------------------
+#
+# Each entry under netConfig.http creates a separate listener.
+# A listener has:
+#   - a port and bind mode (IPv4, IPv6, or both)
+#   - optional TLS configuration
+#   - optional virtual-host routes (matched by Host header)
+#   - a default/catch-all backend
+#   - middleware chains at every level
+#
+# Middleware execution order:
+#   Global middlewares → Route middlewares → Path middlewares → Reverse Proxy
+#
+# Within each layer, middlewares run in the order listed.
+
+netConfig:
+
+  # -- Global middlewares (applied to ALL listeners) ---------------
+  #global:
+  #  middlewares:
+  #    - type: "RequestId"
+
+  http:
+
+    # ==============================================================
+    # Listener 1 — basic HTTP on port 80
+    # ==============================================================
+    - port: 80
+
+      # Bind mode: 1 = IPv4 only, 2 = IPv6 only, 3 = both.
+      bind: 3
+
+      # Bind to a specific network interface (e.g., eth0, en0).
+      # Omit to bind to all interfaces.
+      #interface: eth0
+
+      # -- Server timeouts -----------------------------------------
+      #read-timeout: 30s
+      #read-header-timeout: 10s
+      #write-timeout: 30s
+      #idle-timeout: 120s
+
+      # -- TLS (uncomment to enable) -------------------------------
+      # Automatic via ACME (Let's Encrypt DNS-01):
+      #tls:
+      #  use-acme: true
+      #
+      # Or manual certificate:
+      #tls:
+      #  cert: /etc/torii/certs/cert.pem
+      #  key: /etc/torii/certs/key.pem
+
+      # -- Virtual-host routes -------------------------------------
+      # Matched by the request Host header. Each route has its own
+      # backend, middleware chain, and optional path rules.
+      #
+      #routes:
+      #  - host: app.example.com
+      #    target:
+      #      backend: http://192.168.1.100:8080
+      #      middlewares:
+      #        - type: "RequestId"
+      #        - type: "RequestLog"
+      #        - type: "Metrics"
+      #
+      #      # Path-specific rules (override the route backend/middlewares)
+      #      paths:
+      #        - pattern: /api/v1/*
+      #          middlewares:
+      #            - type: "RateLimiter"
+      #              options:
+      #                mode: "per-client"
+      #                limiter-req:
+      #                  rate-per-second: 10
+      #                  burst: 20
+      #
+      #        - pattern: /static/*
+      #          backend: http://192.168.1.100:9000   # optional backend override
+      #          drop-path: true                      # strip matched prefix
+      #          middlewares:
+      #            - type: "RequestId"
+
+      # -- Default / catch-all backend -----------------------------
+      # Used when no virtual-host route matches.
+      default:
+        backend: http://localhost:8080
+        middlewares:
+          - type: "RequestId"
+          - type: "RequestLog"
+          - type: "Metrics"
+
+        # Path rules for the default backend:
+        #paths:
+        #  - pattern: /health
+        #    middlewares:
+        #      - type: "RequestId"
+
+
+    # ==============================================================
+    # Listener 2 — HTTPS with ACME (example, commented out)
+    # ==============================================================
+    #- port: 443
+    #  bind: 3
+    #  tls:
+    #    use-acme: true
+    #
+    #  routes:
+    #    - host: jellyfin.example.com
+    #      target:
+    #        backend: http://192.168.1.100:8096
+    #        middlewares:
+    #          - type: "RequestId"
+    #          - type: "RequestLog"
+    #          - type: "Metrics"
+    #          - type: "UserAgentBlocker"
+    #            options:
+    #              block-empty-ua: true
+    #              block-defaults:
+    #                - "scanners"
+    #                - "recon"
+    #                - "ai-crawlers"
+    #              allow-defaults:
+    #                - "search-engines"
+    #          - type: "HoneyPot"
+    #            options:
+    #              defaults: ["git", "infra", "backups", "cgi"]
+    #              response:
+    #                trickster-mode: true
+    #                max-slow-tricks: 10
+    #          - type: "RateLimiter"
+    #            options:
+    #              mode: "per-client"
+    #              limiter-req:
+    #                rate-per-second: 10
+    #                burst: 20
+    #          - type: "CircuitBreaker"
+    #            options:
+    #              failure-threshold: 5
+    #              recovery-time: 30s
+    #              half-open-success-threshold: 3
+    #
+    #  default:
+    #    backend: http://192.168.1.50:8080
+
+
+# =================================================================
+# Middleware Reference (quick copy-paste blocks)
+# =================================================================
+#
+# 14 middlewares are available. Below is every middleware with all
+# its options for easy copy-pasting into a route or path above.
+#
+# ---  RequestId  --------------------------------------------------
+# Generates a unique ID per request.
+#
+#   - type: "RequestId"
+#     options:
+#       prefix: "my-proxy"          # optional, auto-generated if omitted
+#
+# ---  RequestLog  -------------------------------------------------
+# Structured request logging. No options.
+#
+#   - type: "RequestLog"
+#
+# ---  Metrics  ----------------------------------------------------
+# Collects request/response metrics for the dashboard. No options.
+#
+#   - type: "Metrics"
+#
+# ---  Cors  -------------------------------------------------------
+# CORS preflight and response headers.
+#
+#   - type: "Cors"
+#     options:
+#       allow-origin: "*"
+#       allow-methods: "GET, POST, PUT, DELETE"
+#       allow-headers: "Content-Type, Authorization"
+#       max-age: 3600
+#
+# ---  Headers  ----------------------------------------------------
+# Set, strip, or require specific headers.
+# Values support $file:/path and $env:VAR for secrets.
+#
+#   - type: "Headers"
+#     options:
+#       set-headers-req:
+#         X-Forwarded-Proto: "https"
+#       set-headers-res:
+#         X-Api-Version: "1.0"
+#       strip-headers-req:
+#         - "X-Debug"
+#       strip-headers-res:
+#         - "Server"
+#         - "X-Powered-By"
+#       cmp-headers-req:             # rejects with 401 if mismatch
+#         X-Proxy-Secret: $env:PROXY_SECRET
+#
+# ---  RateLimiter  ------------------------------------------------
+# Token-bucket rate limiting. Returns 429 with Retry-After.
+#
+#   - type: "RateLimiter"
+#     options:
+#       mode: "per-client"           # "global" or "per-client"
+#       cache-ttl: 24h               # per-client only
+#       cleanup-interval: 1h         # per-client only
+#       max-cache-size: 10000        # per-client only
+#       limiter-req:
+#         rate-per-second: 5
+#         burst: 10
+#
+# ---  IpBlock  ----------------------------------------------------
+# IP allow/block lists with CIDR support.
+#
+#   - type: "IpBlock"
+#     options:
+#       list-mode: allow             # "allow" or "block"
+#       list:
+#         - 192.168.1.0/24
+#         - 10.0.0.1
+#         - 2001:db8::/32
+#
+# ---  CountryBlock  -----------------------------------------------
+# GeoIP blocking using MaxMind MMDB databases.
+# When both country and continent lists are defined, the country
+# list acts as an exception override to the continent policy.
+#
+#   - type: "CountryBlock"
+#     options:
+#       source:
+#         mode: "remote"             # "remote" or "local"
+#         path: "https://example.com/geo.mmdb"
+#         country-field: "country_code"
+#         continent-field: "continent_code"
+#         max-size: 300m             # remote only
+#         refresh-interval: 24h      # remote only
+#       cache-ttl: 24h
+#       cleanup-interval: 1h
+#       max-cache-size: 10000
+#       on-unknown: block            # "allow" or "block"
+#       country-list-mode: allow
+#       country-list:
+#         - PT
+#         - CA
+#       continent-list-mode: block
+#       continent-list:
+#         - EU
+#
+# ---  UserAgentBlocker  -------------------------------------------
+# Blocks known bots, scanners, and unwanted user agents.
+# Built-in categories: scanners, recon, scrapers, headless,
+# malicious, http-clients, cli-tools, ai-crawlers, seo-bots,
+# generic, social, search-engines.
+#
+#   - type: "UserAgentBlocker"
+#     options:
+#       cache-ttl: 24h
+#       cleanup-interval: 1h
+#       max-cache-size: 100000
+#       block-empty-ua: true
+#       block-defaults:
+#         - "scanners"
+#         - "recon"
+#         - "scrapers"
+#         - "ai-crawlers"
+#       block:
+#         - "custom-bad-bot"
+#       allow-defaults:
+#         - "search-engines"
+#       allow:
+#         - "my-good-bot"
+#
+# ---  HoneyPot  ---------------------------------------------------
+# Traps bots hitting common attack paths and blocks their IP.
+# Default path groups: php, git, infra, backups, cgi.
+# Trickster mode wastes bot time with tarpits and fake responses.
+#
+#   - type: "HoneyPot"
+#     options:
+#       cache-ttl: 24h
+#       cleanup-interval: 1h
+#       max-cache-size: 100000
+#       defaults:
+#         - "git"
+#         - "infra"
+#         - "backups"
+#         - "cgi"
+#       paths:
+#         - "/my-custom-trap"
+#       response:
+#         trickster-mode: true
+#         max-slow-tricks: 10
+#         # If trickster-mode is false:
+#         # status-code: 403
+#         # body: "Forbidden"
+#
+# ---  CircuitBreaker  ---------------------------------------------
+# Stops sending requests to failing backends.
+#
+#   - type: "CircuitBreaker"
+#     options:
+#       failure-threshold: 5
+#       recovery-time: 30s
+#       half-open-success-threshold: 3
+#
+# ---  Redirect  ---------------------------------------------------
+# Internal (transparent proxy) or external (HTTP 3xx) redirect.
+#
+#   - type: "Redirect"
+#     options:
+#       mode: "external"             # "internal" or "external"
+#       status-code: 302             # external only (301, 302, 307, 308)
+#       target: "http://192.168.1.100:8080"
+#       drop-path: true
+#       drop-query: true
+#
+# ---  BodySizeLimit  ----------------------------------------------
+# Limits request body size.
+#
+#   - type: "BodySizeLimit"
+#     options:
+#       max-size: 100m               # supports k, m, g
+#
+# ---  Timeout  ----------------------------------------------------
+# Maximum time for the entire request.
+#
+#   - type: "Timeout"
+#     options:
+#       request-timeout: 30s
+

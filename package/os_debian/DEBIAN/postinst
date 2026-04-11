@@ -9,6 +9,8 @@ mkdir -p /var/lib/torii
 chown torii:torii /var/lib/torii
 
 mkdir -p /etc/torii
+chown torii:torii /etc/torii
+chmod 0644 /etc/torii/config.yaml
 
 systemctl daemon-reload
 systemctl enable torii
