@@ -2,10 +2,12 @@ package middleware
 
 import (
 	"context"
+	"fmt"
 	"net/http"
 	"strings"
 
 	"github.com/nunoOliveiraqwe/torii/internal/resolve"
+	"github.com/nunoOliveiraqwe/torii/metrics"
 	"go.uber.org/zap"
 )
 
@@ -89,6 +91,7 @@ func (h *headersConfig) compareHeadersInRequest(r *http.Request) bool {
 		actualVal := r.Header.Get(header)
 		if actualVal != expectedVal {
 			zap.S().Debugf("Header %s value %s does not match expected value", header, actualVal) //don't leak the value
+			metrics.CreateAndAddBlockInfo(r, "headers", fmt.Sprintf("header-%s-mismatch-value", header))
 			return false
 		}
 	}
@@ -117,6 +120,7 @@ func HeadersMiddleware(_ context.Context, next http.HandlerFunc, conf Config) ht
 		isAllMatch := h.compareHeadersInRequest(r)
 		if !isAllMatch {
 			logger.Warn("Request headers do not match expected values")
+
 			w.WriteHeader(http.StatusUnauthorized)
 			return
 		}

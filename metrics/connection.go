@@ -6,6 +6,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/nunoOliveiraqwe/torii/internal/util"
 	"go.uber.org/zap"
 )
 
@@ -28,15 +29,16 @@ type ConnectionMetricsManager struct {
 	listeners    map[int]*metricListener
 	nextListenID int
 
-	errorLog   *ErrorLog
-	requestLog *RequestLog
+	errorLog   *util.RingBuffer[ErrorLogEntry]
+	requestLog *util.RingBuffer[RequestLogEntry]
+	blockedLog *util.RingBuffer[BlockLogEntry]
 }
 
 type ConnectionMetric struct {
 	serverId           string
 	accumulatedMetrics *Metric
 	connectionName     string
-	parentName         string // port-level parent for path metrics; empty for top-level
+	parentMetric       *ConnectionMetric
 	metricsLock        sync.RWMutex
 }
 
@@ -54,101 +56,68 @@ func NewGlobalMetricsHandler(numberOfWorkers int, ctx context.Context) *Connecti
 		context:              ctx,
 		cancel:               cancel,
 		listeners:            make(map[int]*metricListener),
-		errorLog:             NewErrorLog(100),
+		errorLog:             NewErrorLog(200), //maybe add a conf flag
 		requestLog:           NewRequestLog(200),
+		blockedLog:           NewBlockLog(200),
 	}
 	zap.S().Info("Creating a new global connection metric")
 	h.TrackMetricsForConnection(globalMetricsConName, globalMetricsConName)
 	return &h
 }
 
-func (h *ConnectionMetricsManager) updateConnectionMetrics(metric *RequestMetric) {
-	zap.S().Debugf("Updating connection metric for connection %s", metric.connectionName)
-	conMetrics, ok := h.connectionMetricsMap[metric.connectionName]
-	if !ok {
-		zap.S().Warnf("Connection metric for connection %s not found", metric.connectionName)
-		return
-	}
-
-	conMetrics.metricsLock.Lock()
-	conMetrics.accumulatedMetrics.AddRequestMetric(metric)
-	conSnapshot := conMetrics.accumulatedMetrics.Copy()
-	conMetrics.metricsLock.Unlock()
-	h.notifyListeners(metric.connectionName, conSnapshot)
-
-	// propagate up the parent chain so each ancestor aggregates all descendants.
-	// e.g. path → host → port (global is handled separately below).
-	cur := conMetrics
-	for cur.parentName != "" {
-		parentMetrics, ok2 := h.connectionMetricsMap[cur.parentName]
-		if !ok2 {
-			break
-		}
-		parentMetrics.metricsLock.Lock()
-		parentMetrics.accumulatedMetrics.AddRequestMetric(metric)
-		parentSnapshot := parentMetrics.accumulatedMetrics.Copy()
-		parentMetrics.metricsLock.Unlock()
-		h.notifyListeners(cur.parentName, parentSnapshot)
-		cur = parentMetrics
-	}
-
-	if metric.connectionName != globalMetricsConName {
-		globalConMetrics, ok2 := h.connectionMetricsMap[globalMetricsConName]
-		if !ok2 {
-			zap.S().Errorf("no global connection metrics found")
-			return
-		}
-		globalConMetrics.metricsLock.Lock()
-		globalConMetrics.accumulatedMetrics.AddRequestMetric(metric)
-		globalSnapshot := globalConMetrics.accumulatedMetrics.Copy()
-		globalConMetrics.metricsLock.Unlock()
-
-		h.notifyListeners(globalMetricsConName, globalSnapshot)
-	}
-
-	h.requestLog.Add(RequestLogEntry{
-		Timestamp:      time.Now(),
-		RemoteAddress:  metric.RemoteAddress,
-		Country:        metric.Country,
-		ConnectionName: metric.connectionName,
-		StatusCode:     metric.StatusCode,
-		Method:         metric.Method,
-		Path:           metric.Path,
-		LatencyMs:      metric.LatencyMs,
-		BytesSent:      metric.BytesSent,
-		BytesReceived:  metric.BytesReceived,
-	})
-
-	if metric.Is5xxResponse {
-		h.errorLog.Add(ErrorEntry{
-			Timestamp:      time.Now(),
-			ConnectionName: metric.connectionName,
-			RemoteAddress:  metric.RemoteAddress,
-			StatusCode:     metric.StatusCode,
-			Method:         metric.Method,
-			Path:           metric.Path,
-			LatencyMs:      metric.LatencyMs,
-		})
-	}
-}
-
 func (h *ConnectionMetricsManager) TrackMetricsForConnection(serverId, connectionName string) MetricsReportFunc {
 	zap.S().Debugf("Creating a new connection metric for connection %s", connectionName)
+
+	//go's map iteration is wonky, it will always suprised me with it's out of order, so, if im iterating the creation of
+	//proxy routes, i have no guarantees the parent will be created before the child, and if the
+	//child comes first we create the parent, and the child holds the pointer, but then the parent comes allong
+	// and gets created, this fucks things up, because the pointer of the child will be to another ref
+	//so i got to check if it exists first, not because its suposed to, but due to how map iteration works in go, which is not deterministic,
+	//and can cause the parent to be created after the child, which would cause the child to point to the wrong parent metric
+	//this is a bit of a nightmare, but its the only way to ensure the parent-child relationships are correct regardless of the order of creation
+	//i could also just require that the caller creates the parent metrics first, but that would be error prone and not very user friendly, so this is the best solution i guess
+
+	_, ok := h.connectionMetricsMap[connectionName]
+	if ok {
+		zap.S().Infof("Connection metric for connection %s already exists, returning existing report function", connectionName)
+		return func(reqMetric *RequestMetric) { //yes, its a new func, but metrics are then routed by name, so this works
+			reqMetric.connectionName = connectionName
+			h.metricsChan <- reqMetric
+		}
+	}
+
 	m := NewMetric()
 	m.ConnectionName = connectionName
 	parentName := deriveParentMetricName(connectionName)
+	zap.S().Debugf("Derived parent metric name %s for connection %s", parentName, connectionName)
+
+	var connectionMetric *ConnectionMetric
+
+	if parentName != "" {
+		con, exists := h.connectionMetricsMap[parentName]
+		if !exists {
+			zap.S().Warnf("Parent metric %s not found for connection %s, auto-creating it", parentName, connectionName)
+			//we need to create the parent. This will recursively create any missing ancestors as well.
+			h.TrackMetricsForConnection(serverId, parentName) // recursively create parent metric if it doesn't exist
+			con, exists = h.connectionMetricsMap[parentName]  //has to exist
+			if !exists {
+				zap.S().Fatalf("Failed to create parent metric %s for connection %s", parentName, connectionName)
+				return func(reqMetric *RequestMetric) {
+					zap.S().Fatalf("Cannot report metric for connection %s because parent metric %s could not be created", connectionName, parentName)
+				}
+			}
+		}
+		connectionMetric = con
+	}
+
 	connMetric := &ConnectionMetric{
 		serverId:           serverId,
 		accumulatedMetrics: m,
 		metricsLock:        sync.RWMutex{},
 		connectionName:     connectionName,
-		parentName:         parentName,
+		parentMetric:       connectionMetric,
 	}
 	h.addConnectionMetric(connMetric)
-
-	if parentName != "" {
-		h.ensureParentMetric(serverId, parentName)
-	}
 
 	return func(metric *RequestMetric) {
 		metric.connectionName = connectionName
@@ -156,54 +125,23 @@ func (h *ConnectionMetricsManager) TrackMetricsForConnection(serverId, connectio
 	}
 }
 
-func (h *ConnectionMetricsManager) ensureParentMetric(serverId, parentName string) {
-	if _, exists := h.connectionMetricsMap[parentName]; exists {
-		return
-	}
-	zap.S().Infof("Auto-creating parent metric %s for server %s", parentName, serverId)
-	grandparent := deriveParentMetricName(parentName)
-	m := NewMetric()
-	m.ConnectionName = parentName
-	parent := &ConnectionMetric{
-		serverId:           serverId,
-		accumulatedMetrics: m,
-		metricsLock:        sync.RWMutex{},
-		connectionName:     parentName,
-		parentName:         grandparent,
-	}
-	h.addConnectionMetric(parent)
-	if grandparent != "" {
-		h.ensureParentMetric(serverId, grandparent)
-	}
-}
-
-func deriveParentMetricName(connectionName string) string {
-	// Path-level → parent is everything before "-path-" (could be host-level or port-level).
-	idx := strings.Index(connectionName, "-path-")
-	if idx != -1 {
-		return connectionName[:idx]
-	}
-	// Host-level → parent is the port-level metric.
-	idx = strings.Index(connectionName, "-host-")
-	if idx != -1 {
-		return connectionName[:idx]
-	}
-	return ""
-}
-
-func (h *ConnectionMetricsManager) GetErrorLog() *ErrorLog {
+func (h *ConnectionMetricsManager) GetErrorLog() *util.RingBuffer[ErrorLogEntry] {
 	return h.errorLog
 }
 
-func (h *ConnectionMetricsManager) GetRequestLog() *RequestLog {
+func (h *ConnectionMetricsManager) GetRequestLog() *util.RingBuffer[RequestLogEntry] {
 	return h.requestLog
+}
+
+func (h *ConnectionMetricsManager) GetBlockedLog() *util.RingBuffer[BlockLogEntry] {
+	return h.blockedLog
 }
 
 func (h *ConnectionMetricsManager) GetMetricForConnection(connectionName string) *Metric {
 	zap.S().Debugf("Getting connection metrics for connection %s", connectionName)
 	conMetrics, ok := h.connectionMetricsMap[connectionName]
 	if !ok {
-		zap.S().Debugf("Connection metric for connection %s not found", connectionName)
+		zap.S().Infof("Connection metric for connection %s not found", connectionName)
 		return nil
 	}
 	conMetrics.metricsLock.RLock()
@@ -212,7 +150,7 @@ func (h *ConnectionMetricsManager) GetMetricForConnection(connectionName string)
 }
 
 func (h *ConnectionMetricsManager) GetAllMetricsByServer(serverId string) []*Metric {
-	zap.S().Infof("Getting all connection metrics for server %s", serverId)
+	zap.S().Debugf("Getting all connection metrics for server %s", serverId)
 	metrics := make([]*Metric, 0, len(h.connectionMetricsMap))
 	for _, conMetrics := range h.connectionMetricsMap {
 		conMetrics.metricsLock.RLock()
@@ -278,6 +216,35 @@ func (h *ConnectionMetricsManager) RemoveListener(id int) bool {
 	return ok
 }
 
+func (h *ConnectionMetricsManager) AddWildcardListener(fn MetricListenerFunc) int {
+	return h.AddListener("", fn)
+}
+
+func (h *ConnectionMetricsManager) GetRegisteredConnectionNames() []string {
+	names := make([]string, 0, len(h.connectionMetricsMap))
+	for name := range h.connectionMetricsMap {
+		names = append(names, name)
+	}
+	return names
+}
+
+func deriveParentMetricName(connectionName string) string {
+	// Path-level → parent is everything before "-path-" (could be host-level or port-level).
+	idx := strings.Index(connectionName, "-path-")
+	if idx != -1 {
+		return connectionName[:idx]
+	}
+	// Host-level → parent is the port-level metric.
+	idx = strings.Index(connectionName, "-host-")
+	if idx != -1 {
+		return connectionName[:idx]
+	}
+	if connectionName == globalMetricsConName {
+		return ""
+	}
+	return globalMetricsConName
+}
+
 func (h *ConnectionMetricsManager) notifyListeners(connectionName string, snapshot *Metric) {
 	h.listenersMu.RLock()
 	defer h.listenersMu.RUnlock()
@@ -287,10 +254,6 @@ func (h *ConnectionMetricsManager) notifyListeners(connectionName string, snapsh
 			l.fn(connectionName, snapshot)
 		}
 	}
-}
-
-func (h *ConnectionMetricsManager) AddWildcardListener(fn MetricListenerFunc) int {
-	return h.AddListener("", fn)
 }
 
 func (h *ConnectionMetricsManager) addConnectionMetric(c *ConnectionMetric) {
@@ -325,10 +288,63 @@ func (h *ConnectionMetricsManager) collectGlobalMetrics() {
 	}
 }
 
-func (h *ConnectionMetricsManager) GetRegisteredConnectionNames() []string {
-	names := make([]string, 0, len(h.connectionMetricsMap))
-	for name := range h.connectionMetricsMap {
-		names = append(names, name)
+func (h *ConnectionMetricsManager) updateConnectionMetrics(metric *RequestMetric) {
+	zap.S().Debugf("Updating connection metric for connection %s", metric.connectionName)
+	conMetrics, ok := h.connectionMetricsMap[metric.connectionName]
+	if !ok {
+		zap.S().Warnf("Connection metric for connection %s not found", metric.connectionName)
+		return
 	}
-	return names
+
+	conMetrics.metricsLock.Lock()
+	conMetrics.accumulatedMetrics.AddRequestMetric(metric)
+	conSnapshot := conMetrics.accumulatedMetrics.Copy()
+	conMetrics.metricsLock.Unlock()
+	h.notifyListeners(metric.connectionName, conSnapshot)
+
+	for cur := conMetrics.parentMetric; cur != nil; cur = cur.parentMetric {
+		cur.metricsLock.Lock()
+		cur.accumulatedMetrics.AddRequestMetric(metric)
+		parentSnapshot := cur.accumulatedMetrics.Copy()
+		cur.metricsLock.Unlock()
+		h.notifyListeners(cur.connectionName, parentSnapshot)
+	}
+
+	h.requestLog.Add(RequestLogEntry{
+		Timestamp:      time.Now(),
+		RemoteAddress:  metric.RemoteAddress,
+		Country:        metric.Country,
+		ConnectionName: metric.connectionName,
+		StatusCode:     metric.StatusCode,
+		Method:         metric.Method,
+		Path:           metric.Path,
+		LatencyMs:      metric.LatencyMs,
+		BytesSent:      metric.BytesSent,
+		BytesReceived:  metric.BytesReceived,
+	})
+
+	if metric.IsMiddlewareBlockedRequest {
+		h.blockedLog.Add(BlockLogEntry{
+			RemoteAddress:      metric.RemoteAddress,
+			Timestamp:          time.Now(),
+			Method:             metric.Method,
+			Path:               metric.Path,
+			Status:             metric.StatusCode,
+			ConnectionName:     metric.connectionName,
+			BlockReason:        metric.BlockReason,
+			BlockingMiddleware: metric.BlockingMiddleware,
+		})
+	}
+
+	if metric.Is5xxResponse {
+		h.errorLog.Add(ErrorLogEntry{
+			Timestamp:      time.Now(),
+			ConnectionName: metric.connectionName,
+			RemoteAddress:  metric.RemoteAddress,
+			StatusCode:     metric.StatusCode,
+			Method:         metric.Method,
+			Path:           metric.Path,
+			LatencyMs:      metric.LatencyMs,
+		})
+	}
 }

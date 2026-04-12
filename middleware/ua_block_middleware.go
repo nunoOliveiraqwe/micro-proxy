@@ -8,6 +8,7 @@ import (
 
 	"github.com/nunoOliveiraqwe/torii/internal/netutil"
 	"github.com/nunoOliveiraqwe/torii/internal/util"
+	"github.com/nunoOliveiraqwe/torii/metrics"
 	"github.com/nunoOliveiraqwe/torii/middleware/ua"
 	"go.uber.org/zap"
 )
@@ -48,6 +49,7 @@ func UserAgentBlockMiddleware(_ context.Context, next http.HandlerFunc, conf Con
 
 		if uaBlocker.IsBlockedIP(addr.String()) {
 			logger.Warn("BotDetectionMiddleware: blocked request from cached IP", zap.String("clientIp", clientIP))
+			metrics.CreateAndAddBlockInfo(r, "ua-block", "cached blocked IP")
 			http.Error(w, "Forbidden", http.StatusForbidden)
 			return
 		}
@@ -58,6 +60,7 @@ func UserAgentBlockMiddleware(_ context.Context, next http.HandlerFunc, conf Con
 		if uaBlocker.IsBlockedUA(userAgent) {
 			uaBlocker.CacheBlockedIP(addr.String())
 			logger.Warn("BotDetectionMiddleware: blocked request", zap.String("clientIp", clientIP), zap.String("user_agent", userAgent))
+			metrics.CreateAndAddBlockInfo(r, "ua-block", fmt.Sprintf("blocked user agent %s", userAgent))
 			http.Error(w, "Forbidden", http.StatusForbidden)
 			return
 		}

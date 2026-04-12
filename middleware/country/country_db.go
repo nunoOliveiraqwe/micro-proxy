@@ -11,6 +11,7 @@ import (
 	"time"
 
 	"github.com/nunoOliveiraqwe/torii/internal/util"
+	"github.com/nunoOliveiraqwe/torii/metrics"
 	"github.com/oschwald/maxminddb-golang/v2"
 	"go.uber.org/zap"
 )
@@ -181,17 +182,22 @@ func (c *Filter) reloadDB() {
 func (c *Filter) IsFromAllowedCountry(logger *zap.Logger, r *http.Request, ip netip.Addr) bool {
 	entry, err := c.clientCache.GetValue(ip.String())
 	if err != nil && errors.Is(err, util.ErrCacheMiss) {
-		entry = c.lookupIPAndCacheValue(logger, ip)
+		entry = c.lookupIPAndCacheValue(logger, r, ip)
 	}
 	if entry == nil {
 		logger.Info("Request decision by on-unknown: cannot determine country",
 			zap.Bool("onUnknown", c.onUnknown))
+		if !c.onUnknown {
+			metrics.CreateAndAddBlockInfo(r, "country-block", "blocked due to unknown country")
+		}
 		return c.onUnknown
 	}
-	if r != nil {
-		ctx := context.WithValue(r.Context(), "country-code", entry.countryCode)
-		ctx = context.WithValue(ctx, "continent-code", entry.continentCode)
-		*r = *r.WithContext(ctx)
+	ctx := context.WithValue(r.Context(), "country-code", entry.countryCode)
+	ctx = context.WithValue(ctx, "continent-code", entry.continentCode)
+	*r = *r.WithContext(ctx)
+
+	if !entry.IsAllowed {
+		metrics.CreateAndAddBlockInfo(r, "country-block", fmt.Sprintf("blocked country %s, continent %s", entry.countryCode, entry.continentCode))
 	}
 	return entry.IsAllowed
 }
@@ -209,7 +215,7 @@ func (c *Filter) IsFromAllowedCountry(logger *zap.Logger, r *http.Request, ip ne
 //     2. If the country code is NOT found in the list, the continent policy applies.
 //
 // When the resolved code is empty (unknown), on-unknown determines the outcome.
-func (c *Filter) isAllowed(logger *zap.Logger, countryCode string, continentCode string) bool {
+func (c *Filter) isAllowed(logger *zap.Logger, r *http.Request, countryCode string, continentCode string) bool {
 	bothConfigured := c.hasCountryList && c.hasContinentList
 
 	if bothConfigured {
@@ -225,6 +231,7 @@ func (c *Filter) isAllowed(logger *zap.Logger, countryCode string, continentCode
 			case BlockList:
 				logger.Info("Request BLOCKED: country override – country is in block-list",
 					zap.String("country", countryCode), zap.String("continent", continentCode))
+				metrics.CreateAndAddBlockInfo(r, "country-block", fmt.Sprintf("country %s blocked", countryCode))
 				return false
 			}
 		}
@@ -238,6 +245,7 @@ func (c *Filter) isAllowed(logger *zap.Logger, countryCode string, continentCode
 			logger.Info("Request BLOCKED: no country override, continent policy denies",
 				zap.String("country", countryCode), zap.String("continent", continentCode),
 				zap.String("continentMode", modeString(c.continentMode)))
+			metrics.CreateAndAddBlockInfo(r, "country-block", fmt.Sprintf("continent %s blocked", continentCode))
 		}
 		return allowed
 	}
@@ -292,7 +300,7 @@ func (c *Filter) evalList(set map[string]byte, mode ListMode, code string) bool 
 		return false
 	}
 }
-func (c *Filter) lookupIPAndCacheValue(logger *zap.Logger, ip netip.Addr) *clientEntry {
+func (c *Filter) lookupIPAndCacheValue(logger *zap.Logger, r *http.Request, ip netip.Addr) *clientEntry {
 	c.mu.RLock()
 	result := c.db.Lookup(ip)
 	c.mu.RUnlock()
@@ -314,7 +322,7 @@ func (c *Filter) lookupIPAndCacheValue(logger *zap.Logger, ip netip.Addr) *clien
 			zap.String("Continent", continentCode),
 		)
 
-		isAllowed := c.isAllowed(logger, countryCode, continentCode)
+		isAllowed := c.isAllowed(logger, r, countryCode, continentCode)
 
 		entry := &clientEntry{
 			logger:        logger,

@@ -31,6 +31,7 @@ type SSEBroker struct {
 	metricsListenerID int
 	errorListenerID   int
 	requestListenerID int
+	blockedListenerID int
 }
 
 func NewSSEBroker(mgr *metrics.ConnectionMetricsManager) *SSEBroker {
@@ -48,7 +49,7 @@ func NewSSEBroker(mgr *metrics.ConnectionMetricsManager) *SSEBroker {
 		}
 		b.broadcastAll(SSEEvent{Type: "metrics", Data: data})
 	})
-	b.errorListenerID = mgr.GetErrorLog().AddListener(func(entry *metrics.ErrorEntry) {
+	b.errorListenerID = mgr.GetErrorLog().AddListener(func(entry *metrics.ErrorLogEntry) {
 		data, err := json.Marshal(entry)
 		if err != nil {
 			zap.S().Errorf("SSEBroker: failed to marshal error entry: %v", err)
@@ -63,6 +64,14 @@ func NewSSEBroker(mgr *metrics.ConnectionMetricsManager) *SSEBroker {
 			return
 		}
 		b.broadcastAll(SSEEvent{Type: "proxy_request", Data: data})
+	})
+	b.blockedListenerID = mgr.GetBlockedLog().AddListener(func(entry *metrics.BlockLogEntry) {
+		data, err := json.Marshal(entry)
+		if err != nil {
+			zap.S().Errorf("SSEBroker: failed to marshal blocked log entry: %v", err)
+			return
+		}
+		b.broadcastAll(SSEEvent{Type: "proxy_blocked", Data: data})
 	})
 	return b
 }
@@ -119,6 +128,7 @@ func (b *SSEBroker) Stop() {
 	b.mgr.RemoveListener(b.metricsListenerID)
 	b.mgr.GetErrorLog().RemoveListener(b.errorListenerID)
 	b.mgr.GetRequestLog().RemoveListener(b.requestListenerID)
+	b.mgr.GetBlockedLog().RemoveListener(b.blockedListenerID)
 
 	b.mu.Lock()
 	for _, c := range b.clients {

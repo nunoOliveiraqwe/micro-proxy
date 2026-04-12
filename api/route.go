@@ -231,6 +231,16 @@ var routes = []ApplicationRoute{
 		HandlerFunc:        handleGetRecentRequests,
 	},
 	{
+		Name:               "Recent Blocked",
+		Description:        "Returns the most recent blocked request entries",
+		Method:             "GET",
+		Pattern:            "/proxy/blocked",
+		IsAllowedBeforeFts: false,
+		IsAllowedAfterFts:  true,
+		IsSecure:           true,
+		HandlerFunc:        handleGetRecentBlocked,
+	},
+	{
 		Name:               "Get ACME Configuration",
 		Description:        "Returns the current ACME / TLS configuration",
 		Method:             "GET",

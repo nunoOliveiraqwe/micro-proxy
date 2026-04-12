@@ -45,6 +45,7 @@ func ApplyMiddlewares(ctx context.Context, handler http.HandlerFunc, middlewares
 		zap.S().Errorf("Handler cannot be nil when applying middleware chain")
 		return nil, errors.New("handler cannot be nil when applying middleware chain")
 	}
+	middlewares = applyDefaultMiddlewares(middlewares)
 	zap.S().Debugf("Applying middleware chain with size %d", len(middlewares))
 	for i := len(middlewares) - 1; i >= 0; i-- {
 		middleware, err := GetMiddleware(middlewares[i].Type)
@@ -86,4 +87,48 @@ func GetAvailableMiddlewares() []string {
 		middlewares = append(middlewares, key)
 	}
 	return middlewares
+}
+
+var defaultMiddlewareOrder = []string{"RequestId", "RequestLog", "Metrics"}
+
+var defaultMiddlewares = map[string]Func{
+	"RequestId":  RequestIDMiddleware,
+	"RequestLog": RequestLoggerMiddleware,
+	"Metrics":    MetricsMiddleware,
+}
+
+func applyDefaultMiddlewares(middlewares []Config) []Config {
+	zap.S().Debugf("Checking if default middlewares need to be applied, current middleware count: %d", len(middlewares))
+	present := make(map[string]struct{})
+	for _, v := range middlewares {
+		if _, ok := defaultMiddlewares[v.Type]; ok {
+			present[v.Type] = struct{}{}
+		}
+	}
+
+	if len(present) == len(defaultMiddlewares) {
+		//if the user was them, the order the user defined is applied
+		zap.S().Debugf("All default middlewares are already configured, skipping applying defaults")
+		return middlewares
+	}
+
+	var missing []Config
+	for _, name := range defaultMiddlewareOrder {
+		if _, already := present[name]; !already {
+			missing = append(missing, Config{Type: name})
+		}
+	}
+
+	if len(missing) == 0 {
+		return middlewares
+	}
+
+	zap.S().Infof("Prepending %d missing default middleware(s) to chain", len(missing))
+
+	// Prepend missing defaults so they run first (outermost), then the
+	// user-configured chain follows.
+	result := make([]Config, 0, len(missing)+len(middlewares))
+	result = append(result, missing...)
+	result = append(result, middlewares...)
+	return result
 }

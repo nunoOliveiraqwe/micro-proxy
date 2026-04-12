@@ -30,3 +30,12 @@ func handleGetRecentRequests(svc app.SystemService) http.HandlerFunc {
 		WriteResponseAsJSON(svc.GetRecentRequests(200), w)
 	}
 }
+
+func handleGetRecentBlocked(svc app.SystemService) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		logger := middleware.GetRequestLoggerFromContext(r)
+		logger.Debug("Fetching recent blocked entries")
+		WriteResponseAsJSON(svc.GetRecentBlockedEntries(50), w)
+	}
+}
+

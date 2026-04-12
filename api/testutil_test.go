@@ -158,11 +158,14 @@ func (t *testSystemService) AddHttpListener(_ config.HTTPListener) error { retur
 func (t *testSystemService) GetSystemHealth() *app.SystemHealth {
 	return &app.SystemHealth{}
 }
-func (t *testSystemService) GetRecentErrors(n int) []metrics.ErrorEntry {
-	return []metrics.ErrorEntry{}
+func (t *testSystemService) GetRecentErrors(n int) []metrics.ErrorLogEntry {
+	return []metrics.ErrorLogEntry{}
 }
 func (t *testSystemService) GetRecentRequests(n int) []metrics.RequestLogEntry {
 	return []metrics.RequestLogEntry{}
+}
+func (t *testSystemService) GetRecentBlockedEntries(n int) []metrics.BlockLogEntry {
+	return []metrics.BlockLogEntry{}
 }
 
 // ---------------------------------------------------------------------------

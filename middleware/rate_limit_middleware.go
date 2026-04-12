@@ -13,6 +13,7 @@ import (
 
 	"github.com/nunoOliveiraqwe/torii/internal/netutil"
 	"github.com/nunoOliveiraqwe/torii/internal/util"
+	"github.com/nunoOliveiraqwe/torii/metrics"
 	"go.uber.org/zap"
 	"golang.org/x/time/rate"
 )
@@ -54,11 +55,12 @@ func (e *clientEntry) GetLastReadAt() time.Time {
 	return e.lastSeen
 }
 
-func (g *globalLimiter) limit(_ *http.Request, w http.ResponseWriter) bool {
+func (g *globalLimiter) limit(r *http.Request, w http.ResponseWriter) bool {
 	if g.internalLimiter.Allow() {
 		return true
 	}
 	w.Header().Set("Retry-After", g.retryAfter)
+	metrics.CreateAndAddBlockInfo(r, "rate-limit", fmt.Sprintf("global rate limit of %f req/s exceeded", g.internalLimiter.Limit()))
 	http.Error(w, http.StatusText(http.StatusTooManyRequests), http.StatusTooManyRequests)
 	return false
 }
@@ -68,6 +70,7 @@ func (l *perClientLimiter) limit(r *http.Request, w http.ResponseWriter) bool {
 	ipAddr, err := netutil.GetClientIP(r)
 	if err != nil {
 		logger.Warn("RateLimitMiddleware: failed to extract client IP", zap.Error(err))
+		metrics.CreateAndAddBlockInfo(r, "rate-limit", "failed to extract client IP")
 		w.Header().Set("Retry-After", l.retryAfter)
 		http.Error(w, http.StatusText(http.StatusTooManyRequests), http.StatusTooManyRequests)
 		return false
@@ -80,6 +83,7 @@ func (l *perClientLimiter) limit(r *http.Request, w http.ResponseWriter) bool {
 		l.clientCache.CacheValue(ipAddr, entry)
 	} else if err != nil {
 		logger.Warn("RateLimitMiddleware: failed to get client entry from cache for IP", zap.String("Ip", ipAddr), zap.Error(err))
+		metrics.CreateAndAddBlockInfo(r, "rate-limit", "cache error on get")
 		w.Header().Set("Retry-After", l.retryAfter)
 		http.Error(w, http.StatusText(http.StatusTooManyRequests), http.StatusTooManyRequests)
 		return false
@@ -87,6 +91,7 @@ func (l *perClientLimiter) limit(r *http.Request, w http.ResponseWriter) bool {
 	if entry.limiter.Allow() {
 		return true
 	}
+	metrics.CreateAndAddBlockInfo(r, "rate-limit", fmt.Sprintf("rate limit of %f req/s exceeded", entry.limiter.Limit()))
 	w.Header().Set("Retry-After", l.retryAfter)
 	http.Error(w, http.StatusText(http.StatusTooManyRequests), http.StatusTooManyRequests)
 	return false

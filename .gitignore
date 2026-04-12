@@ -40,3 +40,5 @@ go.work.sum
 # Package build output
 package/os_debian/build/
 
+# Local test configs
+pi-test.config

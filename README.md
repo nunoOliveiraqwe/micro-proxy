@@ -226,7 +226,7 @@ Keeping track of what's done and what's next. This is not a roadmap, just my per
 
 
 ### Needs work
-- [ ] Default `apiServer.host` to `0.0.0.0` instead of requiring it — `127.0.0.1` breaks in containers since the API becomes unreachable even with port mapping. Other proxies (Traefik, Caddy's Docker image, NPM) default to `0.0.0.0` in containers. Do I want to do the same?
+- [x] Default `apiServer.host` to `0.0.0.0` instead of requiring it — `127.0.0.1` breaks in containers since the API becomes unreachable even with port mapping. Other proxies (Traefik, Caddy's Docker image, NPM) default to `0.0.0.0` in containers. Do I want to do the same?
 - [ ] IP block lists: middleware is registered, filtering logic is stubbed out
 - [ ] Create HTTP Proxy UI: works, but the UX needs another pass
 - [ ] ACME UI: need a delete button for individual certificates, the reset button placement is bad
@@ -237,8 +237,12 @@ Keeping track of what's done and what's next. This is not a roadmap, just my per
 - [ ] Config persistence: proxy routes created or deleted via the UI are memory-only — they need to be written back to the config file so they survive restarts
 - [ ] TCP proxying: config schema is there, implementation is not
 - [ ] Make `RequestId`, `RequestLog`, and `Metrics` default on all endpoints (too easy to forget and then the dashboard shows nothing)
-- [ ] Blocked IP observability: surface blocked IPs (from honeypot, UA blocker, country block) in the UI with timestamps and metadata, probably as a rolling log
+- [x] Blocked IP observability: surface blocked IPs (from honeypot, UA blocker, country block) in the UI with timestamps and metadata, probably as a rolling log
 - [ ] API keys: Homepage integration endpoint, `read_config` and `write_config` scopes (may be dropped depending on how useful they turn out to be)
+- [ ] UA fingerprint rotation detection: bots that rotate user agents mid-scan are easy to spot — a real client doesn't switch from macOS to Linux to Windows between requests. Track UA consistency per IP and flag or block IPs whose OS/browser family changes unnaturally fast. I encountered this with a bot that rotated through 20+ UAs in a single scan, hitting 100+ endpoints in minutes. The honeypot caught it, but this would be another layer of defense against UA rotation.
+- [ ] Coraza WAF integration: [Coraza](https://coraza.io/) is a full-featured open-source WAF (OWASP CRS compatible). Add it as a middleware so routes can opt into proper WAF rules alongside the existing bot defense. There's overlap with what the honeypot and UA blocker already do, but Coraza covers a much wider surface (SQLi, XSS, protocol violations, etc.).
+- [ ] AbuseIPDB middleware: check client IPs against [AbuseIPDB](https://www.abuseipdb.com/) and block or flag IPs with a high abuse confidence score. Optionally report blocked IPs back (honeypot hits, rate-limit violations, etc.) so the community benefits too.
+
 
 ### Maybe
 - [ ] Proxy-level authentication: login pages so the proxy handles auth before forwarding to backends

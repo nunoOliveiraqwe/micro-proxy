@@ -81,6 +81,13 @@ func MetricsMiddleware(ctx context.Context, next http.HandlerFunc, _ Config) htt
 				metric.Country = countryStr
 			}
 		}
+		blockInfo := metrics.GetBlockInfo(r)
+		if blockInfo != nil {
+			logger.Info("Request was blocked by middleware", zap.String("middleware", blockInfo.Middleware), zap.String("reason", blockInfo.Reason))
+			metric.IsMiddlewareBlockedRequest = true
+			metric.BlockingMiddleware = blockInfo.Middleware
+			metric.BlockReason = blockInfo.Reason
+		}
 		reportFunc(metric)
 	}
 }

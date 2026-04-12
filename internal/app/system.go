@@ -41,8 +41,9 @@ type SystemService interface {
 	DeleteProxy(port int) error
 	AddHttpListener(conf config.HTTPListener) error
 	GetSystemHealth() *SystemHealth
-	GetRecentErrors(n int) []metrics.ErrorEntry
+	GetRecentErrors(n int) []metrics.ErrorLogEntry
 	GetRecentRequests(n int) []metrics.RequestLogEntry
+	GetRecentBlockedEntries(n int) []metrics.BlockLogEntry
 }
 
 type systemService struct {
@@ -128,12 +129,16 @@ func (sm *systemService) GetSystemHealth() *SystemHealth {
 	}
 }
 
-func (sm *systemService) GetRecentErrors(n int) []metrics.ErrorEntry {
+func (sm *systemService) GetRecentErrors(n int) []metrics.ErrorLogEntry {
 	return sm.globalMetricsManager.GetErrorLog().Recent(n)
 }
 
 func (sm *systemService) GetRecentRequests(n int) []metrics.RequestLogEntry {
 	return sm.globalMetricsManager.GetRequestLog().Recent(n)
+}
+
+func (sm *systemService) GetRecentBlockedEntries(n int) []metrics.BlockLogEntry {
+	return sm.globalMetricsManager.GetBlockedLog().Recent(n)
 }
 
 func (sm *systemService) Start() error {

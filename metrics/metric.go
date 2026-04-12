@@ -28,20 +28,23 @@ type Metric struct {
 }
 
 type RequestMetric struct {
-	RemoteAddress  string
-	Country        string
-	connectionName string
-	LatencyMs      int64
-	IsTimedOut     bool
-	BytesSent      int64
-	BytesReceived  int64
-	Is2xxResponse  bool
-	Is3xxResponse  bool
-	Is4xxResponse  bool
-	Is5xxResponse  bool
-	StatusCode     int
-	Path           string
-	Method         string
+	RemoteAddress              string
+	Country                    string
+	connectionName             string
+	LatencyMs                  int64
+	IsTimedOut                 bool
+	BytesSent                  int64
+	BytesReceived              int64
+	Is2xxResponse              bool
+	Is3xxResponse              bool
+	Is4xxResponse              bool
+	Is5xxResponse              bool
+	StatusCode                 int
+	Path                       string
+	Method                     string
+	IsMiddlewareBlockedRequest bool
+	BlockingMiddleware         string
+	BlockReason                string
 }
 
 // NewMetric creates a Metric with an initialised latency ring buffer.
@@ -162,8 +165,14 @@ func ProxyPathMetricsName(port, path string) string {
 	return fmt.Sprintf("metric-port-%s-path-%s", port, path)
 }
 
-func ProxyMetricsName(port string) string {
-	return fmt.Sprintf("metric-port-%s", port)
+func ProxyHostPathMetricsName(port, host, path string) string {
+	if host == "" {
+		return ProxyPathMetricsName(port, path)
+	}
+	if path == "" {
+		return ProxyHostMetricsName(port, host)
+	}
+	return fmt.Sprintf("metric-port-%s-host-%s-path-%s", port, host, path)
 }
 
 func ProxyHostMetricsName(port, host string) string {
@@ -173,12 +182,6 @@ func ProxyHostMetricsName(port, host string) string {
 	return fmt.Sprintf("metric-port-%s-host-%s", port, host)
 }
 
-func ProxyHostPathMetricsName(port, host, path string) string {
-	if host == "" {
-		return ProxyPathMetricsName(port, path)
-	}
-	if path == "" {
-		return ProxyHostMetricsName(port, host)
-	}
-	return fmt.Sprintf("metric-port-%s-host-%s-path-%s", port, host, path)
+func ProxyMetricsName(port string) string {
+	return fmt.Sprintf("metric-port-%s", port)
 }

@@ -6,9 +6,10 @@
 <div id="toast-container" class="toast-container"></div>
 <div class="app-layout">
     <!-- Sidebar -->
-    <aside class="sidebar">
+    <aside class="sidebar" id="app-sidebar">
         <div class="sidebar-brand">
             <strong>⛩️ torii</strong>
+            <button type="button" id="sidebar-toggle" class="sidebar-collapse-btn" title="Collapse sidebar">◀</button>
         </div>
         <ul class="sidebar-nav">
             <li class="sidebar-section">Main</li>
@@ -18,11 +19,8 @@
             <li><a href="#" class="nav-link" data-page="proxy-routes">
                 <span class="nav-icon">🔌</span><span class="nav-label">Proxy Routes</span>
             </a></li>
-            <li><a href="#" class="nav-link" data-page="route-config">
-                <span class="nav-icon">🛠️</span><span class="nav-label">Create HTTP Proxy</span>
-            </a></li>
             <li><a href="#" class="nav-link" data-page="system">
-                <span class="nav-icon">🖥️</span><span class="nav-label">System</span>
+                <span class="nav-icon">📡</span><span class="nav-label">Activity</span>
             </a></li>
             <li><a href="#" class="nav-link" data-page="acme">
                 <span class="nav-icon">🔒</span><span class="nav-label">ACME / TLS</span>
@@ -134,6 +132,39 @@
                     <p class="stat-label">5xx Server Error</p>
                 </div>
             </div>
+            <h4 style="margin-top:1.5rem;">Threat Defense</h4>
+            <div class="stats-grid">
+                <div class="stat-card">
+                    <p class="stat-value" id="stat-blocked-total" style="color:#e67e22">–</p>
+                    <p class="stat-label">Total Blocked</p>
+                    <p class="stat-sub">All blocked requests</p>
+                </div>
+                <div class="stat-card">
+                    <p class="stat-value" id="stat-blocked-ips" style="color:#c0392b">–</p>
+                    <p class="stat-label">Unique IPs</p>
+                    <p class="stat-sub">Distinct blocked sources</p>
+                </div>
+                <div class="stat-card">
+                    <p class="stat-value" id="stat-blocked-honeypot" style="color:#d35400">–</p>
+                    <p class="stat-label">🍯 Honeypot</p>
+                    <p class="stat-sub">Honeypot trap hits</p>
+                </div>
+                <div class="stat-card">
+                    <p class="stat-value" id="stat-blocked-ua" style="color:#8e44ad">–</p>
+                    <p class="stat-label">🤖 UA Block</p>
+                    <p class="stat-sub">User-agent blocks</p>
+                </div>
+                <div class="stat-card">
+                    <p class="stat-value" id="stat-blocked-country" style="color:#2980b9">–</p>
+                    <p class="stat-label">🌍 Geo Block</p>
+                    <p class="stat-sub">Country/continent blocks</p>
+                </div>
+                <div class="stat-card">
+                    <p class="stat-value" id="stat-blocked-ratelimit" style="color:#e74c3c">–</p>
+                    <p class="stat-label">⏱ Rate Limit</p>
+                    <p class="stat-sub">Rate limiter rejections</p>
+                </div>
+            </div>
             <div class="last-updated" id="last-updated">
                 <span class="dot"></span>Waiting for data…
             </div>
@@ -141,73 +172,20 @@
 
         <!-- PAGE: Proxy Routes -->
         <section class="page" data-page="proxy-routes" style="display:none;">
-            <hgroup>
-                <h2>Proxy Routes</h2>
-                <p>Configured proxy server routes</p>
-            </hgroup>
-            <div id="proxy-routes">
-                <p aria-busy="true">Loading proxy routes…</p>
+            <div style="display:flex;justify-content:space-between;align-items:flex-start;flex-wrap:wrap;gap:1rem;margin-bottom:1.5rem;">
+                <hgroup style="margin:0;">
+                    <h2>Proxy Routes</h2>
+                    <p>Configured proxy server routes</p>
+                </hgroup>
+                <button type="button" class="create-proxy-toggle" id="toggle-create-proxy">+ Create Proxy</button>
             </div>
-        </section>
 
-        <!-- PAGE: Create Listener -->
-        <section class="page" data-page="route-config" style="display:none;">
-            <hgroup>
-                <h2>Create HTTP Proxy Server</h2>
-                <p>Configure a new HTTP proxy server with routes and middleware</p>
-            </hgroup>
-
-            <style>
-                .mw-drop-zone{min-height:60px;border:2px dashed var(--pico-muted-border-color);border-radius:0.4rem;padding:0.5rem;transition:border-color 0.2s,background 0.2s;}
-                .mw-drop-zone.drag-over{border-color:#7c6ef0;background:rgba(124,110,240,0.05);}
-                .mw-drop-zone-empty{display:flex;align-items:center;justify-content:center;color:var(--pico-muted-color);font-size:0.78rem;padding:1rem;pointer-events:none;}
-                .mw-chain-item{display:flex;flex-direction:column;background:var(--pico-card-background-color);border:1px solid var(--pico-muted-border-color);border-radius:0.3rem;margin-bottom:0.4rem;overflow:hidden;}
-                .mw-chain-item.dragging{opacity:0.4;}
-                .mw-chain-item-header{display:flex;align-items:center;gap:0.4rem;padding:0.4rem 0.6rem;cursor:grab;font-size:0.8rem;}
-                .mw-chain-item-header .mw-chain-num{color:var(--pico-muted-color);font-size:0.7rem;min-width:1.2rem;}
-                .mw-chain-item-header .mw-chain-name{font-weight:600;flex:1;}
-                .mw-chain-item-header button{padding:0.15rem 0.4rem;font-size:0.7rem;margin:0;border:none;cursor:pointer;border-radius:0.2rem;}
-                .mw-chain-cfg-btn{background:rgba(124,110,240,0.2);color:#7c6ef0;}
-                .mw-chain-rm-btn{background:rgba(231,76,60,0.2);color:#e74c3c;}
-                .mw-chain-opts{padding:0.5rem 0.75rem;border-top:1px solid var(--pico-muted-border-color);background:rgba(0,0,0,0.15);display:none;}
-                .mw-chain-opts label{font-size:0.78rem;margin-bottom:0.15rem;display:block;}
-                .mw-chain-opts input,.mw-chain-opts select{font-size:0.78rem;padding:0.25rem 0.4rem;margin-bottom:0.4rem;}
-                .mw-chain-opts .mw-help{font-size:0.7rem;color:var(--pico-muted-color);margin:-0.25rem 0 0.4rem;line-height:1.3;}
-                .mw-chain-opts .mw-group-label{font-size:0.72rem;text-transform:uppercase;letter-spacing:0.05em;color:var(--pico-muted-color);margin:0.5rem 0 0.25rem;padding-top:0.4rem;border-top:1px solid var(--pico-muted-border-color);}
-                .mw-multiselect{display:flex;flex-wrap:wrap;gap:0.4rem 1rem;margin-bottom:0.4rem;}
-                .mw-multiselect label{display:inline-flex;align-items:center;gap:0.25rem;font-size:0.75rem;cursor:pointer;margin:0;}
-                .mw-stringlist{margin-bottom:0.4rem;}
-                .mw-stringlist-row{display:flex;gap:0.3rem;margin-bottom:0.2rem;}
-                .mw-stringlist-row input{flex:1;margin:0;}
-                .mw-stringlist-row button{padding:0.1rem 0.35rem;font-size:0.7rem;background:#e74c3c;color:#fff;border:none;border-radius:0.2rem;cursor:pointer;}
-                .mw-stringlist-add{font-size:0.7rem;padding:0.15rem 0.5rem;cursor:pointer;}
-                .mw-map-row{display:grid;grid-template-columns:1fr 1fr auto;gap:0.3rem;margin-bottom:0.2rem;}
-                .mw-map-row input{margin:0;}
-                .mw-map-row button{padding:0.1rem 0.35rem;font-size:0.7rem;background:#e74c3c;color:#fff;border:none;border-radius:0.2rem;cursor:pointer;}
-                .lf-section{margin-bottom:1.5rem;}
-                .lf-section h4{margin:0 0 0.75rem;padding-bottom:0.5rem;border-bottom:1px solid var(--pico-muted-border-color);}
-                .lf-route-card{border:1px solid var(--pico-muted-border-color);border-radius:0.5rem;padding:1rem;margin-bottom:1rem;background:rgba(255,255,255,0.02);}
-                .lf-route-card-header{display:flex;justify-content:space-between;align-items:center;margin-bottom:0.75rem;}
-                .lf-route-card-header h5{margin:0;font-size:0.9rem;}
-                .lf-path-card{border:1px solid var(--pico-muted-border-color);border-radius:0.4rem;padding:0.75rem;margin-bottom:0.5rem;background:rgba(0,0,0,0.1);}
-                .lf-path-header{display:flex;justify-content:space-between;align-items:center;margin-bottom:0.5rem;}
-                .lf-path-header span{font-size:0.8rem;font-weight:600;}
-                .lf-mw-section{margin-top:0.5rem;}
-                .lf-mw-section summary{font-size:0.8rem;cursor:pointer;color:var(--pico-muted-color);margin-bottom:0.4rem;}
-                .lf-mw-section summary:hover{color:#7c6ef0;}
-                .lf-remove-btn{padding:0.2rem 0.5rem;font-size:0.72rem;background:rgba(231,76,60,0.2);color:#e74c3c;border:none;border-radius:0.2rem;cursor:pointer;white-space:nowrap;}
-                .lf-remove-btn:hover{background:#e74c3c;color:#fff;}
-                .lf-add-btn{padding:0.3rem 0.75rem;font-size:0.78rem;cursor:pointer;border-radius:0.3rem;}
-                .lf-grid-2{display:grid;grid-template-columns:1fr 1fr;gap:0 1.5rem;}
-                .lf-grid-3{display:grid;grid-template-columns:1fr 1fr 1fr;gap:0 1.5rem;}
-                .lf-grid-4{display:grid;grid-template-columns:1fr 1fr 1fr 1fr;gap:0 1.5rem;}
-                .lf-review-pre{background:rgba(0,0,0,0.3);border:1px solid var(--pico-muted-border-color);border-radius:0.4rem;padding:1rem;font-size:0.78rem;white-space:pre-wrap;word-break:break-word;max-height:500px;overflow-y:auto;color:rgba(255,255,255,0.8);}
-                .lf-step-bar{display:flex;gap:0;margin-bottom:1.5rem;border-bottom:2px solid rgba(255,255,255,0.08);}
-                .lf-step{background:none;border:none;border-bottom:2px solid transparent;margin-bottom:-2px;padding:0.6rem 1.25rem;font-size:0.88rem;font-weight:500;color:rgba(255,255,255,0.35);cursor:pointer;transition:color 0.15s,border-color 0.15s;}
-                .lf-step:hover{color:rgba(255,255,255,0.7);}
-                .lf-step.active{color:#7c6ef0;border-bottom-color:#7c6ef0;font-weight:600;}
-                .lf-step.completed{color:#2ecc71;}
-            </style>
+            <!-- Inline Create Proxy Wizard (collapsed by default) -->
+            <div id="create-proxy-panel" style="display:none;margin-bottom:2rem;">
+                    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:1rem;">
+                        <h4 style="margin:0;">Create HTTP Proxy Server</h4>
+                        <button type="button" id="close-create-proxy" style="background:none;border:none;color:var(--pico-muted-color);font-size:1.2rem;cursor:pointer;padding:0.25rem;">✕</button>
+                    </div>
 
             <div class="stat-card" style="text-align:left;">
                 <!-- Step bar -->
@@ -357,110 +335,76 @@
                 </form>
                 <div id="lf-result" style="margin-top:0.5rem;"></div>
             </div>
+            </div><!-- /create-proxy-panel -->
+
+            <div id="proxy-routes">
+                <p aria-busy="true">Loading proxy routes…</p>
+            </div>
         </section>
 
         <!-- PAGE: System -->
         <section class="page" data-page="system" style="display:none;">
-            <hgroup>
-                <h2>System</h2>
-                <p>Process health, request log and errors</p>
+            <hgroup style="margin-bottom:1.5rem;">
+                <h2>Activity</h2>
+                <p>Process health and live activity</p>
             </hgroup>
 
-            <!-- Inner tab bar -->
-            <div class="inner-tabs" id="system-tabs">
-                <button class="inner-tab active" data-system-tab="system-tab-health">Health</button>
-                <button class="inner-tab" data-system-tab="system-tab-requests">Requests</button>
-                <button class="inner-tab" data-system-tab="system-tab-errors">Errors</button>
-            </div>
-
-            <!-- Tab: Health -->
-            <div class="inner-tab-panel" id="system-tab-health">
-                <!-- Stat cards row -->
-                <div class="stats-grid" style="margin-bottom:1.5rem;">
-                    <div class="stat-card">
-                        <p class="stat-value" id="health-uptime-val">–</p>
-                        <p class="stat-label">Uptime</p>
-                    </div>
-                    <div class="stat-card">
-                        <p class="stat-value" id="health-goroutines-val">–</p>
-                        <p class="stat-label">Goroutines</p>
-                    </div>
-                    <div class="stat-card">
-                        <p class="stat-value" id="health-heap-val">–</p>
-                        <p class="stat-label">Heap Usage</p>
-                        <p class="stat-sub" id="health-heap-sub"></p>
-                    </div>
-                    <div class="stat-card">
-                        <p class="stat-value" id="health-mem-val">–</p>
-                        <p class="stat-label">System Memory</p>
-                        <p class="stat-sub" id="health-mem-sub"></p>
-                    </div>
-                    <div class="stat-card">
-                        <p class="stat-value" id="health-gc-pause-val">–</p>
-                        <p class="stat-label">GC Pause Total</p>
-                    </div>
-                    <div class="stat-card">
-                        <p class="stat-value" id="health-gc-cycles-val">–</p>
-                        <p class="stat-label">GC Cycles</p>
-                    </div>
+            <!-- Health stat cards -->
+            <div class="stats-grid" style="margin-bottom:1rem;">
+                <div class="stat-card">
+                    <p class="stat-value" id="health-uptime-val">–</p>
+                    <p class="stat-label">Uptime</p>
                 </div>
-                <!-- Gauge bars -->
-                <div class="stat-card" style="text-align:left;">
-                    <p class="stat-label" style="margin-bottom:0.75rem;">Resource Gauges</p>
-                    <div class="health-gauges" style="max-width:100%;">
-                        <div class="gauge-row">
-                            <span class="gauge-label">Heap</span>
-                            <div class="gauge-bar">
-                                <div class="gauge-fill" id="gauge-memory-fill" style="width:0%"></div>
-                            </div>
-                            <span class="gauge-value" id="gauge-memory-text">–</span>
-                        </div>
-                        <div class="gauge-row">
-                            <span class="gauge-label">Goroutines</span>
-                            <div class="gauge-bar">
-                                <div class="gauge-fill" id="gauge-goroutine-fill" style="width:0%"></div>
-                            </div>
-                            <span class="gauge-value" id="gauge-goroutine-text">–</span>
-                        </div>
-                        <div class="gauge-row">
-                            <span class="gauge-label">GC Pause</span>
-                            <div class="gauge-bar">
-                                <div class="gauge-fill" id="gauge-gc-fill" style="width:0%"></div>
-                            </div>
-                            <span class="gauge-value" id="gauge-gc-text">–</span>
-                        </div>
-                    </div>
+                <div class="stat-card">
+                    <p class="stat-value" id="health-goroutines-val">–</p>
+                    <p class="stat-label">Goroutines</p>
+                </div>
+                <div class="stat-card">
+                    <p class="stat-value" id="health-heap-val">–</p>
+                    <p class="stat-label">Heap Usage</p>
+                    <p class="stat-sub" id="health-heap-sub"></p>
+                </div>
+                <div class="stat-card">
+                    <p class="stat-value" id="health-mem-val">–</p>
+                    <p class="stat-label">System Memory</p>
+                    <p class="stat-sub" id="health-mem-sub"></p>
+                </div>
+                <div class="stat-card">
+                    <p class="stat-value" id="health-gc-pause-val">–</p>
+                    <p class="stat-label">GC Pause Total</p>
+                </div>
+                <div class="stat-card">
+                    <p class="stat-value" id="health-gc-cycles-val">–</p>
+                    <p class="stat-label">GC Cycles</p>
                 </div>
             </div>
 
-            <!-- Tab: Requests -->
-            <div class="inner-tab-panel" id="system-tab-requests" style="display:none;">
-                <div style="display:flex;justify-content:flex-end;margin-bottom:0.5rem;">
-                    <select id="request-log-filter" aria-label="Filter requests"
-                            style="width:auto;min-width:180px;margin:0;padding:0.3rem 0.5rem;font-size:0.8rem;">
+            <!-- Unified Activity Feed -->
+            <div class="obs-feed-panel" style="margin-top:1.5rem;">
+                <div class="obs-feed-header">
+                    <h5>Live Activity</h5>
+                    <div class="feed-toggles">
+                        <button type="button" class="feed-pill active" id="pill-requests" data-feed-type="requests">🟢 Requests</button>
+                        <button type="button" class="feed-pill active" id="pill-errors" data-feed-type="errors">🔴 Errors</button>
+                        <button type="button" class="feed-pill active" id="pill-blocked" data-feed-type="blocked">🟠 Blocked</button>
+                    </div>
+                </div>
+                <div style="padding:0.4rem 1rem;border-bottom:1px solid var(--pico-muted-border-color);text-align:right;">
+                    <select id="system-log-filter" aria-label="Filter logs"
+                            style="width:auto;min-width:180px;margin:0;margin-bottom:0;padding:0.25rem 0.5rem;font-size:0.75rem;">
                         <option value="">All connections</option>
                     </select>
                 </div>
-                <div class="stat-card" style="text-align:left;padding:0;">
-                    <div class="request-feed" id="request-feed">
-                        <div class="error-empty">No requests recorded</div>
-                    </div>
+                <div class="obs-feed-body" id="activity-feed" style="max-height:520px;">
+                    <div class="error-empty">No activity recorded</div>
                 </div>
             </div>
 
-            <!-- Tab: Errors -->
-            <div class="inner-tab-panel" id="system-tab-errors" style="display:none;">
-                <div style="display:flex;justify-content:flex-end;margin-bottom:0.5rem;">
-                    <select id="error-log-filter" aria-label="Filter errors"
-                            style="width:auto;min-width:180px;margin:0;padding:0.3rem 0.5rem;font-size:0.8rem;">
-                        <option value="">All connections</option>
-                    </select>
-                </div>
-                <div class="stat-card" style="text-align:left;padding:0;">
-                    <div class="error-feed" id="error-feed">
-                        <div class="error-empty">No errors recorded</div>
-                    </div>
-                </div>
+            <!-- Hidden containers for individual feeds (used by existing JS) -->
+            <div style="display:none;">
+                <div id="request-feed"></div>
+                <div id="error-feed"></div>
+                <div id="block-feed"></div>
             </div>
         </section>
 
@@ -700,6 +644,28 @@
         sseDot.title = 'SSE ' + status;
     }
 
+    // ---------- Sidebar collapse ----------
+    var sidebarEl = document.getElementById('app-sidebar');
+    var sidebarToggle = document.getElementById('sidebar-toggle');
+    var sidebarCollapsed = localStorage.getItem('sidebar-collapsed') === 'true';
+
+    function applySidebarState() {
+        sidebarEl.classList.toggle('collapsed', sidebarCollapsed);
+        sidebarToggle.textContent = sidebarCollapsed ? '▶' : '◀';
+        sidebarToggle.title = sidebarCollapsed ? 'Expand sidebar' : 'Collapse sidebar';
+        // Resize chart if on dashboard
+        if (typeof chart !== 'undefined' && chart) {
+            setTimeout(function() { chart.resize(); }, 200);
+        }
+    }
+    applySidebarState();
+
+    sidebarToggle.addEventListener('click', function () {
+        sidebarCollapsed = !sidebarCollapsed;
+        localStorage.setItem('sidebar-collapsed', sidebarCollapsed);
+        applySidebarState();
+    });
+
     // ---------- Page navigation ----------
     var navLinks = document.querySelectorAll('.nav-link');
     var pages = document.querySelectorAll('.page');
@@ -723,25 +689,7 @@
         });
     });
 
-    // System inner tabs
-    document.querySelectorAll('#system-tabs .inner-tab').forEach(function (tab) {
-        tab.addEventListener('click', function () {
-            var targetId = this.getAttribute('data-system-tab');
-            document.querySelectorAll('#system-tabs .inner-tab').forEach(function (t) {
-                t.classList.remove('active');
-            });
-            this.classList.add('active');
-            document.querySelectorAll('.inner-tab-panel[id^="system-tab-"]').forEach(function (panel) {
-                panel.style.display = panel.id === targetId ? '' : 'none';
-            });
-            if (targetId === 'system-tab-requests') {
-                loadRecentRequests();
-            }
-            if (targetId === 'system-tab-errors') {
-                loadRecentErrors();
-            }
-        });
-    });
+    // System inner tabs — removed (unified layout, no tabs)
 
     // API Keys inner tabs
     document.querySelectorAll('#api-keys-tabs .inner-tab').forEach(function (tab) {
@@ -781,6 +729,9 @@
         // Start/stop system health polling based on page
         if (pageId === 'system') {
             fetchSystemHealth();
+            loadRecentRequests();
+            loadRecentErrors();
+            loadRecentBlocked();
             if (!healthInterval) healthInterval = setInterval(fetchSystemHealth, 5000);
         } else {
             if (healthInterval) {
@@ -796,9 +747,11 @@
             });
         }
 
-        // Load listener wizard when page is shown
-        if (pageId === 'route-config') {
+        // Initialize the listener wizard when proxy-routes page is shown
+        if (pageId === 'proxy-routes') {
             initListenerWizard();
+            lastRouteFingerprint = '';  // force full rebuild
+            loadProxyRoutes();
         }
 
         // Load API keys page
@@ -963,11 +916,14 @@
             }
         });
         metricsEventSource.addEventListener('proxy_error', function (e) {
-            addErrorToFeed(JSON.parse(e.data));
+            var entry = JSON.parse(e.data);
+            addErrorToFeed(entry);
+            addToActivityFeed('error', entry);
         });
         metricsEventSource.addEventListener('proxy_request', function (e) {
             var entry = JSON.parse(e.data);
             addRequestToFeed(entry);
+            addToActivityFeed('request', entry);
             // Feed sparkline buffers from request events
             var connKey = entry.connection_name || '';
             if (sparklineBuffers[connKey]) {
@@ -978,6 +934,11 @@
             if (portKey !== connKey && sparklineBuffers[portKey]) {
                 sparklineBuffers[portKey].count++;
             }
+        });
+        metricsEventSource.addEventListener('proxy_blocked', function (e) {
+            var entry = JSON.parse(e.data);
+            addBlockToFeed(entry);
+            addToActivityFeed('blocked', entry);
         });
         metricsEventSource.onopen = function () {
             setSseStatus('connected');
@@ -1175,26 +1136,6 @@
 
                 // GC cycles
                 document.getElementById('health-gc-cycles-val').textContent = fmtNum(h.num_gc);
-
-                // --- Gauge bars ---
-                var memPct = h.heap_sys_bytes > 0 ? (h.heap_alloc_bytes / h.heap_sys_bytes) * 100 : 0;
-                var memFill = document.getElementById('gauge-memory-fill');
-                memFill.style.width = Math.min(memPct, 100).toFixed(1) + '%';
-                memFill.className = 'gauge-fill' + (memPct > 85 ? ' danger' : memPct > 65 ? ' warn' : '');
-                document.getElementById('gauge-memory-text').textContent =
-                    fmtBytes(h.heap_alloc_bytes) + ' / ' + fmtBytes(h.heap_sys_bytes);
-
-                var grPct = Math.min((h.goroutines / 200) * 100, 100);
-                var grFill = document.getElementById('gauge-goroutine-fill');
-                grFill.style.width = grPct.toFixed(1) + '%';
-                grFill.className = 'gauge-fill' + (h.goroutines > 150 ? ' danger' : h.goroutines > 80 ? ' warn' : '');
-                document.getElementById('gauge-goroutine-text').textContent = h.goroutines;
-
-                var gcPct = Math.min((gcMs / 100) * 100, 100);
-                var gcFill = document.getElementById('gauge-gc-fill');
-                gcFill.style.width = gcPct.toFixed(1) + '%';
-                gcFill.className = 'gauge-fill' + (gcMs > 80 ? ' danger' : gcMs > 30 ? ' warn' : '');
-                document.getElementById('gauge-gc-text').textContent = gcMs.toFixed(1) + ' ms (' + h.num_gc + ' cycles)';
             })
             .catch(function () {
             });
@@ -1281,6 +1222,12 @@
                 if (entries && entries.length) {
                     errorEntries = entries.slice(0, MAX_ERROR_ENTRIES);
                     renderErrorFeed();
+                    entries.slice(0, MAX_ERROR_ENTRIES).forEach(function(e) {
+                        activityEntries.push({type:'error', ts:new Date(e.timestamp), entry:e});
+                    });
+                    activityEntries.sort(function(a,b){ return b.ts - a.ts; });
+                    if (activityEntries.length > MAX_ACTIVITY_ENTRIES) activityEntries.length = MAX_ACTIVITY_ENTRIES;
+                    renderActivityFeed();
                 }
             })
             .catch(function () {
@@ -1318,12 +1265,32 @@
                connName.indexOf(filter + '-path-') === 0;
     }
 
+    function blockIcon(mw) {
+        switch (mw) {
+            case 'honeypot':      return '🍯';
+            case 'country-block': return '🌍';
+            case 'ua-block':      return '🤖';
+            case 'rate-limit':    return '⏱';
+            default:              return '🚫';
+        }
+    }
+
     function buildRequestRow(e) {
         var ts = new Date(e.timestamp);
         var time = ts.getHours().toString().padStart(2, '0') + ':' +
             ts.getMinutes().toString().padStart(2, '0') + ':' +
             ts.getSeconds().toString().padStart(2, '0');
         var sc = e.status_code || 0;
+        var blockedTag = '';
+        if (e.blocked_by) {
+            var icon = blockIcon(e.blocked_by);
+            var detail = e.blocked_by;
+            if (e.block_reason) detail += ' (' + e.block_reason + ')';
+            if (e.trickster_mode) detail += ' 🎭 trickster';
+            var title = 'Blocked by ' + detail;
+            if (e.block_client_ip) title += ' | IP: ' + e.block_client_ip;
+            blockedTag = '<span class="req-blocked" style="color:#e67e22;font-size:0.75rem;font-weight:600;" title="' + title.replace(/"/g, '&quot;') + '">' + icon + ' ' + e.blocked_by + (e.trickster_mode ? ' 🎭' : '') + '</span>';
+        }
         var row = document.createElement('div');
         row.className = 'req-entry';
         row.innerHTML =
@@ -1334,7 +1301,8 @@
             '<span class="req-path" title="' + (e.path || '').replace(/"/g, '&quot;') + '">' + (e.path || '/') + '</span>' +
             '<span class="req-method">' + (e.method || '?') + '</span>' +
             '<span class="req-status ' + statusClass(sc) + '">' + (sc || '–') + '</span>' +
-            '<span class="req-latency">' + (e.latency_ms || 0) + ' ms</span>';
+            '<span class="req-latency">' + (e.latency_ms || 0) + ' ms</span>' +
+            blockedTag;
         return row;
     }
 
@@ -1399,11 +1367,272 @@
                 if (entries && entries.length) {
                     requestEntries = entries.slice(0, MAX_REQUEST_ENTRIES);
                     renderRequestFeed();
+                    // Seed activity feed
+                    entries.slice(0, MAX_REQUEST_ENTRIES).forEach(function(e) {
+                        activityEntries.push({type:'request', ts:new Date(e.timestamp), entry:e});
+                    });
+                    activityEntries.sort(function(a,b){ return b.ts - a.ts; });
+                    if (activityEntries.length > MAX_ACTIVITY_ENTRIES) activityEntries.length = MAX_ACTIVITY_ENTRIES;
+                    renderActivityFeed();
                 }
             })
             .catch(function () {
             });
     }
+
+    // ---------- Block Defense Stats (dashboard cards) ----------
+    var blockStats = { total: 0, ips: {}, honeypot: 0, ua: 0, country: 0, ratelimit: 0, other: 0 };
+
+    function trackBlockEntry(e) {
+        blockStats.total++;
+        if (e.remote_address) blockStats.ips[e.remote_address] = true;
+        var mw = (e.blocking_middleware || '').toLowerCase();
+        if (mw.indexOf('honeypot') !== -1 || mw.indexOf('honey') !== -1) blockStats.honeypot++;
+        else if (mw.indexOf('useragent') !== -1 || mw.indexOf('ua') !== -1) blockStats.ua++;
+        else if (mw.indexOf('country') !== -1 || mw.indexOf('geo') !== -1) blockStats.country++;
+        else if (mw.indexOf('rate') !== -1 || mw.indexOf('limiter') !== -1) blockStats.ratelimit++;
+        else blockStats.other++;
+    }
+
+    function updateBlockStatCards() {
+        document.getElementById('stat-blocked-total').textContent = fmtNum(blockStats.total);
+        document.getElementById('stat-blocked-ips').textContent = fmtNum(Object.keys(blockStats.ips).length);
+        document.getElementById('stat-blocked-honeypot').textContent = fmtNum(blockStats.honeypot);
+        document.getElementById('stat-blocked-ua').textContent = fmtNum(blockStats.ua);
+        document.getElementById('stat-blocked-country').textContent = fmtNum(blockStats.country);
+        document.getElementById('stat-blocked-ratelimit').textContent = fmtNum(blockStats.ratelimit);
+    }
+
+    function resetBlockStats() {
+        blockStats = { total: 0, ips: {}, honeypot: 0, ua: 0, country: 0, ratelimit: 0, other: 0 };
+        updateBlockStatCards();
+    }
+
+    // ---------- Block Log Feed ----------
+    var MAX_BLOCK_ENTRIES = 50;
+    var blockEntries = [];
+    var blockLogFilter = '';
+
+    function blockMwIcon(mw) {
+        switch (mw) {
+            case 'honeypot':      return '🍯';
+            case 'country-block': return '🌍';
+            case 'ua-block':      return '🤖';
+            case 'rate-limit':    return '⏱';
+            case 'ip-block':      return '🚫';
+            default:              return '🛡️';
+        }
+    }
+
+    function buildBlockRow(e) {
+        var ts = new Date(e.timestamp);
+        var time = ts.getHours().toString().padStart(2, '0') + ':' +
+            ts.getMinutes().toString().padStart(2, '0') + ':' +
+            ts.getSeconds().toString().padStart(2, '0');
+        var icon = blockMwIcon(e.blocking_middleware);
+        var row = document.createElement('div');
+        row.className = 'block-entry';
+        row.innerHTML =
+            '<span class="block-time">' + time + '</span>' +
+            '<span class="block-remote">' + (e.remote_address || '–') + '</span>' +
+            '<span class="block-mw" title="' + (e.block_reason || '').replace(/"/g, '&quot;') + '">' + icon + ' ' + (e.blocking_middleware || '?') + '</span>' +
+            '<span class="block-method">' + (e.method || '?') + '</span>' +
+            '<span class="block-path" title="' + (e.path || '').replace(/"/g, '&quot;') + '">' + (e.path || '/') + '</span>' +
+            '<span class="block-reason" title="' + (e.block_reason || '').replace(/"/g, '&quot;') + '">' + (e.block_reason || '') + '</span>';
+        return row;
+    }
+
+    var blockFeedHeader = '<div class="block-entry req-header">' +
+        '<span class="block-time">Time</span>' +
+        '<span class="block-remote">Remote</span>' +
+        '<span class="block-mw">Middleware</span>' +
+        '<span class="block-method">Method</span>' +
+        '<span class="block-path">Path</span>' +
+        '<span class="block-reason">Reason</span>' +
+        '</div>';
+
+    function ensureBlockFeedHeader(el) {
+        if (!el.querySelector('.req-header')) {
+            el.innerHTML = blockFeedHeader;
+        }
+    }
+
+    function addBlockToFeed(entry) {
+        blockEntries.unshift(entry);
+        if (blockEntries.length > MAX_BLOCK_ENTRIES) blockEntries.pop();
+        trackBlockEntry(entry);
+        updateBlockStatCards();
+        if (!matchesConnectionFilter(entry.connection_name, blockLogFilter)) return;
+        var el = document.getElementById('block-feed');
+        var empty = el.querySelector('.error-empty');
+        if (empty) empty.remove();
+        ensureBlockFeedHeader(el);
+        var header = el.querySelector('.req-header');
+        var row = buildBlockRow(entry);
+        header.insertAdjacentElement('afterend', row);
+        while (el.children.length > MAX_BLOCK_ENTRIES + 1) {
+            el.removeChild(el.lastElementChild);
+        }
+    }
+
+    function renderBlockFeed() {
+        var el = document.getElementById('block-feed');
+        var filtered = blockEntries.filter(function (e) {
+            return matchesConnectionFilter(e.connection_name, blockLogFilter);
+        });
+        if (filtered.length === 0) {
+            el.innerHTML = '<div class="error-empty">No blocked requests</div>';
+            return;
+        }
+        var html = blockFeedHeader;
+        filtered.forEach(function (e) {
+            html += buildBlockRow(e).outerHTML;
+        });
+        el.innerHTML = html;
+    }
+
+    function loadRecentBlocked() {
+        fetch('/api/v1/proxy/blocked', {credentials: 'same-origin'})
+            .then(function (resp) {
+                return resp.ok ? resp.json() : [];
+            })
+            .then(function (entries) {
+                if (entries && entries.length) {
+                    blockEntries = entries.slice(0, MAX_BLOCK_ENTRIES);
+                    renderBlockFeed();
+                    entries.forEach(function(e) { trackBlockEntry(e); });
+                    updateBlockStatCards();
+                    entries.slice(0, MAX_BLOCK_ENTRIES).forEach(function(e) {
+                        activityEntries.push({type:'blocked', ts:new Date(e.timestamp), entry:e});
+                    });
+                    activityEntries.sort(function(a,b){ return b.ts - a.ts; });
+                    if (activityEntries.length > MAX_ACTIVITY_ENTRIES) activityEntries.length = MAX_ACTIVITY_ENTRIES;
+                    renderActivityFeed();
+                }
+            })
+            .catch(function () {
+            });
+    }
+
+    // ---------- Unified Activity Feed ----------
+    var MAX_ACTIVITY_ENTRIES = 200;
+    var activityEntries = [];  // {type:'request'|'error'|'blocked', ts:Date, entry:object}
+    var feedShowRequests = true;
+    var feedShowErrors = true;
+    var feedShowBlocked = true;
+    var activityLogFilter = '';
+
+    function activityBadge(type) {
+        switch (type) {
+            case 'request': return '<span class="activity-badge">🟢</span>';
+            case 'error':   return '<span class="activity-badge">🔴</span>';
+            case 'blocked': return '<span class="activity-badge">🟠</span>';
+            default:        return '<span class="activity-badge">⚪</span>';
+        }
+    }
+
+    function fmtActivityTime(ts) {
+        var d = new Date(ts);
+        return d.getHours().toString().padStart(2,'0') + ':' +
+               d.getMinutes().toString().padStart(2,'0') + ':' +
+               d.getSeconds().toString().padStart(2,'0');
+    }
+
+    function buildActivityRow(item) {
+        var e = item.entry;
+        var time = fmtActivityTime(e.timestamp);
+        var row = document.createElement('div');
+        row.className = 'activity-entry';
+        row.setAttribute('data-activity-type', item.type);
+
+        if (item.type === 'request') {
+            var sc = e.status_code || 0;
+            var scClass = sc >= 500 ? 's5xx' : sc >= 400 ? 's4xx' : sc >= 300 ? 's3xx' : 's2xx';
+            var detail = (e.latency_ms || 0) + ' ms';
+            row.innerHTML = activityBadge('request') +
+                '<span class="act-time">' + time + '</span>' +
+                '<span class="act-remote">' + (e.remote_address || '–') + '</span>' +
+                '<span class="act-method">' + (e.method || '?') + '</span>' +
+                '<span class="act-path" title="' + (e.path||'').replace(/"/g,'&quot;') + '">' + (e.path || '/') + '</span>' +
+                '<span class="act-status ' + scClass + '">' + (sc || '–') + '</span>' +
+                '<span class="act-detail">' + detail + '</span>';
+        } else if (item.type === 'error') {
+            row.innerHTML = activityBadge('error') +
+                '<span class="act-time">' + time + '</span>' +
+                '<span class="act-remote">' + (e.remote_address || '–') + '</span>' +
+                '<span class="act-method">' + (e.method || '?') + '</span>' +
+                '<span class="act-path" title="' + (e.path||'').replace(/"/g,'&quot;') + '">' + (e.path || '/') + '</span>' +
+                '<span class="act-status s5xx">' + (e.status_code || '5xx') + '</span>' +
+                '<span class="act-detail">' + (e.latency_ms || 0) + ' ms</span>';
+        } else if (item.type === 'blocked') {
+            var icon = blockMwIcon(e.blocking_middleware);
+            row.innerHTML = activityBadge('blocked') +
+                '<span class="act-time">' + time + '</span>' +
+                '<span class="act-remote">' + (e.remote_address || '–') + '</span>' +
+                '<span class="act-method">' + (e.method || '?') + '</span>' +
+                '<span class="act-path" title="' + (e.path||'').replace(/"/g,'&quot;') + '">' + (e.path || '/') + '</span>' +
+                '<span class="act-status" style="color:#e67e22;">' + icon + '</span>' +
+                '<span class="act-detail" title="' + (e.block_reason||'').replace(/"/g,'&quot;') + '">' + (e.blocking_middleware || '?') + (e.block_reason ? ': ' + e.block_reason : '') + '</span>';
+        }
+        return row;
+    }
+
+    function addToActivityFeed(type, entry) {
+        var ts = new Date(entry.timestamp);
+        activityEntries.unshift({type: type, ts: ts, entry: entry});
+        if (activityEntries.length > MAX_ACTIVITY_ENTRIES) activityEntries.pop();
+
+        // Check visibility filter
+        if (type === 'request' && !feedShowRequests) return;
+        if (type === 'error' && !feedShowErrors) return;
+        if (type === 'blocked' && !feedShowBlocked) return;
+        if (!matchesConnectionFilter(entry.connection_name, activityLogFilter)) return;
+
+        var el = document.getElementById('activity-feed');
+        var empty = el.querySelector('.error-empty');
+        if (empty) empty.remove();
+
+        var row = buildActivityRow({type: type, ts: ts, entry: entry});
+        if (el.firstChild) {
+            el.insertBefore(row, el.firstChild);
+        } else {
+            el.appendChild(row);
+        }
+        // Trim excess
+        while (el.children.length > MAX_ACTIVITY_ENTRIES) {
+            el.removeChild(el.lastElementChild);
+        }
+    }
+
+    function renderActivityFeed() {
+        var el = document.getElementById('activity-feed');
+        var filtered = activityEntries.filter(function(item) {
+            if (item.type === 'request' && !feedShowRequests) return false;
+            if (item.type === 'error' && !feedShowErrors) return false;
+            if (item.type === 'blocked' && !feedShowBlocked) return false;
+            return matchesConnectionFilter(item.entry.connection_name, activityLogFilter);
+        });
+        if (filtered.length === 0) {
+            el.innerHTML = '<div class="error-empty">No activity recorded</div>';
+            return;
+        }
+        el.innerHTML = '';
+        filtered.forEach(function(item) {
+            el.appendChild(buildActivityRow(item));
+        });
+    }
+
+    // Wire up filter pill toggles
+    document.querySelectorAll('.feed-pill').forEach(function(pill) {
+        pill.addEventListener('click', function() {
+            this.classList.toggle('active');
+            var type = this.getAttribute('data-feed-type');
+            if (type === 'requests') feedShowRequests = this.classList.contains('active');
+            if (type === 'errors') feedShowErrors = this.classList.contains('active');
+            if (type === 'blocked') feedShowBlocked = this.classList.contains('active');
+            renderActivityFeed();
+        });
+    });
 
     // ---------- Log Filter Dropdowns ----------
     function buildLogFilterOptions() {
@@ -1438,23 +1667,19 @@
 
     function updateLogFilterDropdowns() {
         var html = buildLogFilterOptions();
-        var reqSel = document.getElementById('request-log-filter');
-        var errSel = document.getElementById('error-log-filter');
-        var reqCur = reqSel.value;
-        var errCur = errSel.value;
-        reqSel.innerHTML = html;
-        errSel.innerHTML = html;
-        if (reqCur && reqSel.querySelector('option[value="' + reqCur + '"]')) reqSel.value = reqCur;
-        if (errCur && errSel.querySelector('option[value="' + errCur + '"]')) errSel.value = errCur;
+        var sysSel = document.getElementById('system-log-filter');
+        var sysCur = sysSel.value;
+        sysSel.innerHTML = html;
+        if (sysCur && sysSel.querySelector('option[value="' + sysCur + '"]')) sysSel.value = sysCur;
     }
 
-    document.getElementById('request-log-filter').addEventListener('change', function () {
-        requestLogFilter = this.value;
-        renderRequestFeed();
-    });
-    document.getElementById('error-log-filter').addEventListener('change', function () {
-        errorLogFilter = this.value;
-        renderErrorFeed();
+    document.getElementById('system-log-filter').addEventListener('change', function () {
+        var filter = this.value;
+        requestLogFilter = filter;
+        errorLogFilter = filter;
+        blockLogFilter = filter;
+        activityLogFilter = filter;
+        renderActivityFeed();
     });
 
     // ---------- Sparklines ----------
@@ -2974,10 +3199,12 @@
         })
         .then(function(result) {
             if (result === null) return;
-            showToast('HTTP proxy server on port ' + payload.port + ' created. Use Proxy Routes to start it.', 'success');
-            resultEl.innerHTML = '<div class="success-alert">HTTP proxy server created on port ' + payload.port + '. Navigate to <strong>Proxy Routes</strong> to start it.</div>';
+            showToast('HTTP proxy server on port ' + payload.port + ' created successfully.', 'success');
             lfResetForm();
             loadProxyRoutes();
+            // Collapse the create proxy panel
+            document.getElementById('create-proxy-panel').style.display = 'none';
+            document.getElementById('toggle-create-proxy').textContent = '+ Create Proxy';
         })
         .catch(function() {
             resultEl.innerHTML = '<div class="error-alert">An error occurred. Please try again.</div>';
@@ -3015,12 +3242,29 @@
         lfShowStep(1);
     }
 
+    // ---------- Create Proxy Panel Toggle ----------
+    document.getElementById('toggle-create-proxy').addEventListener('click', function () {
+        var panel = document.getElementById('create-proxy-panel');
+        var isVisible = panel.style.display !== 'none';
+        panel.style.display = isVisible ? 'none' : '';
+        this.textContent = isVisible ? '+ Create Proxy' : '− Cancel';
+        if (!isVisible) {
+            initListenerWizard();
+            panel.scrollIntoView({ behavior: 'smooth', block: 'start' });
+        }
+    });
+    document.getElementById('close-create-proxy').addEventListener('click', function () {
+        document.getElementById('create-proxy-panel').style.display = 'none';
+        document.getElementById('toggle-create-proxy').textContent = '+ Create Proxy';
+    });
+
     // ---------- Bootstrap ----------
     initChart();
     connectMetricsSSE();
     startChartTick();
     loadProxyRoutes();
     loadIdentity();
+    loadRecentBlocked();  // seed threat defense cards on dashboard
     setInterval(loadProxyRoutes, 10000);
     setInterval(tickSparklines, 1000);
 </script>
