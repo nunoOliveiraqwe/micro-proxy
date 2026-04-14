@@ -7,6 +7,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/nunoOliveiraqwe/torii/internal/auth"
 	"github.com/nunoOliveiraqwe/torii/internal/domain"
 	"github.com/nunoOliveiraqwe/torii/internal/store"
 	"github.com/nunoOliveiraqwe/torii/internal/util"
@@ -40,12 +41,13 @@ func (e *apiKeyCacheEntry) GetLastReadAt() time.Time {
 }
 
 type ApiKeyService struct {
-	store store.ApiKeyStore
-	cache *util.Cache[*apiKeyCacheEntry]
+	store  store.ApiKeyStore
+	cache  *util.Cache[*apiKeyCacheEntry]
+	hasher *auth.HMACHasher
 }
 
-func NewApiKeyService(store store.ApiKeyStore) *ApiKeyService {
-	zap.S().Info("Initializing API Key Service with hardcoded cache defaults (this might change in the future)")
+func NewApiKeyService(store store.ApiKeyStore, hmacSecret []byte) *ApiKeyService {
+	zap.S().Info("Initializing API Key Service")
 
 	cacheOpts := &util.CacheOptions{
 		MaxEntries:      10000,
@@ -59,32 +61,38 @@ func NewApiKeyService(store store.ApiKeyStore) *ApiKeyService {
 	}
 
 	return &ApiKeyService{
-		store: store,
-		cache: cache,
+		store:  store,
+		cache:  cache,
+		hasher: auth.NewHMACHasher(hmacSecret),
 	}
 }
 
 func (s *ApiKeyService) IsKeyValidForScope(key string, scope string) (bool, error) {
-	// Check cache first
-	entry, err := s.cache.GetValue(key)
+	// HMAC the raw key immediately — from this point on we only work with the hash.
+	// The raw key is never stored anywhere (not in cache, not in DB).
+	hashedKey := s.hasher.Hash(key)
+
+	// Check cache first (keyed by hashed key, no raw keys in memory)
+	entry, err := s.cache.GetValue(hashedKey)
 	if err == nil {
 		if !entry.expiresAt.IsZero() && time.Now().After(entry.expiresAt) {
-			s.cache.Evict(key)
+			s.cache.Evict(hashedKey)
 			return false, nil
 		}
 		_, ok := entry.allowedScopes[scope]
 		return ok, nil
 	}
 
-	// Cache miss — query the store
-	valid, err := s.store.IsKeyValidForScope(context.Background(), key, scope)
+	// Cache miss — look up the hashed key in the DB.
+	// HMAC is deterministic, so WHERE key = hash works.
+	valid, err := s.store.IsKeyValidForScope(context.Background(), hashedKey, scope)
 	if err != nil {
 		return false, fmt.Errorf("failed to check key scope: %w", err)
 	}
 
-	// On a valid key, fetch the full key to populate the cache with all scopes
+	// On a valid key, populate the cache so subsequent checks are instant
 	if valid {
-		s.warmCache(key)
+		s.warmCache(hashedKey)
 	}
 
 	return valid, nil
@@ -118,20 +126,35 @@ func (s *ApiKeyService) CreateApiKey(ctx context.Context, apiKeyRequest *CreateA
 		}
 		scopeMap[domain.Scope(scope)] = s
 	}
-	apiKey := &domain.ApiKey{
+
+	rawKey := generateApiKey()
+	hashedKey := s.hasher.Hash(rawKey)
+
+	dbKey := &domain.ApiKey{
 		Alias:     apiKeyRequest.Alias,
-		Key:       generateApiKey(),
+		Key:       hashedKey, // store the HMAC, not the raw key
 		Scopes:    scopeMap,
 		Expires:   apiKeyRequest.ExpiryDate,
 		CreatedAt: time.Now().Unix(),
 	}
-	err = s.store.NewApiKey(ctx, apiKey)
+	err = s.store.NewApiKey(ctx, dbKey)
 	if err != nil {
 		zap.S().Errorf("Failed to create API key with alias %s: %v", apiKeyRequest.Alias, err)
 		return nil, fmt.Errorf("failed to create API key: %w", err)
 	}
+
+	// Return the raw key to the caller — this is the only time it's visible
+	returnKey := &domain.ApiKey{
+		ID:        dbKey.ID,
+		Alias:     apiKeyRequest.Alias,
+		Key:       rawKey,
+		Scopes:    scopeMap,
+		Expires:   apiKeyRequest.ExpiryDate,
+		CreatedAt: dbKey.CreatedAt,
+	}
+
 	zap.S().Debugf("API key with alias %s created successfully", apiKeyRequest.Alias)
-	return apiKey, nil
+	return returnKey, nil
 }
 
 func (s *ApiKeyService) DeleteApiKey(ctx context.Context, alias string) error {
@@ -165,10 +188,12 @@ func (s *ApiKeyService) GetAllApiKeys(ctx context.Context) []*domain.ApiKey {
 	return apiKeys
 }
 
-// warmCache fetches the full key from the store by its raw value
-// and caches all its scopes so subsequent scope checks are fast.
-func (s *ApiKeyService) warmCache(key string) {
-	apiKey, err := s.store.GetApiKeyByRawKey(context.Background(), key)
+// warmCache populates the in-memory cache after a successful DB validation.
+// The cache is keyed by the HMAC-hashed key so no raw keys are ever held in
+// memory. Subsequent requests still compute the HMAC (fast) but skip the DB
+// round-trip entirely.
+func (s *ApiKeyService) warmCache(hashedKey string) {
+	apiKey, err := s.store.GetApiKeyByRawKey(context.Background(), hashedKey)
 	if err != nil || apiKey == nil {
 		zap.S().Debugf("Cache warm skipped for API key: %v", err)
 		return
@@ -179,7 +204,7 @@ func (s *ApiKeyService) warmCache(key string) {
 		scopes[string(scope)] = 1
 	}
 
-	s.cache.CacheValue(key, &apiKeyCacheEntry{
+	s.cache.CacheValue(hashedKey, &apiKeyCacheEntry{
 		allowedScopes: scopes,
 		expiresAt:     apiKey.Expires,
 		lastSeen:      time.Now(),

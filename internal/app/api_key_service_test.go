@@ -5,6 +5,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/nunoOliveiraqwe/torii/internal/auth"
 	"github.com/nunoOliveiraqwe/torii/internal/domain"
 	"github.com/nunoOliveiraqwe/torii/internal/store"
 	"github.com/stretchr/testify/assert"
@@ -12,6 +13,8 @@ import (
 	"github.com/stretchr/testify/require"
 	"go.uber.org/zap"
 )
+
+var testHmacSecret = []byte("test-hmac-secret-32-bytes-long!!")
 
 func init() {
 	logger := zap.NewNop()
@@ -68,7 +71,7 @@ func (m *mockApiKeyStore) GetAllApiKeys(ctx context.Context) ([]*domain.ApiKey, 
 
 func TestCreateApiKey_NilRequest(t *testing.T) {
 	ms := new(mockApiKeyStore)
-	svc := NewApiKeyService(ms)
+	svc := NewApiKeyService(ms, testHmacSecret)
 
 	_, err := svc.CreateApiKey(context.Background(), nil)
 	assert.ErrorIs(t, err, ErrorInvalidApiKeyRequest)
@@ -76,7 +79,7 @@ func TestCreateApiKey_NilRequest(t *testing.T) {
 
 func TestCreateApiKey_EmptyAlias(t *testing.T) {
 	ms := new(mockApiKeyStore)
-	svc := NewApiKeyService(ms)
+	svc := NewApiKeyService(ms, testHmacSecret)
 
 	_, err := svc.CreateApiKey(context.Background(), &CreateApiKeyRequest{
 		Alias:  "",
@@ -87,7 +90,7 @@ func TestCreateApiKey_EmptyAlias(t *testing.T) {
 
 func TestCreateApiKey_NoScopes(t *testing.T) {
 	ms := new(mockApiKeyStore)
-	svc := NewApiKeyService(ms)
+	svc := NewApiKeyService(ms, testHmacSecret)
 
 	_, err := svc.CreateApiKey(context.Background(), &CreateApiKeyRequest{
 		Alias:  "my-key",
@@ -98,7 +101,7 @@ func TestCreateApiKey_NoScopes(t *testing.T) {
 
 func TestCreateApiKey_EmptyScopes(t *testing.T) {
 	ms := new(mockApiKeyStore)
-	svc := NewApiKeyService(ms)
+	svc := NewApiKeyService(ms, testHmacSecret)
 
 	_, err := svc.CreateApiKey(context.Background(), &CreateApiKeyRequest{
 		Alias:  "my-key",
@@ -109,7 +112,7 @@ func TestCreateApiKey_EmptyScopes(t *testing.T) {
 
 func TestCreateApiKey_InvalidScope(t *testing.T) {
 	ms := new(mockApiKeyStore)
-	svc := NewApiKeyService(ms)
+	svc := NewApiKeyService(ms, testHmacSecret)
 
 	// GetApiKey should return nil (no existing key)
 	ms.On("GetApiKey", mock.Anything, "my-key").Return(nil, nil)
@@ -123,7 +126,7 @@ func TestCreateApiKey_InvalidScope(t *testing.T) {
 
 func TestCreateApiKey_ExpiredExpiryDate(t *testing.T) {
 	ms := new(mockApiKeyStore)
-	svc := NewApiKeyService(ms)
+	svc := NewApiKeyService(ms, testHmacSecret)
 
 	_, err := svc.CreateApiKey(context.Background(), &CreateApiKeyRequest{
 		Alias:      "my-key",
@@ -135,7 +138,7 @@ func TestCreateApiKey_ExpiredExpiryDate(t *testing.T) {
 
 func TestCreateApiKey_DuplicateAlias(t *testing.T) {
 	ms := new(mockApiKeyStore)
-	svc := NewApiKeyService(ms)
+	svc := NewApiKeyService(ms, testHmacSecret)
 
 	ms.On("GetApiKey", mock.Anything, "existing").Return(&domain.ApiKey{
 		Alias: "existing",
@@ -150,7 +153,7 @@ func TestCreateApiKey_DuplicateAlias(t *testing.T) {
 
 func TestCreateApiKey_Success(t *testing.T) {
 	ms := new(mockApiKeyStore)
-	svc := NewApiKeyService(ms)
+	svc := NewApiKeyService(ms, testHmacSecret)
 
 	ms.On("GetApiKey", mock.Anything, "new-key").Return(nil, nil)
 	ms.On("NewApiKey", mock.Anything, mock.AnythingOfType("*domain.ApiKey")).Return(nil)
@@ -164,11 +167,17 @@ func TestCreateApiKey_Success(t *testing.T) {
 	assert.Equal(t, "new-key", apiKey.Alias)
 	assert.NotEmpty(t, apiKey.Key, "generated key should not be empty")
 	assert.True(t, apiKey.CreatedAt > 0)
+
+	// Verify the key stored in the DB is the HMAC, not the raw key
+	storedCall := ms.Calls[1] // NewApiKey call
+	storedKey := storedCall.Arguments.Get(1).(*domain.ApiKey)
+	hasher := auth.NewHMACHasher(testHmacSecret)
+	assert.Equal(t, hasher.Hash(apiKey.Key), storedKey.Key, "DB should store HMAC, not raw key")
 }
 
 func TestCreateApiKey_WithFutureExpiry_Success(t *testing.T) {
 	ms := new(mockApiKeyStore)
-	svc := NewApiKeyService(ms)
+	svc := NewApiKeyService(ms, testHmacSecret)
 
 	expiry := time.Now().Add(48 * time.Hour)
 	ms.On("GetApiKey", mock.Anything, "expiring").Return(nil, nil)
@@ -189,7 +198,7 @@ func TestCreateApiKey_WithFutureExpiry_Success(t *testing.T) {
 
 func TestGetApiKey_RedactsRawKey(t *testing.T) {
 	ms := new(mockApiKeyStore)
-	svc := NewApiKeyService(ms)
+	svc := NewApiKeyService(ms, testHmacSecret)
 
 	ms.On("GetApiKey", mock.Anything, "my-key").Return(&domain.ApiKey{
 		Alias: "my-key",
@@ -207,7 +216,7 @@ func TestGetApiKey_RedactsRawKey(t *testing.T) {
 
 func TestGetAllApiKeys_RedactsRawKeys(t *testing.T) {
 	ms := new(mockApiKeyStore)
-	svc := NewApiKeyService(ms)
+	svc := NewApiKeyService(ms, testHmacSecret)
 
 	ms.On("GetAllApiKeys", mock.Anything).Return([]*domain.ApiKey{
 		{Alias: "a", Key: "secret-a"},
@@ -223,7 +232,7 @@ func TestGetAllApiKeys_RedactsRawKeys(t *testing.T) {
 
 func TestGetAllApiKeys_StoreError_ReturnsNil(t *testing.T) {
 	ms := new(mockApiKeyStore)
-	svc := NewApiKeyService(ms)
+	svc := NewApiKeyService(ms, testHmacSecret)
 
 	ms.On("GetAllApiKeys", mock.Anything).Return(nil, assert.AnError)
 
@@ -237,7 +246,7 @@ func TestGetAllApiKeys_StoreError_ReturnsNil(t *testing.T) {
 
 func TestDeleteApiKey_DelegatesToStore(t *testing.T) {
 	ms := new(mockApiKeyStore)
-	svc := NewApiKeyService(ms)
+	svc := NewApiKeyService(ms, testHmacSecret)
 
 	ms.On("DeleteApiKey", mock.Anything, "victim").Return(nil)
 
@@ -252,12 +261,14 @@ func TestDeleteApiKey_DelegatesToStore(t *testing.T) {
 
 func TestIsKeyValidForScope_ValidKey_CacheMiss(t *testing.T) {
 	ms := new(mockApiKeyStore)
-	svc := NewApiKeyService(ms)
+	svc := NewApiKeyService(ms, testHmacSecret)
+	hasher := auth.NewHMACHasher(testHmacSecret)
+	hashed := hasher.Hash("raw-key")
 
-	ms.On("IsKeyValidForScope", mock.Anything, "raw-key", "read_stats").Return(true, nil)
-	ms.On("GetApiKeyByRawKey", mock.Anything, "raw-key").Return(&domain.ApiKey{
+	ms.On("IsKeyValidForScope", mock.Anything, hashed, "read_stats").Return(true, nil)
+	ms.On("GetApiKeyByRawKey", mock.Anything, hashed).Return(&domain.ApiKey{
 		Alias:  "test",
-		Key:    "raw-key",
+		Key:    hashed,
 		Scopes: map[domain.Scope]byte{domain.READ_STATS_SCOPE: 1},
 	}, nil)
 
@@ -268,9 +279,11 @@ func TestIsKeyValidForScope_ValidKey_CacheMiss(t *testing.T) {
 
 func TestIsKeyValidForScope_InvalidKey(t *testing.T) {
 	ms := new(mockApiKeyStore)
-	svc := NewApiKeyService(ms)
+	svc := NewApiKeyService(ms, testHmacSecret)
+	hasher := auth.NewHMACHasher(testHmacSecret)
+	hashed := hasher.Hash("bad-key")
 
-	ms.On("IsKeyValidForScope", mock.Anything, "bad-key", "read_stats").Return(false, nil)
+	ms.On("IsKeyValidForScope", mock.Anything, hashed, "read_stats").Return(false, nil)
 
 	valid, err := svc.IsKeyValidForScope("bad-key", "read_stats")
 	require.NoError(t, err)
@@ -279,13 +292,15 @@ func TestIsKeyValidForScope_InvalidKey(t *testing.T) {
 
 func TestIsKeyValidForScope_CacheHit(t *testing.T) {
 	ms := new(mockApiKeyStore)
-	svc := NewApiKeyService(ms)
+	svc := NewApiKeyService(ms, testHmacSecret)
+	hasher := auth.NewHMACHasher(testHmacSecret)
+	hashed := hasher.Hash("raw-key")
 
 	// First call: cache miss → store hit → warm cache
-	ms.On("IsKeyValidForScope", mock.Anything, "raw-key", "read_stats").Return(true, nil).Once()
-	ms.On("GetApiKeyByRawKey", mock.Anything, "raw-key").Return(&domain.ApiKey{
+	ms.On("IsKeyValidForScope", mock.Anything, hashed, "read_stats").Return(true, nil).Once()
+	ms.On("GetApiKeyByRawKey", mock.Anything, hashed).Return(&domain.ApiKey{
 		Alias:  "test",
-		Key:    "raw-key",
+		Key:    hashed,
 		Scopes: map[domain.Scope]byte{domain.READ_STATS_SCOPE: 1},
 	}, nil).Once()
 
@@ -303,13 +318,15 @@ func TestIsKeyValidForScope_CacheHit(t *testing.T) {
 
 func TestIsKeyValidForScope_CachedExpiredKey_ReturnsFalse(t *testing.T) {
 	ms := new(mockApiKeyStore)
-	svc := NewApiKeyService(ms)
+	svc := NewApiKeyService(ms, testHmacSecret)
+	hasher := auth.NewHMACHasher(testHmacSecret)
+	hashed := hasher.Hash("raw-key")
 
 	// First call: cache miss → store says valid → warm cache with expired key
-	ms.On("IsKeyValidForScope", mock.Anything, "raw-key", "read_stats").Return(true, nil).Once()
-	ms.On("GetApiKeyByRawKey", mock.Anything, "raw-key").Return(&domain.ApiKey{
+	ms.On("IsKeyValidForScope", mock.Anything, hashed, "read_stats").Return(true, nil).Once()
+	ms.On("GetApiKeyByRawKey", mock.Anything, hashed).Return(&domain.ApiKey{
 		Alias:   "test",
-		Key:     "raw-key",
+		Key:     hashed,
 		Scopes:  map[domain.Scope]byte{domain.READ_STATS_SCOPE: 1},
 		Expires: time.Now().Add(-1 * time.Minute), // already expired
 	}, nil).Once()
@@ -326,9 +343,11 @@ func TestIsKeyValidForScope_CachedExpiredKey_ReturnsFalse(t *testing.T) {
 
 func TestIsKeyValidForScope_WrongScope(t *testing.T) {
 	ms := new(mockApiKeyStore)
-	svc := NewApiKeyService(ms)
+	svc := NewApiKeyService(ms, testHmacSecret)
+	hasher := auth.NewHMACHasher(testHmacSecret)
+	hashed := hasher.Hash("raw-key")
 
-	ms.On("IsKeyValidForScope", mock.Anything, "raw-key", "write_config").Return(false, nil)
+	ms.On("IsKeyValidForScope", mock.Anything, hashed, "write_config").Return(false, nil)
 
 	valid, err := svc.IsKeyValidForScope("raw-key", "write_config")
 	require.NoError(t, err)

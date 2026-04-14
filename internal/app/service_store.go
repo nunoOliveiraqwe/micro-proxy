@@ -3,6 +3,7 @@ package app
 import (
 	"github.com/nunoOliveiraqwe/torii/internal/store"
 	"github.com/nunoOliveiraqwe/torii/proxy"
+	"go.uber.org/zap"
 )
 
 type ServiceStore struct {
@@ -14,8 +15,13 @@ type ServiceStore struct {
 }
 
 func NewServiceStore(ds *DataStore, reloadAcme func() error, getProxies func() []*proxy.ProxySnapshot) *ServiceStore {
+	conf, err := ds.SystemConfigStore.GetSystemConfiguration()
+	if err != nil {
+		zap.S().Errorf("Failed to get system configuration: %v", err)
+		return nil
+	}
 	return &ServiceStore{
-		apiKeyService:              NewApiKeyService(ds.ApiKeyStore),
+		apiKeyService:              NewApiKeyService(ds.ApiKeyStore, conf.ApiKeyHmacSecret),
 		userService:                NewUserService(ds),
 		systemConfigurationService: NewSystemConfigurationService(ds),
 		acmeService:                NewAcmeService(ds.AcmeStore, reloadAcme, getProxies),
