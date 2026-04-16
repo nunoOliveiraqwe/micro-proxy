@@ -55,11 +55,9 @@ func NewTorii(conf config.NetworkConfig, mgr *metrics.ConnectionMetricsManager, 
 func (m *Torii) StartAll() error {
 	zap.S().Infof("Starting torii with %d HTTP servers", len(m.stoppedHttpServers))
 	for port, _ := range m.stoppedHttpServers {
-		//hmmm, i can't lock here, because i wanto to call start
 		err := m.StartHttpProxy(port)
 		if err != nil {
 			zap.S().Errorf("Failed to start HTTP server on port %d: %v", port, err)
-			//should i stop everything if one fails??
 		}
 	}
 
@@ -199,6 +197,37 @@ func (m *Torii) AddHttpServer(ctx context.Context, conf config.HTTPListener, glo
 	return nil
 }
 
+// TODO -> implement edit endpoint to use this
+func (m *Torii) HotSwapHandler(ctx context.Context, port int, conf config.HTTPListener, globalConf *config.GlobalConfig) error {
+	m.lock.Lock()
+	defer m.lock.Unlock()
+
+	server, ok := m.startedHttpServers[port]
+	if !ok {
+		server, ok = m.stoppedHttpServers[port]
+	}
+	if !ok {
+		return fmt.Errorf("no HTTP server found for port %d", port)
+	}
+
+	ctx = context.WithValue(ctx, ctxkeys.MetricsMgr, m.metricsManager)
+
+	handler, mwNames, backends, routeSnapshots, err := buildHandlerChain(ctx, server.GetServerId(), conf, globalConf)
+	if err != nil {
+		return fmt.Errorf("failed to build handler chain: %w", err)
+	}
+
+	if err := server.updateHandler(handler); err != nil {
+		return fmt.Errorf("failed to swap handler: %w", err)
+	}
+
+	// Update snapshot metadata so dashboards reflect the new config.
+	m.updateServerMetadata(server, mwNames, backends, routeSnapshots)
+
+	zap.S().Infof("Hot-swapped handler for server on port %d", port)
+	return nil
+}
+
 func (m *Torii) AddTcpServer(conf config.TCPListener) {
 	//TODO
 }
@@ -272,4 +301,17 @@ func appendDomainsFromServers(servers map[int]MicroHttpServer, domains []string)
 		}
 	}
 	return domains
+}
+
+func (m *Torii) updateServerMetadata(server MicroHttpServer, mwNames []string, backends []string, routes []RouteSnapshot) {
+	switch s := server.(type) {
+	case *ToriiHttpServer:
+		s.middlewareChain = mwNames
+		s.backends = backends
+		s.routes = routes
+	case *ToriiHttpsServer:
+		s.middlewareChain = mwNames
+		s.backends = backends
+		s.routes = routes
+	}
 }

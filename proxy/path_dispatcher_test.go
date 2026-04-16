@@ -46,6 +46,10 @@ func TestPathRulePrefix(t *testing.T) {
 		{"/a/b/c", "/a/b/c"},
 		{"/a/b/c/", "/a/b/c"},
 		{"/a/b/c/*", "/a/b/c"},
+		// Mid-path wildcards — cannot be used with StripPrefix
+		{"/users/*/profile", ""},
+		{"/users/*/profile/*", ""},
+		{"/a/*/b/*/c", ""},
 	}
 	for _, tt := range tests {
 		t.Run(tt.input, func(t *testing.T) {

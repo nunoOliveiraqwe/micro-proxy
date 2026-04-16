@@ -68,6 +68,31 @@ func (e *externalRedirecter) buildRedirectURL(r *http.Request) string {
 	return u.String()
 }
 
+type schemeOnlyRedirecter struct {
+	opts *redirectOptions
+}
+
+func (e *schemeOnlyRedirecter) redirect(w http.ResponseWriter, r *http.Request) {
+	redirectURL := e.buildRedirectURL(r)
+	logger := GetRequestLoggerFromContext(r)
+	logger.Info(fmt.Sprintf("Scheme-only redirecting request from %s to %s", r.Host, redirectURL))
+	http.Redirect(w, r, redirectURL, e.opts.statusCode)
+}
+
+func (e *schemeOnlyRedirecter) buildRedirectURL(r *http.Request) string {
+	u := url.URL{
+		Scheme: e.opts.targetUrl.Scheme,
+		Host:   r.Host,
+	}
+	if !e.opts.dropPath {
+		u.Path = r.URL.Path
+	}
+	if !e.opts.dropQuery {
+		u.RawQuery = r.URL.RawQuery
+	}
+	return u.String()
+}
+
 func newInternalRedirecter(opts *redirectOptions) (*internalRedirecter, error) {
 	proxy, err := proxyutil.NewReverseProxy(opts.targetUrl.String(), proxyutil.ProxyOptions{
 		DropPath:  opts.dropPath,
@@ -96,6 +121,8 @@ func RedirectMiddleware(_ context.Context, _ http.HandlerFunc, conf Config) http
 	var r redirecter
 	if opts.mode == "external" {
 		r = &externalRedirecter{opts: opts}
+	} else if opts.mode == "external-scheme-only" {
+		r = &schemeOnlyRedirecter{opts: opts}
 	} else {
 		ir, irErr := newInternalRedirecter(opts)
 		if irErr != nil {
@@ -121,12 +148,12 @@ func parseRedirectConf(conf Config) (*redirectOptions, error) {
 	if err != nil {
 		return nil, err
 	}
-	if mode != "internal" && mode != "external" {
-		return nil, fmt.Errorf("invalid 'mode' option: must be 'internal' or 'external'")
+	if mode != "internal" && mode != "external" && mode != "external-scheme-only" {
+		return nil, fmt.Errorf("invalid 'mode' option: must be 'internal', 'external', or 'external-scheme-only'")
 	}
 
 	var statusCode int
-	if mode == "external" {
+	if mode == "external" || mode == "external-scheme-only" {
 		statusCodeRaw, ok := conf.Options["status-code"]
 		if !ok {
 			statusCode = 302
@@ -144,6 +171,21 @@ func parseRedirectConf(conf Config) (*redirectOptions, error) {
 	}
 
 	zap.S().Debugf("RedirectMiddleware: successfully parsed configuration with mode %q, status code %d and target %q", mode, statusCode, target)
+
+	// external-scheme-only requires target to be a plain scheme ("https" or "http").
+	if mode == "external-scheme-only" {
+		scheme := strings.ToLower(strings.TrimSuffix(target, "://"))
+		if scheme != "http" && scheme != "https" {
+			return nil, fmt.Errorf("'target' for external-scheme-only mode must be 'http' or 'https'")
+		}
+		return &redirectOptions{
+			mode:       mode,
+			statusCode: statusCode,
+			targetUrl:  &url.URL{Scheme: scheme},
+			dropPath:   ParseBoolOpt(conf.Options, "drop-path", false),
+			dropQuery:  ParseBoolOpt(conf.Options, "drop-query", false),
+		}, nil
+	}
 
 	parsed, parseErr := url.Parse(target)
 

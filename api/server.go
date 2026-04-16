@@ -29,13 +29,13 @@ func StartServer(conf config.APIServerConfig, systemService app.SystemService) *
 	httpServer.ReadTimeout = time.Duration(conf.ReadTimeoutSecs) * time.Second
 	httpServer.WriteTimeout = time.Duration(conf.WriteTimeoutSecs) * time.Second
 
-	mux := buildMux(conf.Port, systemService)
+	mux := buildMux(conf.Port, conf.AccessLogPath, systemService)
 	httpServer.Handler = systemService.SessionRegistry().WrapWithSessionMiddleware(mux)
 	return httpServer
 
 }
 
-func buildMux(port int, svc app.SystemService) *http.ServeMux {
+func buildMux(port int, logPath string, svc app.SystemService) *http.ServeMux {
 	zap.S().Debugf("Building http mux for proxy API")
 	mux := http.NewServeMux()
 
@@ -49,7 +49,8 @@ func buildMux(port int, svc app.SystemService) *http.ServeMux {
 	globalHandler = middleware.BodySizeLimitMiddleware(ctx, globalHandler, middleware.Config{
 		Options: map[string]interface{}{"max-size": "20m"},
 	})
-	globalHandler = middleware.RequestLoggerMiddleware(ctx, globalHandler, middleware.Config{})
+	globalHandler = middleware.RequestLoggerMiddleware(ctx, globalHandler, middleware.Config{
+		Options: map[string]interface{}{"request-log-path": logPath}})
 	globalHandler = middleware.RequestIDMiddleware(ctx, globalHandler, middleware.Config{})
 
 	for _, route := range routes {

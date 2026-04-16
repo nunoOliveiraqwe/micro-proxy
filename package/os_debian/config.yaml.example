@@ -17,7 +17,7 @@
 # -----------------------------------------------------------------
 
 # Log level: DEBUG, INFO, WARN, ERROR
-#log.logLevel INFO
+#log.log-level INFO
 
 # Log encoding format: "console" (human-readable) or "json" (structured)
 #log.encoding console
@@ -26,13 +26,13 @@
 #log.color false
 
 # File path to write logs to (in addition to stdout)
-#log.logPath /var/log/torii/torii.log
+#log.log-path /var/log/torii/torii.log
 
 # Enable development-mode logging
 #log.debug false
 
 log:
-  logLevel: INFO
+  log-level: INFO
   encoding: console
   color: false
 
@@ -44,12 +44,12 @@ log:
 # On first launch, open http://<host>:<port>/ui to set the admin password.
 
 # Bind address. Use 0.0.0.0 to listen on all interfaces.
-#apiServer.host 0.0.0.0
+#api-server.host 0.0.0.0
 
 # Bind port.
-#apiServer.port 27000
+#api-server.port 27000
 
-apiServer:
+api-server:
   host: 0.0.0.0
   port: 27000
 
@@ -61,33 +61,33 @@ apiServer:
 #session.lifetime 16h
 
 # Session idle timeout.
-#session.idleTimeout 60m
+#session.idle-timeout 60m
 
 # Expired session cleanup interval.
-#session.cleanupInterval 1h
+#session.cleanup-interval 1h
 
 # Set the Secure flag on session cookies (disable if not using HTTPS for the UI).
-#session.cookieSecure true
+#session.cookie-secure true
 
 # Set the HttpOnly flag on session cookies.
-#session.cookieHttpOnly true
+#session.cookie-http-only true
 
 # SameSite cookie attribute: strict, lax, or none.
-#session.cookieSameSite lax
+#session.cookie-same-site lax
 
 #session:
 #  lifetime: 16h
-#  idleTimeout: 60m
-#  cleanupInterval: 1h
-#  cookieSecure: true
-#  cookieHttpOnly: true
-#  cookieSameSite: lax
+#  idle-timeout: 60m
+#  cleanup-interval: 1h
+#  cookie-secure: true
+#  cookie-http-only: true
+#  cookie-same-site: lax
 
 # -----------------------------------------------------------------
 # Network — HTTP listeners
 # -----------------------------------------------------------------
 #
-# Each entry under netConfig.http creates a separate listener.
+# Each entry under net-config.http creates a separate listener.
 # A listener has:
 #   - a port and bind mode (IPv4, IPv6, or both)
 #   - optional TLS configuration
@@ -100,7 +100,7 @@ apiServer:
 #
 # Within each layer, middlewares run in the order listed.
 
-netConfig:
+net-config:
 
   # -- Global middlewares (applied to ALL listeners) ---------------
   #global:

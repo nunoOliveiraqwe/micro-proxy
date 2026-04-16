@@ -8,10 +8,14 @@ import (
 	"go.uber.org/zap"
 )
 
-
 type Func func(ctx context.Context, next http.HandlerFunc, middlewareConf Config) http.HandlerFunc
 
-type Registry = map[string]Func
+type RegistryEntry struct {
+	Fn         Func
+	Terminates bool //indicates that the middleware terminates the handling, e.g, redirect
+}
+
+type Registry = map[string]RegistryEntry
 
 type Config struct {
 	Type    string                 `json:"type"`
@@ -21,21 +25,21 @@ type Config struct {
 var registry Registry
 
 func init() {
-	registry = map[string]Func{
-		"Metrics":          MetricsMiddleware,
-		"RequestId":        RequestIDMiddleware,
-		"RequestLog":       RequestLoggerMiddleware,
-		"Headers":          HeadersMiddleware,
-		"RateLimiter":      RateLimitMiddleware,
-		"CountryBlock":     CountryBlockMiddleware,
-		"IpBlock":          IpBlockMiddleware,
-		"Redirect":         RedirectMiddleware,
-		"BodySizeLimit":    BodySizeLimitMiddleware,
-		"Timeout":          TimeoutMiddleware,
-		"HoneyPot":         HoneyPotMiddleware,
-		"UserAgentBlocker": UserAgentBlockMiddleware,
-		"CircuitBreaker":   CircuitBreakerMiddleware,
-		"Cors":             CorsMiddleware,
+	registry = map[string]RegistryEntry{
+		"Metrics":          {Fn: MetricsMiddleware},
+		"RequestId":        {Fn: RequestIDMiddleware},
+		"RequestLog":       {Fn: RequestLoggerMiddleware},
+		"Headers":          {Fn: HeadersMiddleware},
+		"RateLimiter":      {Fn: RateLimitMiddleware},
+		"CountryBlock":     {Fn: CountryBlockMiddleware},
+		"IpBlock":          {Fn: IpBlockMiddleware},
+		"Redirect":         {Fn: RedirectMiddleware, Terminates: true},
+		"BodySizeLimit":    {Fn: BodySizeLimitMiddleware},
+		"Timeout":          {Fn: TimeoutMiddleware},
+		"HoneyPot":         {Fn: HoneyPotMiddleware},
+		"UserAgentBlocker": {Fn: UserAgentBlockMiddleware},
+		"CircuitBreaker":   {Fn: CircuitBreakerMiddleware},
+		"Cors":             {Fn: CorsMiddleware},
 	}
 }
 
@@ -47,7 +51,7 @@ func ApplyMiddlewares(ctx context.Context, handler http.HandlerFunc, middlewares
 	middlewares = applyDefaultMiddlewares(middlewares)
 	zap.S().Debugf("Applying middleware chain with size %d", len(middlewares))
 	for i := len(middlewares) - 1; i >= 0; i-- {
-		middleware, err := GetMiddleware(middlewares[i].Type)
+		entry, err := GetMiddleware(middlewares[i].Type)
 		if err != nil {
 			zap.S().Errorf("Error applying middleware of type %s: %v", middlewares[i].Type, err)
 			return nil, err
@@ -56,7 +60,7 @@ func ApplyMiddlewares(ctx context.Context, handler http.HandlerFunc, middlewares
 			zap.S().Warnf("Middleware options for middleware of type %s is nil. Initializing it as an empty map", middlewares[i].Type)
 			middlewares[i].Options = make(map[string]interface{})
 		}
-		handler = middleware(ctx, handler, middlewares[i])
+		handler = entry.Fn(ctx, handler, middlewares[i])
 	}
 	return handler, nil
 }
@@ -69,15 +73,15 @@ func MiddlewareExists(key string) bool {
 	return exists
 }
 
-func GetMiddleware(key string) (Func, error) {
+func GetMiddleware(key string) (RegistryEntry, error) {
 	if key == "" {
-		return nil, errors.New("middleware key cannot be empty")
+		return RegistryEntry{}, errors.New("middleware key cannot be empty")
 	}
-	middleware, exists := registry[key]
+	entry, exists := registry[key]
 	if !exists {
-		return nil, errors.New("middleware not found")
+		return RegistryEntry{}, errors.New("middleware not found")
 	}
-	return middleware, nil
+	return entry, nil
 }
 
 func GetAvailableMiddlewares() []string {
@@ -88,12 +92,21 @@ func GetAvailableMiddlewares() []string {
 	return middlewares
 }
 
+func HasTerminatingMiddleware(middlewares []Config) bool {
+	for _, m := range middlewares {
+		if entry, exists := registry[m.Type]; exists && entry.Terminates {
+			return true
+		}
+	}
+	return false
+}
+
 var defaultMiddlewareOrder = []string{"RequestId", "RequestLog", "Metrics"}
 
-var defaultMiddlewares = map[string]Func{
-	"RequestId":  RequestIDMiddleware,
-	"RequestLog": RequestLoggerMiddleware,
-	"Metrics":    MetricsMiddleware,
+var defaultMiddlewares = map[string]struct{}{
+	"RequestId":  {},
+	"RequestLog": {},
+	"Metrics":    {},
 }
 
 func applyDefaultMiddlewares(middlewares []Config) []Config {

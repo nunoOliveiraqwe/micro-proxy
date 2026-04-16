@@ -183,8 +183,8 @@ var routes = []ApplicationRoute{
 		HandlerFunc:        handleGetGlobalMetrics,
 	},
 	{
-		Name:               "Global proxy metrics",
-		Description:        "Fetches the global proxy metrics",
+		Name:               "Proxy metrics",
+		Description:        "Fetches the metrics for a specific proxy server",
 		Method:             "GET",
 		Pattern:            "/proxy/metrics/{serverId}",
 		IsAllowedBeforeFts: false,

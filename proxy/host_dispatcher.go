@@ -10,6 +10,7 @@ import (
 	"github.com/nunoOliveiraqwe/torii/config"
 	"github.com/nunoOliveiraqwe/torii/internal/ctxkeys"
 	"github.com/nunoOliveiraqwe/torii/internal/proxyutil"
+	"github.com/nunoOliveiraqwe/torii/middleware"
 	"go.uber.org/zap"
 )
 
@@ -108,11 +109,21 @@ func buildRouteSnapshot(host string, target config.RouteTarget) RouteSnapshot {
 }
 
 func buildRouteHandler(ctx context.Context, target config.RouteTarget) (http.Handler, []string, []string, error) {
-	proxy, err := buildHttpRevProxy(target.Backend, proxyutil.ProxyOptions{})
-	if err != nil {
-		return nil, nil, nil, fmt.Errorf("failed to build reverse proxy for backend %s: %w", target.Backend, err)
+	var baseHandler http.HandlerFunc
+	if target.Backend != "" {
+		proxy, err := buildHttpRevProxy(target.Backend, proxyutil.ProxyOptions{})
+		if err != nil {
+			return nil, nil, nil, fmt.Errorf("failed to build reverse proxy for backend %s: %w", target.Backend, err)
+		}
+		baseHandler = buildDefaultHttpHandler(proxy)
+	} else {
+		if !middleware.HasTerminatingMiddleware(target.Middlewares) {
+			return nil, nil, nil, fmt.Errorf("route has no backend and no terminating middleware — nothing to serve requests")
+		}
+		baseHandler = func(w http.ResponseWriter, r *http.Request) {
+			http.Error(w, "no backend configured", http.StatusBadGateway)
+		}
 	}
-	baseHandler := buildDefaultHttpHandler(proxy)
 
 	mwNames := middlewareNames(target.Middlewares)
 	backends := make([]string, 0)

@@ -1518,18 +1518,20 @@ func TestMiddlewareChain_MixedMiddlewareTypesPerLevel(t *testing.T) {
 
 	t.Run("slow backend triggers path-level timeout", func(t *testing.T) {
 		// Build a separate server with a short timeout at path level.
-		// The path rule has its own backend so prefix stripping applies:
+		// The path rule has its own backend and strip-prefix enabled:
 		// /slow-path/slow → /slow on the backend (which sleeps 5s).
 		backend2 := newEchoBackend(t)
 		port2 := getFreePort(t)
+		stripPrefix := true
 		listener2 := config.HTTPListener{
 			Port: port2,
 			Bind: config.Ipv4Flag,
 			Default: &config.RouteTarget{
 				Backend: backend2.URL,
 				Paths: []config.PathRule{{
-					Pattern: "/slow-path/*",
-					Backend: backend2.URL,
+					Pattern:     "/slow-path/*",
+					Backend:     backend2.URL,
+					StripPrefix: &stripPrefix,
 					Middlewares: []middleware.Config{{
 						Type: "Timeout",
 						Options: map[string]interface{}{
@@ -1625,6 +1627,7 @@ func TestChainBattle_RequestIdLog_HeadersCmp_BodySizeLimit(t *testing.T) {
 func TestChainBattle_GlobalRateLimit_RouteIdHeaders_PathTimeout(t *testing.T) {
 	backend := newEchoBackend(t)
 	port := getFreePort(t)
+	stripPrefix := true
 
 	globalConf := &config.GlobalConfig{
 		Middlewares: []middleware.Config{{
@@ -1647,8 +1650,9 @@ func TestChainBattle_GlobalRateLimit_RouteIdHeaders_PathTimeout(t *testing.T) {
 				}},
 			},
 			Paths: []config.PathRule{{
-				Pattern: "/timed/*",
-				Backend: backend.URL,
+				Pattern:     "/timed/*",
+				Backend:     backend.URL,
+				StripPrefix: &stripPrefix,
 				Middlewares: []middleware.Config{{
 					Type:    "Timeout",
 					Options: map[string]interface{}{"request-timeout": "200ms"},
@@ -3118,11 +3122,13 @@ func TestEdge_ServerTimeouts(t *testing.T) {
 // ═══════════════════════════════════════════════════════════════════════════
 
 func TestPathPrefixStripping_DedicatedBackend(t *testing.T) {
-	// When a path rule has its own backend, the path prefix should be
-	// stripped before forwarding. e.g. /api/users → /users on the backend.
+	// When a path rule has its own backend and strip-prefix is enabled,
+	// the path prefix should be stripped before forwarding.
+	// e.g. /api/users → /users on the backend.
 	apiBackend := newEchoBackend(t)
 	mainBackend := newEchoBackend(t)
 	port := getFreePort(t)
+	stripPrefix := true
 
 	listener := config.HTTPListener{
 		Port: port,
@@ -3130,8 +3136,9 @@ func TestPathPrefixStripping_DedicatedBackend(t *testing.T) {
 		Default: &config.RouteTarget{
 			Backend: mainBackend.URL,
 			Paths: []config.PathRule{{
-				Pattern: "/api/*",
-				Backend: apiBackend.URL,
+				Pattern:     "/api/*",
+				Backend:     apiBackend.URL,
+				StripPrefix: &stripPrefix,
 			}},
 		},
 	}
@@ -3148,6 +3155,7 @@ func TestPathPrefixStripping_NestedPrefix(t *testing.T) {
 	apiBackend := newEchoBackend(t)
 	mainBackend := newEchoBackend(t)
 	port := getFreePort(t)
+	stripPrefix := true
 
 	listener := config.HTTPListener{
 		Port: port,
@@ -3155,8 +3163,9 @@ func TestPathPrefixStripping_NestedPrefix(t *testing.T) {
 		Default: &config.RouteTarget{
 			Backend: mainBackend.URL,
 			Paths: []config.PathRule{{
-				Pattern: "/app/v1/*",
-				Backend: apiBackend.URL,
+				Pattern:     "/app/v1/*",
+				Backend:     apiBackend.URL,
+				StripPrefix: &stripPrefix,
 			}},
 		},
 	}
@@ -3785,4 +3794,94 @@ func TestEdge_NilGlobalConfig(t *testing.T) {
 	echo := readEcho(t, resp)
 	assert.Equal(t, http.StatusOK, resp.StatusCode)
 	_ = echo
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+// SECTION 29 — Redirect external-scheme-only mode
+// ═══════════════════════════════════════════════════════════════════════════
+
+func TestMiddleware_Redirect_SchemeOnly_PreservesHostAndPath(t *testing.T) {
+	backend := newEchoBackend(t)
+	port := getFreePort(t)
+	mws := []middleware.Config{{
+		Type: "Redirect",
+		Options: map[string]interface{}{
+			"mode":        "external-scheme-only",
+			"target":      "https",
+			"status-code": 301,
+		},
+	}}
+	baseURL := buildAndStart(t, simpleListener(port, backend.URL, mws), nil)
+
+	resp, err := noRedirectClient().Get(baseURL + "/some/path?q=1")
+	require.NoError(t, err)
+	defer resp.Body.Close()
+
+	assert.Equal(t, 301, resp.StatusCode)
+	loc := resp.Header.Get("Location")
+	assert.True(t, strings.HasPrefix(loc, "https://"), "location should use https scheme")
+	assert.Contains(t, loc, "/some/path", "location should preserve path")
+	assert.Contains(t, loc, "q=1", "location should preserve query")
+}
+
+func TestMiddleware_Redirect_SchemeOnly_DefaultStatusCode(t *testing.T) {
+	backend := newEchoBackend(t)
+	port := getFreePort(t)
+	mws := []middleware.Config{{
+		Type: "Redirect",
+		Options: map[string]interface{}{
+			"mode":   "external-scheme-only",
+			"target": "https",
+			// status-code intentionally omitted — should default to 302
+		},
+	}}
+	baseURL := buildAndStart(t, simpleListener(port, backend.URL, mws), nil)
+
+	resp, err := noRedirectClient().Get(baseURL + "/")
+	require.NoError(t, err)
+	defer resp.Body.Close()
+	assert.Equal(t, 302, resp.StatusCode,
+		"external-scheme-only should default to 302 when status-code is omitted")
+}
+
+func TestMiddleware_Redirect_SchemeOnly_AcceptsSchemeWithSeparator(t *testing.T) {
+	// "https://" (with separator) should be accepted as a valid target.
+	backend := newEchoBackend(t)
+	port := getFreePort(t)
+	mws := []middleware.Config{{
+		Type: "Redirect",
+		Options: map[string]interface{}{
+			"mode":        "external-scheme-only",
+			"target":      "https://",
+			"status-code": 301,
+		},
+	}}
+	baseURL := buildAndStart(t, simpleListener(port, backend.URL, mws), nil)
+
+	resp, err := noRedirectClient().Get(baseURL + "/page")
+	require.NoError(t, err)
+	defer resp.Body.Close()
+	assert.Equal(t, 301, resp.StatusCode)
+	assert.True(t, strings.HasPrefix(resp.Header.Get("Location"), "https://"))
+}
+
+func TestMiddleware_Redirect_SchemeOnly_InvalidTarget(t *testing.T) {
+	// A full URL as target should be rejected for external-scheme-only mode,
+	// causing the middleware to fail closed with 503.
+	backend := newEchoBackend(t)
+	port := getFreePort(t)
+	mws := []middleware.Config{{
+		Type: "Redirect",
+		Options: map[string]interface{}{
+			"mode":   "external-scheme-only",
+			"target": "https://example.com",
+		},
+	}}
+	baseURL := buildAndStart(t, simpleListener(port, backend.URL, mws), nil)
+
+	resp, err := noRedirectClient().Get(baseURL + "/")
+	require.NoError(t, err)
+	defer resp.Body.Close()
+	assert.Equal(t, http.StatusServiceUnavailable, resp.StatusCode,
+		"full URL target should cause misconfiguration (503) for external-scheme-only mode")
 }

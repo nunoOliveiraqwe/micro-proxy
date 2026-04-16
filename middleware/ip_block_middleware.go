@@ -2,9 +2,11 @@ package middleware
 
 import (
 	"context"
+	"fmt"
 	"net/http"
 
 	"github.com/nunoOliveiraqwe/torii/internal/netutil"
+	"github.com/nunoOliveiraqwe/torii/metrics"
 	"github.com/nunoOliveiraqwe/torii/middleware/ip_block"
 	"go.uber.org/zap"
 )
@@ -30,12 +32,16 @@ func IpBlockMiddleware(ctx context.Context, next http.HandlerFunc, conf Config) 
 		blocked, err := filter.IsBlocked(clientIP)
 		if err != nil {
 			logger.Error("IpBlockMiddleware: error checking IP", zap.String("clientIp", clientIP), zap.Error(err))
+			metrics.CreateAndAddBlockInfo(r, "IpBlock", fmt.Sprintf("An error occurred check if IP %s is blocked. err = %s",
+				clientIP,
+				err.Error()))
 			http.Error(w, "Forbidden", http.StatusForbidden)
 			return
 		}
 
 		if blocked {
 			logger.Warn("IpBlockMiddleware: blocked request", zap.String("clientIp", clientIP))
+			metrics.CreateAndAddBlockInfo(r, "IpBlock", fmt.Sprintf("Blocked IP: %s", clientIP))
 			http.Error(w, "Forbidden", http.StatusForbidden)
 			return
 		}

@@ -12,12 +12,14 @@ import (
 	"github.com/nunoOliveiraqwe/torii/metrics"
 	"github.com/nunoOliveiraqwe/torii/proxy/acme"
 	"go.uber.org/zap"
+	"golang.org/x/net/http2"
+	"golang.org/x/net/http2/h2c"
 )
 
 type ToriiHttpServer struct {
 	httpServer        *http.Server
 	serverId          string
-	handler           http.Handler
+	handler           *SwappableHandler
 	readTimeout       time.Duration
 	readHeaderTimeout time.Duration
 	writeTimeout      time.Duration
@@ -26,9 +28,11 @@ type ToriiHttpServer struct {
 	bindPort          int
 	iPV4BindInterface string
 	iPV6BindInterface string
+	disableH2C        bool
 	middlewareChain   []string
 	backends          []string
 	routes            []RouteSnapshot
+	errorMessage      string
 }
 
 func (m *ToriiHttpServer) GetProxySnapshot(metrics []*metrics.Metric) *ProxySnapshot {
@@ -42,6 +46,7 @@ func (m *ToriiHttpServer) GetProxySnapshot(metrics []*metrics.Metric) *ProxySnap
 		Metrics:         metrics,
 		Backends:        m.backends,
 		Routes:          m.routes,
+		ErrorMessage:    m.errorMessage,
 	}
 }
 
@@ -52,6 +57,13 @@ func (m *ToriiHttpServer) GetServerId() string {
 func (m *ToriiHttpServer) start(_ *acme.LegoAcmeManager) error {
 	zap.S().Infof("Starting HTTP server on %d, ipv4 = %s, ipv6 = %s", m.bindPort, m.iPV4BindInterface, m.iPV6BindInterface)
 	listeners := buildNetListeners(m.iPV4BindInterface, m.iPV6BindInterface, m.bindPort)
+	closeListeners := func() {
+		for _, ln := range listeners {
+			if err := ln.Close(); err != nil {
+				zap.S().Warnf("Failed to close listener: %v", err)
+			}
+		}
+	}
 	numberOfRequiredListeners := 0
 	if m.iPV4BindInterface != "" {
 		numberOfRequiredListeners++
@@ -61,19 +73,30 @@ func (m *ToriiHttpServer) start(_ *acme.LegoAcmeManager) error {
 	}
 	if len(listeners) == 0 {
 		zap.S().Errorf("No listeners available to start HTTP server")
+		m.errorMessage = fmt.Sprintf("No listeners available to start HTTP server on port %d", m.bindPort)
 		return fmt.Errorf("no listeners available for port %d", m.bindPort)
 	} else if len(listeners) != numberOfRequiredListeners {
 		zap.S().Errorf("Expected %d listeners based on configuration but got %d, cannot start HTTP server", numberOfRequiredListeners, len(listeners))
+		closeListeners()
+		m.errorMessage = fmt.Sprintf("Expected %d listeners based on configuration but got %d, cannot start HTTP server on port %d",
+			numberOfRequiredListeners, len(listeners), m.bindPort)
 		return fmt.Errorf("expected %d listeners based on configuration but got %d", numberOfRequiredListeners, len(listeners))
 	}
+
+	var handler http.Handler = m.handler
+	if !m.disableH2C {
+		handler = h2c.NewHandler(m.handler, &http2.Server{})
+	}
+
 	m.httpServer = &http.Server{
-		Handler:           m.handler,
+		Handler:           handler,
 		ReadTimeout:       m.readTimeout,
 		ReadHeaderTimeout: m.readHeaderTimeout,
 		WriteTimeout:      m.writeTimeout,
 		IdleTimeout:       m.idleTimeout,
 	}
 	m.isStarted.Store(true)
+	m.errorMessage = ""
 	for _, listener := range listeners {
 		go func(ln net.Listener) {
 			if err := m.httpServer.Serve(ln); err != nil && !errors.Is(err, http.ErrServerClosed) {
@@ -100,14 +123,14 @@ func (m *ToriiHttpServer) stop() error {
 }
 
 func (m *ToriiHttpServer) getHandler() http.Handler {
-	return m.handler
+	return m.handler.Load()
 }
 
 func (m *ToriiHttpServer) updateHandler(handler http.Handler) error {
+	old := m.handler.Swap(handler)
 	if m.isStarted.Load() {
-		return fmt.Errorf("HTTP server is already started, cannot update handler")
+		zap.S().Infof("Hot-swapped HTTP handler on port %d (was %T, now %T)", m.bindPort, old, handler)
 	}
-	m.handler = handler
 	return nil
 }
 

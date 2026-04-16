@@ -121,6 +121,7 @@ type PathRuleDTO struct {
 	Pattern     string                `json:"pattern"`
 	Backend     string                `json:"backend,omitempty"`
 	DropQuery   *bool                 `json:"drop_query,omitempty"`
+	StripPrefix *bool                 `json:"strip_prefix,omitempty"`
 	Middlewares []MiddlewareConfigDTO `json:"middlewares,omitempty"`
 }
 

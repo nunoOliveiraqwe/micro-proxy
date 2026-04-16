@@ -25,10 +25,11 @@ type HTTPListener struct {
 	Bind              IpFlag        `yaml:"bind" json:"bind"`
 	Interface         string        `yaml:"interface" json:"interface,omitempty"`
 	TLS               *TLSConfig    `yaml:"tls" json:"tls,omitempty"`
-	ReadTimeout       time.Duration `yaml:"read-timeout" json:"read_timeout,omitempty"`
-	ReadHeaderTimeout time.Duration `yaml:"read-header-timeout" json:"read_header_timeout,omitempty"`
-	WriteTimeout      time.Duration `yaml:"write-timeout" json:"write_timeout,omitempty"`
-	IdleTimeout       time.Duration `yaml:"idle-timeout" json:"idle_timeout,omitempty"`
+	DisableHTTP2      bool          `yaml:"disable-http2" json:"disable-http2,omitempty"`
+	ReadTimeout       time.Duration `yaml:"read-timeout" json:"read-timeout,omitempty"`
+	ReadHeaderTimeout time.Duration `yaml:"read-header-timeout" json:"read-header-timeout,omitempty"`
+	WriteTimeout      time.Duration `yaml:"write-timeout" json:"write-timeout,omitempty"`
+	IdleTimeout       time.Duration `yaml:"idle-timeout" json:"idle-timeout,omitempty"`
 	Routes            []Route       `yaml:"routes" json:"routes,omitempty"`
 	Default           *RouteTarget  `yaml:"default" json:"default,omitempty"`
 }
@@ -53,7 +54,8 @@ type Route struct {
 type PathRule struct {
 	Pattern     string              `yaml:"pattern" json:"pattern"`
 	Backend     string              `yaml:"backend" json:"backend,omitempty"`
-	DropQuery   *bool               `yaml:"drop-query" json:"drop_query,omitempty"`
+	DropQuery   *bool               `yaml:"drop-query" json:"drop-query,omitempty"`
+	StripPrefix *bool               `yaml:"strip-prefix" json:"strip-prefix,omitempty"`
 	Middlewares []middleware.Config `yaml:"middlewares" json:"middlewares,omitempty"`
 }
 
@@ -64,7 +66,7 @@ type RouteTarget struct {
 }
 
 type TLSConfig struct {
-	UseAcme bool   `yaml:"use-acme" json:"use_acme"`
+	UseAcme bool   `yaml:"use-acme" json:"use-acme"`
 	Cert    string `yaml:"cert" json:"cert,omitempty"`
 	Key     string `yaml:"key" json:"key,omitempty"`
 }

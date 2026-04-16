@@ -1845,7 +1845,7 @@
         return proxies.slice().sort(function (a, b) {
             return a.port - b.port;
         }).map(function (p) {
-            return p.port + ':' + (p.is_started ? '1' : '0');
+            return p.port + ':' + (p.is_started ? '1' : '0') + ':' + (p.errorMessage || '');
         }).join('|');
     }
 
@@ -1931,9 +1931,11 @@
                     : '<em>none</em>') + '</td>' +
                 '<td>' + badge(p.is_using_https) + '</td>' +
                 '<td>' + badge(p.is_using_acme) + '</td>' +
-                '<td>' + (p.is_started
-                    ? '<span class="badge badge-success">Running</span>'
-                    : '<span class="badge badge-danger">Stopped</span>') + '</td>' +
+                '<td>' + (p.errorMessage
+                    ? '<span class="badge badge-danger" data-tooltip="' + p.errorMessage.replace(/"/g, '&quot;') + '">Error</span>'
+                    : p.is_started
+                        ? '<span class="badge badge-success">Running</span>'
+                        : '<span class="badge badge-danger">Stopped</span>') + '</td>' +
                 '<td>' + sparkHtml + '</td>' +
                 '<td data-metrics-port="' + p.port + '">' + metricsHtmlFor(livePortMetric(p)) + '</td>' +
                 '<td>' + actionBtn + deleteBtn + '</td>' +

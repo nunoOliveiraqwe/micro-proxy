@@ -3,20 +3,20 @@
 # Full reference: https://github.com/nunoOliveiraqwe/torii/blob/main/docs/configuration.md
 
 log:
-  logLevel: INFO
+  log-level: INFO
   encoding: console
   color: false
 
-apiServer:
+api-server:
   host: 0.0.0.0
   port: 27000
 
-# Set cookieSecure to false if accessing the UI over plain HTTP.
+# Set cookie-secure to false if accessing the UI over plain HTTP.
 # Set it to true once you enable TLS.
 session:
-  cookieSecure: false
+  cookie-secure: false
 
-netConfig:
+net-config:
   http:
     - port: 80
       bind: 3

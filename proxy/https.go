@@ -14,12 +14,13 @@ import (
 	"github.com/nunoOliveiraqwe/torii/metrics"
 	"github.com/nunoOliveiraqwe/torii/proxy/acme"
 	"go.uber.org/zap"
+	"golang.org/x/net/http2"
 )
 
 type ToriiHttpsServer struct {
 	httpServer        *http.Server
 	serverId          string
-	handler           http.Handler
+	handler           *SwappableHandler
 	readTimeout       time.Duration
 	readHeaderTimeout time.Duration
 	writeTimeout      time.Duration
@@ -29,11 +30,13 @@ type ToriiHttpsServer struct {
 	iPV4BindInterface string
 	iPV6BindInterface string
 	useAcme           bool
+	disableHTTP2      bool
 	keyFilePath       string
 	certFilepath      string
 	middlewareChain   []string
 	backends          []string
 	routes            []RouteSnapshot
+	errorMessage      string
 }
 
 func (m *ToriiHttpsServer) GetProxySnapshot(metrics []*metrics.Metric) *ProxySnapshot {
@@ -47,6 +50,7 @@ func (m *ToriiHttpsServer) GetProxySnapshot(metrics []*metrics.Metric) *ProxySna
 		Metrics:         metrics,
 		Backends:        m.backends,
 		Routes:          m.routes,
+		ErrorMessage:    m.errorMessage,
 	}
 }
 
@@ -57,6 +61,20 @@ func (m *ToriiHttpsServer) GetServerId() string {
 func (m *ToriiHttpsServer) start(acmeManager *acme.LegoAcmeManager) error {
 	zap.S().Infof("Starting HTTPS server on %d, ipv4 = %s, ipv6 = %s", m.bindPort, m.iPV4BindInterface, m.iPV6BindInterface)
 	listeners := buildNetListeners(m.iPV4BindInterface, m.iPV6BindInterface, m.bindPort)
+	closeListeners := func() {
+		for _, ln := range listeners {
+			if err := ln.Close(); err != nil {
+				zap.S().Warnf("Failed to close listener: %v", err)
+			}
+		}
+	}
+	success := false
+	defer func() {
+		if !success {
+			zap.S().Warnf("HTTPS server failed to start, closing listeners")
+			closeListeners()
+		}
+	}()
 	numberOfRequiredListeners := 0
 	if m.iPV4BindInterface != "" {
 		numberOfRequiredListeners++
@@ -66,9 +84,12 @@ func (m *ToriiHttpsServer) start(acmeManager *acme.LegoAcmeManager) error {
 	}
 	if len(listeners) == 0 {
 		zap.S().Errorf("No listeners available to start HTTPS server")
+		m.errorMessage = fmt.Sprintf("No listeners available to start HTTPS server on port %d", m.bindPort)
 		return fmt.Errorf("no listeners available for port %d", m.bindPort)
 	} else if len(listeners) != numberOfRequiredListeners {
 		zap.S().Errorf("Expected %d listeners based on configuration but got %d, cannot start HTTPS server", numberOfRequiredListeners, len(listeners))
+		m.errorMessage = fmt.Sprintf("Expected %d listeners based on configuration but got %d, cannot start HTTPS server on port %d", numberOfRequiredListeners,
+			len(listeners), m.bindPort)
 		return fmt.Errorf("expected %d listeners based on configuration but got %d", numberOfRequiredListeners, len(listeners))
 	}
 	m.httpServer = &http.Server{
@@ -81,10 +102,20 @@ func (m *ToriiHttpsServer) start(acmeManager *acme.LegoAcmeManager) error {
 	if m.useAcme {
 		zap.S().Infof("Starting ACME HTTPS server")
 		if acmeManager == nil {
+			m.errorMessage = fmt.Sprintf("ACME is enabled but no ACME manager is configured for port %d", m.bindPort)
 			return fmt.Errorf("ACME is enabled but no ACME manager is configured")
+
 		}
 		m.httpServer.TLSConfig = acmeManager.GetTLSConfig()
+		if !m.disableHTTP2 {
+			if err := http2.ConfigureServer(m.httpServer, nil); err != nil {
+				m.errorMessage = fmt.Sprintf("failed to configure HTTP/2 for ACME server: %v", err)
+				return fmt.Errorf("failed to configure HTTP/2 for ACME server: %w", err)
+			}
+		}
 		m.isStarted.Store(true)
+		m.errorMessage = ""
+		success = true
 		for _, listener := range listeners {
 			tlsListener := tls.NewListener(listener, m.httpServer.TLSConfig)
 			go func(ln net.Listener) {
@@ -101,7 +132,13 @@ func (m *ToriiHttpsServer) start(acmeManager *acme.LegoAcmeManager) error {
 		m.httpServer.TLSConfig = &tls.Config{
 			MinVersion: tls.VersionTLS12,
 		}
+		if m.disableHTTP2 {
+			// ServeTLS auto-configures H2 unless TLSNextProto is a non-nil map.
+			m.httpServer.TLSNextProto = make(map[string]func(*http.Server, *tls.Conn, http.Handler))
+		}
 		m.isStarted.Store(true)
+		m.errorMessage = ""
+		success = true
 		for _, listener := range listeners {
 			go func(ln net.Listener) {
 				zap.S().Infof("Starting HTTPS server on %d, ipv4 = %s, ipv6 = %s", m.bindPort, m.iPV4BindInterface, m.iPV6BindInterface)
@@ -112,6 +149,7 @@ func (m *ToriiHttpsServer) start(acmeManager *acme.LegoAcmeManager) error {
 		}
 		return nil
 	}
+	m.errorMessage = fmt.Sprintf("HTTPS server cannot start: no ACME manager and no valid certificate/key files provided for port %d", m.bindPort)
 	return fmt.Errorf("HTTPS server cannot start: no ACME manager and no valid certificate/key files provided")
 }
 
@@ -128,13 +166,13 @@ func (m *ToriiHttpsServer) stop() error {
 }
 
 func (m *ToriiHttpsServer) getHandler() http.Handler {
-	return m.handler
+	return m.handler.Load()
 }
 
 func (m *ToriiHttpsServer) updateHandler(handler http.Handler) error {
+	old := m.handler.Swap(handler)
 	if m.isStarted.Load() {
-		return fmt.Errorf("HTTPS server is already started, cannot update handler")
+		zap.S().Infof("Hot-swapped HTTPS handler on port %d (was %T, now %T)", m.bindPort, old, handler)
 	}
-	m.handler = handler
 	return nil
 }

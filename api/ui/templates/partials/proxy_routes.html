@@ -19,7 +19,7 @@
                 <td>{{if .Interface}}{{.Interface}}{{else}}<em>all</em>{{end}}</td>
                 <td>{{if .IsUsingHTTPS}}<span class="badge badge-success">Yes</span>{{else}}<span class="badge badge-muted">No</span>{{end}}</td>
                 <td>{{if .IsUsingACME}}<span class="badge badge-info">Yes</span>{{else}}<span class="badge badge-muted">No</span>{{end}}</td>
-                <td>{{if .IsStarted}}<span class="badge badge-success">Running</span>{{else}}<span class="badge badge-danger">Stopped</span>{{end}}</td>
+                <td>{{if .ErrorMessage}}<span class="badge badge-danger" data-tooltip="{{.ErrorMessage}}">Error</span>{{else if .IsStarted}}<span class="badge badge-success">Running</span>{{else}}<span class="badge badge-danger">Stopped</span>{{end}}</td>
                 <td>{{if .MiddlewareChain}}{{join .MiddlewareChain ", "}}{{else}}<em>none</em>{{end}}</td>
             </tr>
             {{end}}

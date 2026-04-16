@@ -78,13 +78,13 @@ On first launch, open `http://127.0.0.1:27000/ui` to set your admin password.
 
 ```yaml
 log:
-  logLevel: INFO
+  log-level: INFO
 
-apiServer:
+api-server:
   host: 127.0.0.1
   port: 27000
 
-netConfig:
+net-config:
   http:
     - port: 80
       bind: 3
@@ -99,7 +99,7 @@ netConfig:
 ### With TLS and route-level security
 
 ```yaml
-netConfig:
+net-config:
   http:
     - port: 443
       bind: 3
@@ -226,7 +226,6 @@ Keeping track of what's done and what's next. This is not a roadmap, just my per
 
 
 ### Needs work
-- [x] Default `apiServer.host` to `0.0.0.0` instead of requiring it — `127.0.0.1` breaks in containers since the API becomes unreachable even with port mapping. Other proxies (Traefik, Caddy's Docker image, NPM) default to `0.0.0.0` in containers. Do I want to do the same?
 - [x] IP block lists: middleware is registered, filtering logic is stubbed out
 - [ ] Create HTTP Proxy UI: works, but the UX needs another pass
 - [ ] ACME UI: need a delete button for individual certificates, the reset button placement is bad
@@ -235,6 +234,7 @@ Keeping track of what's done and what's next. This is not a roadmap, just my per
 
 ### Up next
 - [ ] Config persistence: proxy routes created or deleted via the UI are memory-only — they need to be written back to the config file so they survive restarts - not sure if I will. maybe with an overridable flag, because if I want to expose the proxy API to the internet for dynamic route management, I don't want those changes written to disk, and if I want to manage the config through the file, I don't want the UI overwriting it. Maybe a `persist-ui-changes` flag that defaults to `false` and can be set per-route or globally. Also maybe don't even allow proxy route changes to be created. If the session is hijacked, then not much can be done if no config can be done. Ask for password when creating a proxy!!!!!
+- [ ] Wildcard host matching: `VirtualHostDispatcher` uses exact map lookup, no support for `*.home.example.com`. Implement a reversed-label trie so wildcard routes match with DNS-style semantics (one label only, most-specific wins). Priority chain: exact match → longest wildcard match → `default` → 502. Normalize to lowercase, strip trailing dots. Watch out for ACME domain collection (preserve `*.example.com` for wildcard cert issuance) and SNI matching in TLS config.
 - [ ] TCP proxying: config schema is there, implementation is not
 - [x] Make `RequestId`, `RequestLog`, and `Metrics` default on all endpoints (too easy to forget and then the dashboard shows nothing)
 - [x] Blocked IP observability: surface blocked IPs (from honeypot, UA blocker, country block) in the UI with timestamps and metadata, probably as a rolling log
@@ -243,6 +243,10 @@ Keeping track of what's done and what's next. This is not a roadmap, just my per
 - [ ] Coraza WAF integration: [Coraza](https://coraza.io/) is a full-featured open-source WAF (OWASP CRS compatible). Add it as a middleware so routes can opt into proper WAF rules alongside the existing bot defense. There's overlap with what the honeypot and UA blocker already do, but Coraza covers a much wider surface (SQLi, XSS, protocol violations, etc.).
 - [x] AbuseIPDB middleware: check client IPs against [AbuseIPDB](https://www.abuseipdb.com/) and block or flag IPs with a high abuse confidence score. Optionally report blocked IPs back (honeypot hits, rate-limit violations, etc.) so the community benefits too.
 
+
+### Known Bugs
+- [x] **ACME port leak on startup:** if a route has `use-acme: true` but ACME is not configured, the server fails to start. Starting the proxy manually afterwards returns an ACME error, but the port is already bound from the first attempt. A second manual start then fails with a "bind: address already in use" error. The listener from the failed first start is never closed.
+- [ ] **ACME config not loadable from config file:** there is no way to specify ACME configuration (provider, credentials, etc.) in the YAML config file. On first start with `use-acme: true`, it should be possible to seed the ACME configuration from the config file instead of requiring it to be set up through the UI first.
 
 ### Maybe
 - [ ] Proxy-level authentication: login pages so the proxy handles auth before forwarding to backends

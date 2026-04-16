@@ -25,4 +25,5 @@ type ProxySnapshot struct {
 	IsUsingACME     bool              `json:"is_using_acme"`
 	Metrics         []*metrics.Metric `json:"metrics"`
 	Routes          []RouteSnapshot   `json:"routes,omitempty"`
+	ErrorMessage    string            `json:"errorMessage,omitempty"`
 }

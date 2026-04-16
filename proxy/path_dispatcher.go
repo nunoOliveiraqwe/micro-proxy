@@ -29,24 +29,11 @@ func buildPathDispatcher(ctx context.Context, defaultHandler http.HandlerFunc, p
 		pathBaseHandler := defaultHandler
 		if rule.Backend != "" {
 			zap.S().Infof("Building backend handler for path rule %q with backend %q", rule.Pattern, rule.Backend)
-			opts := proxyutil.ProxyOptions{
-				DropQuery: rule.DropQuery != nil && *rule.DropQuery,
-			}
-			proxy, err := buildHttpRevProxy(rule.Backend, opts)
+			handler, err := buildPathBackendHandler(rule)
 			if err != nil {
-				return nil, nil, nil, fmt.Errorf("failed to build reverse proxy for path rule %q: %w", rule.Pattern, err)
+				return nil, nil, nil, err
 			}
-			pathBaseHandler = buildDefaultHttpHandler(proxy)
-
-			// Strip the path-rule prefix before forwarding to the backend so
-			// that the backend sees the request at its own root.  For example,
-			// a rule with pattern "/jellyfino" proxying to 192.168.1.27:2884
-			// will forward "/" instead of "/jellyfino".
-			if prefix := pathRulePrefix(rule.Pattern); prefix != "" {
-				zap.S().Infof("Stripping prefix %q for path rule %q", prefix, rule.Pattern)
-				pathBaseHandler = http.StripPrefix(prefix, pathBaseHandler).ServeHTTP
-			}
-
+			pathBaseHandler = handler
 			backends = append(backends, rule.Backend)
 		}
 
@@ -58,6 +45,16 @@ func buildPathDispatcher(ctx context.Context, defaultHandler http.HandlerFunc, p
 		}
 
 		mux.HandleFunc(pattern, handler)
+
+		// When the rule has its own backend and the pattern is a bare path
+		// (e.g. "/jellyfino"), Go's ServeMux treats it as an exact match
+		// only.  We also need a catch-all so that sub-paths like
+		// "/jellyfino/library" are routed to this backend instead of
+		// falling through to the default handler.
+		if rule.Backend != "" && !strings.HasSuffix(pattern, "/") && !strings.Contains(pattern, "{path...}") {
+			mux.HandleFunc(pattern+"/{path...}", handler)
+		}
+
 		mwNames = append(mwNames, middlewareNames(rule.Middlewares)...)
 		zap.S().Infof("Registered path rule %q with %d middlewares", pattern, len(rule.Middlewares))
 	}
@@ -66,6 +63,45 @@ func buildPathDispatcher(ctx context.Context, defaultHandler http.HandlerFunc, p
 	mux.HandleFunc("/", defaultHandler)
 
 	return &PathDispatcher{mux: mux}, mwNames, backends, nil
+}
+
+// buildPathBackendHandler creates the handler for a path rule that has its own
+// backend.  It builds the reverse proxy, injects X-Forwarded-Prefix, and
+// optionally strips the path prefix when explicitly requested.
+func buildPathBackendHandler(rule config.PathRule) (http.HandlerFunc, error) {
+	opts := proxyutil.ProxyOptions{
+		DropQuery: rule.DropQuery != nil && *rule.DropQuery,
+	}
+	proxy, err := buildHttpRevProxy(rule.Backend, opts)
+	if err != nil {
+		return nil, fmt.Errorf("failed to build reverse proxy for path rule %q: %w", rule.Pattern, err)
+	}
+	handler := buildDefaultHttpHandler(proxy)
+
+	// Inject X-Forwarded-Prefix so that backends aware of this header
+	// (Spring Boot, ASP.NET, etc.) can generate correct absolute URLs
+	// without manual base-URL configuration.
+	if fwdPrefix := pathRulePrefix(rule.Pattern); fwdPrefix != "" {
+		inner := handler
+		handler = func(w http.ResponseWriter, r *http.Request) {
+			r.Header.Set("X-Forwarded-Prefix", fwdPrefix)
+			inner(w, r)
+		}
+	}
+
+	// Only strip the path prefix when explicitly requested.  By default the
+	// full path (including the prefix) is forwarded so that response-generated
+	// links (HTML, redirects, etc.) keep working without rewriting.  Most
+	// self-hosted apps (Jellyfin, Sonarr, …) have a "base URL" setting the
+	// user should configure to match the path prefix instead.
+	if rule.StripPrefix != nil && *rule.StripPrefix {
+		if prefix := pathRulePrefix(rule.Pattern); prefix != "" {
+			zap.S().Infof("Stripping prefix %q for path rule %q", prefix, rule.Pattern)
+			handler = http.StripPrefix(prefix, handler).ServeHTTP
+		}
+	}
+
+	return handler, nil
 }
 
 // pathRulePrefix extracts the static prefix from a path-rule pattern so it
@@ -82,6 +118,12 @@ func pathRulePrefix(pattern string) string {
 	p := strings.TrimSuffix(pattern, "*")
 	p = strings.TrimRight(p, "/")
 	if p == "" {
+		return ""
+	}
+	// If the cleaned prefix still contains a wildcard (mid-path *), we
+	// cannot use it with http.StripPrefix because the literal "*" would
+	// never match a real request path segment.
+	if strings.Contains(p, "*") {
 		return ""
 	}
 	return p

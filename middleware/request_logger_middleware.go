@@ -6,6 +6,7 @@ import (
 
 	"github.com/nunoOliveiraqwe/torii/internal/ctxkeys"
 	"go.uber.org/zap"
+	"go.uber.org/zap/zapcore"
 )
 
 var logEntryContextKey = ctxkeys.Logger
@@ -14,9 +15,20 @@ type zapLogFormatter struct {
 	logger *zap.Logger
 }
 
-func newZapLogFormatter() *zapLogFormatter {
+func newZapLogFormatter(accessLogFileName string) *zapLogFormatter {
+	conf := zap.NewProductionConfig()
+	if accessLogFileName != "" {
+		conf.OutputPaths = []string{"stdout", accessLogFileName}
+	}
+	conf.DisableCaller = false
+	conf.EncoderConfig.EncodeTime = zapcore.ISO8601TimeEncoder
+	logger, err := conf.Build()
+	if err != nil {
+		logger = zap.NewNop()
+		zap.S().Errorf("Failed to initialize request logger: %v", err)
+	}
 	return &zapLogFormatter{
-		logger: zap.L(),
+		logger: logger,
 	}
 }
 
@@ -53,10 +65,25 @@ func GetRequestLoggerFromContext(r *http.Request) *zap.Logger {
 	return zap.L()
 }
 
-func RequestLoggerMiddleware(_ context.Context, next http.HandlerFunc, _ Config) http.HandlerFunc {
-	newZapLogFormatter := newZapLogFormatter()
+func RequestLoggerMiddleware(_ context.Context, next http.HandlerFunc, conf Config) http.HandlerFunc {
+	formatterPath := parseConfig(conf)
+	newZapLogFormatter := newZapLogFormatter(formatterPath)
 	return func(w http.ResponseWriter, r *http.Request) {
 		newZapLogFormatter.LogRequest(r)
 		next.ServeHTTP(w, r)
 	}
+}
+
+func parseConfig(conf Config) string {
+	path, ok := conf.Options["request-log-path"]
+	if !ok {
+		zap.S().Info("RequestLoggerMiddleware: no request log path specified, defaulting to stdout only")
+		return ""
+	}
+	if pathStr, ok := path.(string); ok {
+		zap.S().Info("RequestLoggerMiddleware: using request log path from configuration: %s", pathStr)
+		return pathStr
+	}
+	zap.S().Warn("RequestLoggerMiddleware: request log path is not a string, defaulting to stdout only")
+	return ""
 }

@@ -239,9 +239,10 @@ func convertRouteTarget(dto RouteTargetDTO) config.RouteTarget {
 	}
 	for _, p := range dto.Paths {
 		pr := config.PathRule{
-			Pattern:   p.Pattern,
-			Backend:   p.Backend,
-			DropQuery: p.DropQuery,
+			Pattern:     p.Pattern,
+			Backend:     p.Backend,
+			DropQuery:   p.DropQuery,
+			StripPrefix: p.StripPrefix,
 		}
 		for _, m := range p.Middlewares {
 			pr.Middlewares = append(pr.Middlewares, mw.Config{

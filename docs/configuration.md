@@ -31,15 +31,15 @@
 
 | Key | Type | Default | Description |
 |---|---|---|---|
-| `log.logLevel` | `string` | `INFO` | Log level: `DEBUG`, `INFO`, `WARN`, `ERROR`. |
-| `log.logPath` | `string` | | File path to write logs to (in addition to stdout). |
-| `log.logDebug` | `bool` | `false` | Enable development-mode logging. |
+| `log.log-level` | `string` | `INFO` | Log level: `DEBUG`, `INFO`, `WARN`, `ERROR`. |
+| `log.log-path` | `string` | | File path to write logs to (in addition to stdout). |
+| `log.log-debug` | `bool` | `false` | Enable development-mode logging. |
 | `log.encoding` | `string` | `console` | Log format: `console` (human-readable) or `json` (structured). |
 | `log.color` | `bool` | `true` | Colored log levels (only applies to `console` encoding). |
-| `apiServer.host` | `string` | `127.0.0.1` | Management API bind address. |
-| `apiServer.port` | `int` | `27000` | Management API port. |
+| `api-server.host` | `string` | `127.0.0.1` | Management API bind address. |
+| `api-server.port` | `int` | `27000` | Management API port. |
 
-## HTTP Listener (`netConfig.http[]`)
+## HTTP Listener (`net-config.http[]`)
 
 | Key | Type | Description |
 |---|---|---|
@@ -69,7 +69,7 @@
 | `drop-query` | `bool` | Strip query parameters before proxying. |
 | `middlewares` | `list` | Middleware chain for this path. |
 
-## Global Middlewares (`netConfig.global`)
+## Global Middlewares (`net-config.global`)
 
 | Key | Type | Description |
 |---|---|---|
@@ -80,11 +80,11 @@
 | Key | Type | Default | Description |
 |---|---|---|---|
 | `lifetime` | `duration` | `16h` | Maximum session lifetime. |
-| `idleTimeout` | `duration` | `60m` | Session idle timeout. |
-| `cleanupInterval` | `duration` | `1h` | Expired session cleanup interval. |
-| `cookieSecure` | `bool` | `true` | Set the `Secure` flag on session cookies. |
-| `cookieHttpOnly` | `bool` | `true` | Set the `HttpOnly` flag on session cookies. |
-| `cookieSameSite` | `string` | `lax` | `SameSite` cookie attribute: `strict`, `lax`, or `none`. |
+| `idle-timeout` | `duration` | `60m` | Session idle timeout. |
+| `cleanup-interval` | `duration` | `1h` | Expired session cleanup interval. |
+| `cookie-secure` | `bool` | `true` | Set the `Secure` flag on session cookies. |
+| `cookie-http-only` | `bool` | `true` | Set the `HttpOnly` flag on session cookies. |
+| `cookie-same-site` | `string` | `lax` | `SameSite` cookie attribute: `strict`, `lax`, or `none`. |
 
 ## CLI Flags
 

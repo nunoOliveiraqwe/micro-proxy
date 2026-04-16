@@ -12,19 +12,19 @@ import (
 
 type AppConfig struct {
 	LogConfig LogConfig       `yaml:"log" json:"log"`
-	APIServer APIServerConfig `yaml:"apiServer" json:"apiServer"`
-	NetConfig NetworkConfig   `yaml:"netConfig" json:"netConfig"`
+	APIServer APIServerConfig `yaml:"api-server" json:"api-server"`
+	NetConfig NetworkConfig   `yaml:"net-config" json:"net-config"`
 	Session   SessionConfig   `yaml:"session" json:"session"`
 }
 
 type SessionConfig struct {
 	Lifetime        time.Duration `yaml:"lifetime" json:"lifetime"`
-	IdleTimeout     time.Duration `yaml:"idleTimeout" json:"idleTimeout"`
-	CleanupInterval time.Duration `yaml:"cleanupInterval" json:"cleanupInterval"`
-	CookieDomain    string        `yaml:"cookieDomain" json:"cookieDomain"`
-	CookieSecure    bool          `yaml:"cookieSecure" json:"cookieSecure"`
-	CookieHttpOnly  bool          `yaml:"cookieHttpOnly" json:"cookieHttpOnly"`
-	CookieSameSite  string        `yaml:"cookieSameSite" json:"cookieSameSite"`
+	IdleTimeout     time.Duration `yaml:"idle-timeout" json:"idle-timeout"`
+	CleanupInterval time.Duration `yaml:"cleanup-interval" json:"cleanup-interval"`
+	CookieDomain    string        `yaml:"cookie-domain" json:"cookie-domain"`
+	CookieSecure    bool          `yaml:"cookie-secure" json:"cookie-secure"`
+	CookieHttpOnly  bool          `yaml:"cookie-http-only" json:"cookie-http-only"`
+	CookieSameSite  string        `yaml:"cookie-same-site" json:"cookie-same-site"`
 }
 
 // SameSiteMode converts the string config value to an http.SameSite constant.
@@ -42,9 +42,9 @@ func (c SessionConfig) SameSiteMode() http.SameSite {
 }
 
 type LogConfig struct {
-	LogConfDebug bool   `yaml:"logDebug" json:"LogDebug"`
-	LogPath      string `yaml:"logPath" json:"logPath"`
-	LogLevel     string `yaml:"logLevel" json:"logLevel"`
+	LogConfDebug bool   `yaml:"log-debug" json:"log-debug"`
+	LogPath      string `yaml:"log-path" json:"log-path"`
+	LogLevel     string `yaml:"log-level" json:"log-level"`
 	Encoding     string `yaml:"encoding" json:"encoding"`
 	ColorEnabled *bool  `yaml:"color" json:"color"`
 }
@@ -69,9 +69,10 @@ func (c LogConfig) IsColorEnabled() bool {
 type APIServerConfig struct {
 	Port             int    `yaml:"port" json:"port"`
 	Host             string `yaml:"host" json:"host"`
-	IdleTimeoutSecs  int    `yaml:"idleTimeout" json:"idleTimeout"`
-	ReadTimeoutSecs  int    `yaml:"readTimeout" json:"readTimeout"`
-	WriteTimeoutSecs int    `yaml:"writeTimeout" json:"writeTimeout"`
+	AccessLogPath    string `yaml:"access-log-path" json:"access-log-path"`
+	IdleTimeoutSecs  int    `yaml:"idle-timeout" json:"idle-timeout"`
+	ReadTimeoutSecs  int    `yaml:"read-timeout" json:"read-timeout"`
+	WriteTimeoutSecs int    `yaml:"write-timeout" json:"write-timeout"`
 }
 
 func DefaultConfiguration() AppConfig {
