@@ -3,6 +3,7 @@ package app
 import (
 	"context"
 	"fmt"
+	"os"
 	"runtime"
 	"time"
 
@@ -14,18 +15,22 @@ import (
 	"github.com/nunoOliveiraqwe/torii/metrics"
 	"github.com/nunoOliveiraqwe/torii/proxy"
 	"github.com/nunoOliveiraqwe/torii/proxy/acme"
+	"github.com/shirou/gopsutil/v4/cpu"
+	"github.com/shirou/gopsutil/v4/mem"
+	"github.com/shirou/gopsutil/v4/process"
 	"go.uber.org/zap"
 )
 
 type SystemHealth struct {
-	UptimeSeconds  float64 `json:"uptime_seconds"`
-	Goroutines     int     `json:"goroutines"`
-	MemAllocBytes  uint64  `json:"mem_alloc_bytes"`
-	MemSysBytes    uint64  `json:"mem_sys_bytes"`
-	HeapAllocBytes uint64  `json:"heap_alloc_bytes"`
-	HeapSysBytes   uint64  `json:"heap_sys_bytes"`
-	GCPauseTotalNs uint64  `json:"gc_pause_total_ns"`
-	NumGC          uint32  `json:"num_gc"`
+	UptimeSeconds    float64 `json:"uptime_seconds"`
+	Goroutines       int     `json:"goroutines"`
+	CpuUtilPercent   float64 `json:"cpu_util_percent"`
+	ProcessRSSBytes  uint64  `json:"process_rss_bytes"`
+	ProcessMemPct    float32 `json:"process_mem_percent"`
+	SysMemTotalBytes uint64  `json:"sys_mem_total_bytes"`
+	SysMemUsedPct    float64 `json:"sys_mem_used_percent"`
+	HeapAllocBytes   uint64  `json:"heap_alloc_bytes"`
+	GCPauseTotalNs   uint64  `json:"gc_pause_total_ns"`
 }
 
 type SystemService interface {
@@ -116,19 +121,38 @@ func (sm *systemService) SessionRegistry() *session.Registry {
 }
 
 func (sm *systemService) GetSystemHealth() *SystemHealth {
-	var mem runtime.MemStats
-	runtime.CPUProfile()
-	runtime.ReadMemStats(&mem)
-	return &SystemHealth{
-		UptimeSeconds:  time.Since(sm.startTime).Seconds(),
-		Goroutines:     runtime.NumGoroutine(),
-		MemAllocBytes:  mem.Alloc,
-		MemSysBytes:    mem.Sys,
-		HeapAllocBytes: mem.HeapAlloc,
-		HeapSysBytes:   mem.HeapSys,
-		GCPauseTotalNs: mem.PauseTotalNs,
-		NumGC:          mem.NumGC,
+	h := &SystemHealth{
+		UptimeSeconds: time.Since(sm.startTime).Seconds(),
+		Goroutines:    runtime.NumGoroutine(),
 	}
+
+	if cpuPct, err := cpu.Percent(0, false); err != nil {
+		zap.S().Errorf("Failed to get CPU usage: %v", err)
+		h.CpuUtilPercent = -1
+	} else if len(cpuPct) > 0 {
+		h.CpuUtilPercent = cpuPct[0]
+	}
+
+	if proc, err := process.NewProcess(int32(os.Getpid())); err == nil {
+		if memInfo, err := proc.MemoryInfo(); err == nil {
+			h.ProcessRSSBytes = memInfo.RSS
+		}
+		if pct, err := proc.MemoryPercent(); err == nil {
+			h.ProcessMemPct = pct
+		}
+	}
+
+	if vmStat, err := mem.VirtualMemory(); err == nil {
+		h.SysMemTotalBytes = vmStat.Total
+		h.SysMemUsedPct = vmStat.UsedPercent
+	}
+
+	var ms runtime.MemStats
+	runtime.ReadMemStats(&ms)
+	h.HeapAllocBytes = ms.HeapAlloc
+	h.GCPauseTotalNs = ms.PauseTotalNs
+
+	return h
 }
 
 func (sm *systemService) GetRecentErrors(n int) []metrics.ErrorLogEntry {

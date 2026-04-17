@@ -351,26 +351,30 @@
                     <p class="stat-label">Uptime</p>
                 </div>
                 <div class="stat-card">
+                    <p class="stat-value" id="health-cpu-val">–</p>
+                    <p class="stat-label">CPU Usage</p>
+                </div>
+                <div class="stat-card">
                     <p class="stat-value" id="health-goroutines-val">–</p>
                     <p class="stat-label">Goroutines</p>
                 </div>
                 <div class="stat-card">
-                    <p class="stat-value" id="health-heap-val">–</p>
-                    <p class="stat-label">Heap Usage</p>
-                    <p class="stat-sub" id="health-heap-sub"></p>
+                    <p class="stat-value" id="health-rss-val">–</p>
+                    <p class="stat-label">Process Memory</p>
+                    <p class="stat-sub" id="health-rss-sub"></p>
                 </div>
                 <div class="stat-card">
-                    <p class="stat-value" id="health-mem-val">–</p>
+                    <p class="stat-value" id="health-sysmem-val">–</p>
                     <p class="stat-label">System Memory</p>
-                    <p class="stat-sub" id="health-mem-sub"></p>
+                    <p class="stat-sub" id="health-sysmem-sub"></p>
+                </div>
+                <div class="stat-card">
+                    <p class="stat-value" id="health-heap-val">–</p>
+                    <p class="stat-label">Heap Usage</p>
                 </div>
                 <div class="stat-card">
                     <p class="stat-value" id="health-gc-pause-val">–</p>
                     <p class="stat-label">GC Pause Total</p>
-                </div>
-                <div class="stat-card">
-                    <p class="stat-value" id="health-gc-cycles-val">–</p>
-                    <p class="stat-label">GC Cycles</p>
                 </div>
             </div>
 
@@ -1123,25 +1127,34 @@
                 parts.push(secs + 's');
                 document.getElementById('health-uptime-val').textContent = parts.join(' ');
 
+                // CPU
+                var cpuEl = document.getElementById('health-cpu-val');
+                if (h.cpu_util_percent >= 0) {
+                    cpuEl.textContent = h.cpu_util_percent.toFixed(1) + '%';
+                    cpuEl.style.color = h.cpu_util_percent > 90 ? '#e74c3c' : h.cpu_util_percent > 70 ? '#f39c12' : '#7c6ef0';
+                } else {
+                    cpuEl.textContent = '–';
+                }
+
                 // Goroutines
                 var grEl = document.getElementById('health-goroutines-val');
                 grEl.textContent = h.goroutines;
                 grEl.style.color = h.goroutines > 150 ? '#e74c3c' : h.goroutines > 80 ? '#f39c12' : '#7c6ef0';
 
-                // Heap
-                document.getElementById('health-heap-val').textContent = fmtBytes(h.heap_alloc_bytes);
-                document.getElementById('health-heap-sub').textContent = fmtBytes(h.heap_alloc_bytes) + ' / ' + fmtBytes(h.heap_sys_bytes) + ' reserved';
+                // Process memory (RSS)
+                document.getElementById('health-rss-val').textContent = fmtBytes(h.process_rss_bytes);
+                document.getElementById('health-rss-sub').textContent = h.process_mem_percent.toFixed(1) + '% of system';
 
                 // System memory
-                document.getElementById('health-mem-val').textContent = fmtBytes(h.mem_alloc_bytes);
-                document.getElementById('health-mem-sub').textContent = fmtBytes(h.mem_sys_bytes) + ' total from OS';
+                document.getElementById('health-sysmem-val').textContent = h.sys_mem_used_percent.toFixed(1) + '%';
+                document.getElementById('health-sysmem-sub').textContent = fmtBytes(h.sys_mem_total_bytes) + ' total';
+
+                // Heap
+                document.getElementById('health-heap-val').textContent = fmtBytes(h.heap_alloc_bytes);
 
                 // GC pause
                 var gcMs = h.gc_pause_total_ns / 1e6;
                 document.getElementById('health-gc-pause-val').textContent = gcMs < 1000 ? gcMs.toFixed(1) + ' ms' : (gcMs / 1000).toFixed(2) + ' s';
-
-                // GC cycles
-                document.getElementById('health-gc-cycles-val').textContent = fmtNum(h.num_gc);
             })
             .catch(function () {
             });
