@@ -9,54 +9,35 @@
 </p>
 
 <p align="center">
-  <b>A reverse proxy built for your home lab that isn't afraid of the open internet.</b>
+  <b>See everything hitting your server. Block what shouldn't be there.</b>
 </p>
 
 ---
 
-> **`v0.1.0` — early alpha.** Things will break. Things will change. But it works, and it's already running on a Pi exposed to the internet. If you find bugs, open an issue.
+<p align="center">
+  <img src="docs/screenshots/dashboard.png" alt="Torii Dashboard" width="800" />
+</p>
 
-## Why Torii?
+<p align="center">
+  <i>Live dashboard on a Raspberry Pi exposed to the internet. Every request, every blocked IP, every bot caught — in real time.</i>
+</p>
 
-You're running services at home and you want to expose some of them to the internet without managing nginx configs, certbot cron jobs, or a monitoring stack with three dependencies just to see what's going on.
+---
 
-Torii is a single binary that handles routing, TLS, rate limiting, bot defense, geo-blocking, and observability. No Docker required. No dependencies. Just the binary and a config file.
+## What is this?
 
-The dashboard was the first thing built, before the proxy even forwarded a single request. I wanted to see what was happening without spinning up Grafana, Prometheus, or ELK.
+A reverse proxy with a built-in security dashboard. One binary, one config file, no dependencies.
 
-## Screenshots
+You point it at your services, expose it to the internet, and watch what happens. Torii handles routing, TLS certificates, rate limiting, and bot defense — and shows you all of it live.
 
-|                  Dashboard                   |                    Proxy Routes                    |
-|:--------------------------------------------:|:--------------------------------------------------:|
-| ![Dashboard](docs/screenshots/dashboard.png) | ![Proxy Routes](docs/screenshots/proxy-routes.png) |
-
-|                    Activity                    |                    Under Load                    |
-|:----------------------------------------------:|:------------------------------------------------:|
-| ![Activity](docs/screenshots/activity.png)     | ![Load Test](docs/screenshots/load-test.png)     |
-
-## Features
-
-- **Routing** — HTTP/HTTPS, virtual-host routing, path-based routing with wildcards, per-path backend overrides, path stripping
-- **Automatic TLS** — Let's Encrypt via DNS-01. No port 80 required. Per-domain SNI. Background renewal.
-- **Hierarchical metrics** — global → route → path. Drill down from one dropdown. Live request/error logs via SSE.
-- **Web UI** — HTMX, no build pipeline. Dashboard, route viewer, server wizard, ACME management, API keys.
-- **Bot defense** — UA blocking (scanners, scrapers, AI crawlers), honeypot traps (`.git/config`, `wp-login.php`), optional trickster mode (tarpits, fake creds, infinite streams), GeoIP blocking
-- **Rate limiting** — token-bucket, global or per-client IP, proper `429` + `Retry-After`
-- **Circuit breaker** — stops forwarding to unhealthy backends until they recover
-- **Header validation** — set, strip, or require headers. Values from files or env vars.
-- **API keys** — scoped keys (e.g. `read_stats` for [Homepage](https://gethomepage.dev) integration)
-- **14 middlewares** — all composable, per-route or per-path. [Full list →](docs/configuration.md#middleware-reference)
-- **SQLite** — single-file DB, WAL mode, embedded migrations
-- **Debug mode** — `--debug` spins up stub backends for testing config without real services
-
-## Quick Start
+## 30-second start
 
 ```bash
 go build -o torii ./cmd/torii
-./torii -config config.yaml
+./torii -config config.yaml --debug
 ```
 
-Open `http://127.0.0.1:27000/ui` to set your admin password.
+Open `http://127.0.0.1:27000/ui`, set your password, and you're looking at live traffic. `--debug` starts stub backends so you can explore without configuring real services.
 
 ### Minimal config
 
@@ -71,40 +52,83 @@ api-server:
 net-config:
   http:
     - port: 80
-      bind: 3
       default:
         backend: http://192.168.1.50:8080
-        middlewares:
-          - type: "RequestId"
-          - type: "RequestLog"
-          - type: "Metrics"
 ```
-Full configuration reference: [docs/configuration.md](docs/configuration.md)
 
-## Architecture
+That's it. Torii adds request logging, metrics, and request IDs automatically.
 
+Full configuration reference → [docs/configuration.md](docs/configuration.md)
+
+---
+
+## What it catches
+
+Torii is running on a Raspberry Pi 3 with ports open to the internet. Here's what a typical day looks like:
+
+- **Scanners probing for vulnerabilities** — `.env`, `wp-login.php`, `.git/config` — caught by honeypot traps and auto-blocked
+- **Known scanner user agents** — Nuclei, zgrab, scrapers, AI crawlers — matched and blocked on sight
+- **IPs with known abuse history** — checked against AbuseIPDB in real time
+- **Brute-force attempts** — rate limited with proper `429` + `Retry-After`, repeat offenders blocked
+- **Traffic from unexpected countries** — geo-blocked before it reaches your services
+
+Everything that gets blocked shows up in the dashboard with timestamps, IPs, and the reason it was caught.
+
+|                    Activity Log                    |                    Under Load                    |
+|:--------------------------------------------------:|:------------------------------------------------:|
+| ![Activity](docs/screenshots/activity.png)         | ![Load Test](docs/screenshots/load-test.png)     |
+
+---
+
+## What it does
+
+**Routing** — HTTP/HTTPS, virtual-host routing, path-based routing with wildcards, per-path backend overrides.
+
+**Automatic TLS** — Let's Encrypt via DNS-01. No port 80 required. Per-domain SNI. Background renewal.
+
+**Bot defense** — UA blocking (scanners, scrapers, AI crawlers), honeypot traps with optional trickster mode (tarpits, fake credentials, infinite streams), GeoIP blocking.
+
+**Rate limiting** — Token-bucket, global or per-client IP.
+
+**Circuit breaker** — Stops forwarding to unhealthy backends until they recover.
+
+**AbuseIPDB integration** — Check client IPs against community abuse reports. Optionally report blocked IPs back.
+
+**Live dashboard** — Hierarchical metrics (global → route → path), real-time request and error logs via SSE, blocked IP log.
+
+**14 composable middlewares** — all per-route or per-path. [Full list →](docs/configuration.md#middleware-reference)
+
+---
+
+## Homepage integration
+
+Torii has scoped API keys for read-only stats access. Add this to your [Homepage](https://gethomepage.dev) config:
+
+```yaml
+- Torii:
+    icon: shield
+    href: http://127.0.0.1:27000/ui
+    widget:
+      type: customapi
+      url: http://127.0.0.1:27000/api/v1/health
+      headers:
+        X-API-Key: your-read-stats-key
+      mappings:
+        - field: total_requests
+          label: Requests
+        - field: blocked_ips
+          label: Blocked IPs
 ```
-                    ┌─────────────────────────────────────────┐
-                    │              torii                       │
-  Incoming          │                                         │
-  Request ─────────►│  Global Middlewares                      │
-                    │    ▼                                     │
-                    │  Host Dispatcher ──► Route Middlewares    │
-                    │    ▼                                     │
-                    │  Path Dispatcher ──► Path Middlewares     │
-                    │    ▼                                     │
-                    │  Reverse Proxy ──────────────────► Backend│
-                    └─────────────────────────────────────────┘
 
-  Management        ┌─────────────────────────────────────────┐
-  (localhost)       │  API Server (:27000)                     │
-                    │    ├── /ui          Web dashboard        │
-                    │    ├── /api/v1      REST API             │
-                    │    └── SSE stream   Real-time metrics    │
-                    │                                         │
-                    │  SQLite (torii.db)                       │
-                    └─────────────────────────────────────────┘
-```
+---
+
+## Screenshots
+
+|                  Dashboard                   |                    Proxy Routes                    |
+|:--------------------------------------------:|:--------------------------------------------------:|
+| ![Dashboard](docs/screenshots/dashboard.png) | ![Proxy Routes](docs/screenshots/proxy-routes.png) |
+
+---
 
 ## Installation
 
@@ -130,22 +154,16 @@ docker run -d \
 | Mount | Purpose |
 |---|---|
 | `torii-data:/data` | SQLite database (persists across restarts) |
-| `/path/to/config.yaml:/etc/torii/config.yaml` | Config file (read-write — UI can write changes back) |
+| `/path/to/config.yaml` | Config file |
 
 <details>
 <summary>Building from source (Docker)</summary>
 
 ```bash
-# Multi-stage
 docker build -f docker/Multistage.Dockerfile -t torii .
-
-# Single-stage (pre-built binary)
-CGO_ENABLED=1 go build -ldflags="-s -w -linkmode external -extldflags '-static'" -o torii ./cmd/torii
-cp torii docker/
-docker build -f docker/Dockerfile -t torii docker/
 ```
 
-> Torii uses `mattn/go-sqlite3` which requires CGO. The binary must be built with `CGO_ENABLED=1`.
+Torii uses `mattn/go-sqlite3` which requires CGO. The binary must be built with `CGO_ENABLED=1`.
 
 </details>
 
@@ -155,40 +173,31 @@ docker build -f docker/Dockerfile -t torii docker/
 dpkg -i torii_<version>_amd64.deb
 ```
 
+---
+
 ## Performance
 
-Benchmarked over HTTPS with full middleware chain (`RequestId` → `RequestLog` → `Metrics`), debug stub backends, using [`hey`](https://github.com/rakyll/hey).
+Full middleware chain over HTTPS on a **Raspberry Pi 3** (4-core ARM, 906 MB RAM):
 
-**Raspberry Pi 3** (4-core ARM, 906 MB RAM):
-
-| Concurrency | Req/s | p50 | p95 | p99 |
-|:-----------:|------:|----:|----:|----:|
-| 10 | **663** | 12 ms | 24 ms | 98 ms |
-| 100 | **656** | 146 ms | 239 ms | 359 ms |
-
-~660 req/s sustained. CPU-bound at ~3 of 4 cores, ~100 MB RSS.
+| Concurrency | Req/s | p50 | p99 |
+|:-----------:|------:|----:|----:|
+| 10 | **663** | 12 ms | 98 ms |
+| 100 | **656** | 146 ms | 359 ms |
 
 **Desktop** (AMD 9800X3D, 32 GB RAM):
 
-| Concurrency | Req/s | p50 | p95 | p99 |
-|:-----------:|------:|----:|----:|----:|
-| 100 | **9,540** | 9 ms | 12 ms | 96 ms |
-| 200 | **13,114** | 12 ms | 22 ms | 100 ms |
-| 300 | **10,189** | 15 ms | 98 ms | 333 ms |
+| Concurrency | Req/s | p50 | p99 |
+|:-----------:|------:|----:|----:|
+| 100 | **9,540** | 9 ms | 96 ms |
+| 200 | **13,114** | 12 ms | 100 ms |
 
-Peak throughput at c200: **~13K req/s** (~1.1B requests/day). Throughput drops at c300 due to TLS handshake contention.
-
-```bash
-# Run your own benchmarks
-go install github.com/rakyll/hey@latest
-./torii -config config.yaml --debug
-hey -z 1m -c 200 https://localhost:<proxy-port>/
-```
+---
 
 ## Documentation
 
 - [Configuration & Middleware Reference](docs/configuration.md)
 - [Management API](docs/api.md)
+
 
 ## TODO
 
@@ -205,7 +214,7 @@ Keeping track of what's done and what's next. This is not a roadmap, just my per
 ### Up next
 - [ ] Config persistence: proxy routes created or deleted via the UI are memory-only — they need to be written back to the config file so they survive restarts - not sure if I will. maybe with an overridable flag, because if I want to expose the proxy API to the internet for dynamic route management, I don't want those changes written to disk, and if I want to manage the config through the file, I don't want the UI overwriting it. Maybe a `persist-ui-changes` flag that defaults to `false` and can be set per-route or globally. Also maybe don't even allow proxy route changes to be created. If the session is hijacked, then not much can be done if no config can be done. Ask for password when creating a proxy!!!!!
 - [x] Wildcard host matching: `VirtualHostDispatcher` uses exact map lookup, no support for `*.home.example.com`. Replace the `map[string]http.Handler` in `VirtualHostDispatcher` with a reversed-label trie so wildcard routes match with DNS-style semantics (one label only, most-specific wins). Priority chain: exact match → longest wildcard match → `default` → 502. Normalize to lowercase, strip trailing dots. Watch out for ACME domain collection (preserve `*.example.com` for wildcard cert issuance) and SNI matching in TLS config.
-- [ ] CPU usage in system activity: add CPU usage metrics to the system health/activity dashboard alongside the existing memory and other system stats.
+- [x] CPU usage in system activity: add CPU usage metrics to the system health/activity dashboard alongside the existing memory and other system stats.
 - [ ] Terminating middleware support in UI: update the Create/Edit Proxy UI so that when a terminating middleware (e.g., Redirect) is present in the chain, the backend field becomes optional. Currently the UI always requires a backend.
 - [ ] Route editing in UI: add edit support for existing proxy routes through the web UI (there is already a comment/placeholder for this in the codebase). Users should be able to modify host, backend, middlewares, and path rules for an existing route without deleting and recreating it.
 - [ ] TCP proxying: config schema is there, implementation is not
