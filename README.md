@@ -241,4 +241,4 @@ Keeping track of what's done and what's next. This is not a roadmap, just my per
 
 ## License
 
-[Apache License 2.0](LICENSE)
+[GNU Affero General Public License v3.0](LICENSE)
