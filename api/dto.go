@@ -88,6 +88,7 @@ type CreateProxyServerRequest struct {
 	Bind              int             `json:"bind"` // 1=IPv4, 2=IPv6, 3=both
 	Interface         string          `json:"interface,omitempty"`
 	TLS               *TLSConfigDTO   `json:"tls,omitempty"`
+	DisableHTTP2      bool            `json:"disable_http2,omitempty"`
 	ReadTimeout       string          `json:"read_timeout,omitempty"` // Go duration string
 	ReadHeaderTimeout string          `json:"read_header_timeout,omitempty"`
 	WriteTimeout      string          `json:"write_timeout,omitempty"`
@@ -111,18 +112,20 @@ type RouteDTO struct {
 
 // RouteTargetDTO mirrors config.RouteTarget. Middlewares use middleware.Config directly.
 type RouteTargetDTO struct {
-	Backend     string                `json:"backend"`
-	Middlewares []MiddlewareConfigDTO `json:"middlewares,omitempty"`
-	Paths       []PathRuleDTO         `json:"paths,omitempty"`
+	Backend         string                `json:"backend"`
+	Middlewares     []MiddlewareConfigDTO `json:"middlewares,omitempty"`
+	Paths           []PathRuleDTO         `json:"paths,omitempty"`
+	DisableDefaults bool                  `json:"disable_default_middlewares,omitempty"`
 }
 
 // PathRuleDTO mirrors config.PathRule.
 type PathRuleDTO struct {
-	Pattern     string                `json:"pattern"`
-	Backend     string                `json:"backend,omitempty"`
-	DropQuery   *bool                 `json:"drop_query,omitempty"`
-	StripPrefix *bool                 `json:"strip_prefix,omitempty"`
-	Middlewares []MiddlewareConfigDTO `json:"middlewares,omitempty"`
+	Pattern         string                `json:"pattern"`
+	Backend         string                `json:"backend,omitempty"`
+	DropQuery       *bool                 `json:"drop_query,omitempty"`
+	StripPrefix     *bool                 `json:"strip_prefix,omitempty"`
+	Middlewares     []MiddlewareConfigDTO `json:"middlewares,omitempty"`
+	DisableDefaults bool                  `json:"disable_default_middlewares,omitempty"`
 }
 
 type MiddlewareConfigDTO struct {

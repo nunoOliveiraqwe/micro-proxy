@@ -1,6 +1,7 @@
 package api
 
 import (
+	"errors"
 	"fmt"
 	"net"
 	"net/http"
@@ -11,6 +12,7 @@ import (
 	"github.com/nunoOliveiraqwe/torii/internal/app"
 	"github.com/nunoOliveiraqwe/torii/internal/netutil"
 	mw "github.com/nunoOliveiraqwe/torii/middleware"
+	"github.com/nunoOliveiraqwe/torii/proxy"
 	"go.uber.org/zap"
 )
 
@@ -109,7 +111,9 @@ func handleGetNetworkInterfaces(_ app.SystemService) http.HandlerFunc {
 			http.Error(writer, "Failed to list network interfaces", http.StatusInternalServerError)
 			return
 		}
-		var result []NetworkInterfaceDTO
+		result := []NetworkInterfaceDTO{
+			{Name: "All Interfaces", IPv4: "0.0.0.0", IPv6: "::"},
+		}
 		for _, iface := range ifaces {
 			if iface.Flags&net.FlagUp == 0 {
 				continue
@@ -149,6 +153,16 @@ func handleCreateHttpProxyServer(svc app.SystemService) http.HandlerFunc {
 			http.Error(w, "At least one route or a default route is required", http.StatusBadRequest)
 			return
 		}
+		if req.Default != nil && req.Default.Backend == "" && !hasTerminatingMiddlewareDTO(req.Default.Middlewares) {
+			http.Error(w, "Default route requires a backend or a terminating middleware", http.StatusBadRequest)
+			return
+		}
+		for _, route := range req.Routes {
+			if route.Target.Backend == "" && !hasTerminatingMiddlewareDTO(route.Target.Middlewares) {
+				http.Error(w, fmt.Sprintf("Route %q requires a backend or a terminating middleware", route.Host), http.StatusBadRequest)
+				return
+			}
+		}
 		conf, err := convertToHTTPListener(req)
 		if err != nil {
 			logger.Error("Invalid listener configuration", zap.Error(err))
@@ -170,11 +184,20 @@ func handleCreateHttpProxyServer(svc app.SystemService) http.HandlerFunc {
 	}
 }
 
+func hasTerminatingMiddlewareDTO(middlewares []MiddlewareConfigDTO) bool {
+	configs := make([]mw.Config, len(middlewares))
+	for i, m := range middlewares {
+		configs[i] = mw.Config{Type: m.Type, Options: m.Options}
+	}
+	return mw.HasTerminatingMiddleware(configs)
+}
+
 func convertToHTTPListener(req *CreateProxyServerRequest) (config.HTTPListener, error) {
 	conf := config.HTTPListener{
-		Port:      req.Port,
-		Interface: req.Interface,
-		Bind:      config.IpFlag(req.Bind),
+		Port:         req.Port,
+		Interface:    req.Interface,
+		Bind:         config.IpFlag(req.Bind),
+		DisableHTTP2: req.DisableHTTP2,
 	}
 	if req.ReadTimeout != "" {
 		d, err := time.ParseDuration(req.ReadTimeout) //i can't fucking believe this shit existed
@@ -229,7 +252,8 @@ func convertToHTTPListener(req *CreateProxyServerRequest) (config.HTTPListener, 
 
 func convertRouteTarget(dto RouteTargetDTO) config.RouteTarget {
 	target := config.RouteTarget{
-		Backend: dto.Backend,
+		Backend:         dto.Backend,
+		DisableDefaults: dto.DisableDefaults,
 	}
 	for _, m := range dto.Middlewares {
 		target.Middlewares = append(target.Middlewares, mw.Config{
@@ -239,10 +263,11 @@ func convertRouteTarget(dto RouteTargetDTO) config.RouteTarget {
 	}
 	for _, p := range dto.Paths {
 		pr := config.PathRule{
-			Pattern:     p.Pattern,
-			Backend:     p.Backend,
-			DropQuery:   p.DropQuery,
-			StripPrefix: p.StripPrefix,
+			Pattern:         p.Pattern,
+			Backend:         p.Backend,
+			DropQuery:       p.DropQuery,
+			StripPrefix:     p.StripPrefix,
+			DisableDefaults: p.DisableDefaults,
 		}
 		for _, m := range p.Middlewares {
 			pr.Middlewares = append(pr.Middlewares, mw.Config{
@@ -269,5 +294,125 @@ func handleGetMetricForConnection(systemService app.SystemService) http.HandlerF
 		logger.Info("Fetching metric for connection", zap.String("serverId", serverId))
 		metrics := systemService.GetGlobalMetricsManager().GetAllMetricsByServer(serverId)
 		WriteResponseAsJSON(metrics, writer)
+	}
+}
+
+func handleGetProxyConfig(svc app.SystemService) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		logger := mw.GetRequestLoggerFromContext(r)
+		port := r.PathValue("serverId")
+		portInt, err := strconv.Atoi(port)
+		if err != nil {
+			http.Error(w, "Invalid port format", http.StatusBadRequest)
+			return
+		}
+		conf := svc.GetProxyConfig(portInt)
+		if conf == nil {
+			http.Error(w, "Proxy not found", http.StatusNotFound)
+			return
+		}
+		resp := configToDTO(conf)
+		logger.Info("Returning proxy config", zap.Int("port", portInt))
+		WriteResponseAsJSON(resp, w)
+	}
+}
+
+func configToDTO(conf *config.HTTPListener) CreateProxyServerRequest {
+	dto := CreateProxyServerRequest{
+		Port:         conf.Port,
+		Bind:         int(conf.Bind),
+		Interface:    conf.Interface,
+		DisableHTTP2: conf.DisableHTTP2,
+	}
+	if conf.TLS != nil {
+		dto.TLS = &TLSConfigDTO{
+			UseAcme: conf.TLS.UseAcme,
+			Cert:    conf.TLS.Cert,
+			Key:     conf.TLS.Key,
+		}
+	}
+	if conf.ReadTimeout > 0 {
+		dto.ReadTimeout = conf.ReadTimeout.String()
+	}
+	if conf.ReadHeaderTimeout > 0 {
+		dto.ReadHeaderTimeout = conf.ReadHeaderTimeout.String()
+	}
+	if conf.WriteTimeout > 0 {
+		dto.WriteTimeout = conf.WriteTimeout.String()
+	}
+	if conf.IdleTimeout > 0 {
+		dto.IdleTimeout = conf.IdleTimeout.String()
+	}
+	if conf.Default != nil {
+		defDTO := routeTargetToDTO(*conf.Default)
+		dto.Default = &defDTO
+	}
+	for _, route := range conf.Routes {
+		dto.Routes = append(dto.Routes, RouteDTO{
+			Host:   route.Host,
+			Target: routeTargetToDTO(route.Target),
+		})
+	}
+	return dto
+}
+
+func routeTargetToDTO(t config.RouteTarget) RouteTargetDTO {
+	dto := RouteTargetDTO{Backend: t.Backend, DisableDefaults: t.DisableDefaults}
+	for _, m := range t.Middlewares {
+		mDTO := MiddlewareConfigDTO{Type: m.Type, Options: m.Options}
+		dto.Middlewares = append(dto.Middlewares, mDTO)
+	}
+	for _, p := range t.Paths {
+		pDTO := PathRuleDTO{
+			Pattern:         p.Pattern,
+			Backend:         p.Backend,
+			DropQuery:       p.DropQuery,
+			StripPrefix:     p.StripPrefix,
+			DisableDefaults: p.DisableDefaults,
+		}
+		for _, m := range p.Middlewares {
+			pDTO.Middlewares = append(pDTO.Middlewares, MiddlewareConfigDTO{Type: m.Type, Options: m.Options})
+		}
+		dto.Paths = append(dto.Paths, pDTO)
+	}
+	return dto
+}
+
+func handleEditProxy(svc app.SystemService) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		logger := mw.GetRequestLoggerFromContext(r)
+		port := r.PathValue("serverId")
+		portInt, err := strconv.Atoi(port)
+		if err != nil {
+			http.Error(w, "Invalid port format", http.StatusBadRequest)
+			return
+		}
+		req, err := DecodeJSONBody[CreateProxyServerRequest](r)
+		if err != nil {
+			logger.Error("Failed to decode edit request", zap.Error(err))
+			http.Error(w, "Invalid request body: "+err.Error(), http.StatusBadRequest)
+			return
+		}
+		req.Port = portInt
+		conf, err := convertToHTTPListener(req)
+		if err != nil {
+			logger.Error("Invalid listener configuration", zap.Error(err))
+			http.Error(w, "Invalid configuration: "+err.Error(), http.StatusBadRequest)
+			return
+		}
+		if err := svc.EditProxy(portInt, conf); err != nil {
+			if errors.Is(err, proxy.ErrProxyNotFound) {
+				http.Error(w, "Proxy not found", http.StatusNotFound)
+				return
+			}
+			logger.Error("Failed to edit proxy", zap.Error(err))
+			http.Error(w, "Failed to edit proxy: "+err.Error(), http.StatusInternalServerError)
+			return
+		}
+		logger.Info("Proxy edited", zap.Int("port", portInt))
+		WriteResponseAsJSON(map[string]interface{}{
+			"status": "updated",
+			"port":   conf.Port,
+		}, w)
 	}
 }

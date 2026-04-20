@@ -31,6 +31,7 @@ type OptionField struct {
 type MiddlewareSchema struct {
 	Name        string        `json:"name"`
 	Description string        `json:"description"`
+	Terminates  bool          `json:"terminates"`
 	Fields      []OptionField `json:"fields"`
 }
 
@@ -48,7 +49,7 @@ var cacheFields = []OptionField{
 
 // GetMiddlewareSchemas returns the schema for all available middlewares.
 func GetMiddlewareSchemas() []MiddlewareSchema {
-	return []MiddlewareSchema{
+	schemas := []MiddlewareSchema{
 		{
 			Name:        "RequestId",
 			Description: "Generates unique request IDs for tracing requests across proxied services.",
@@ -281,4 +282,12 @@ func GetMiddlewareSchemas() []MiddlewareSchema {
 			},
 		},
 	}
+	for i, s := range schemas {
+		if entry, exists := registry[s.Name]; exists && entry.Terminates {
+			schemas[i].Terminates = true
+		} else {
+			schemas[i].Terminates = false
+		}
+	}
+	return schemas
 }

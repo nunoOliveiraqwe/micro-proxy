@@ -1,6 +1,7 @@
 {{ define "title"}} – Dashboard{{ end }}
 {{ define "head"}}
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.7/dist/chart.umd.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/js-yaml@4.1.0/dist/js-yaml.min.js"></script>
 {{ end }}
 {{ define "body"}}
 <div id="toast-container" class="toast-container"></div>
@@ -237,10 +238,23 @@
                                     </label>
                                     <label style="font-size:0.85rem;margin-bottom:0.25rem;">
                                         Key Path
-                                        <input type="text" id="lf-tls-key" placeholder="/path/to/key.pem" style="margin-bottom:0.5rem;">
+                                        <div style="display:flex;gap:0.25rem;align-items:center;">
+                                            <input type="text" id="lf-tls-key" placeholder="/path/to/key.pem" style="margin-bottom:0.5rem;flex:1;">
+                                            <button type="button" class="outline" style="margin-bottom:0.5rem;padding:0.3rem 0.6rem;font-size:0.8rem;white-space:nowrap;" onclick="openFileBrowser('lf-tls-key', '.pem,.key')">Browse</button>
+                                        </div>
                                     </label>
                                 </div>
                             </div>
+                        </div>
+
+                        <div class="lf-section">
+                            <h4>Protocol</h4>
+                            <fieldset style="margin:0;padding:0;border:none;">
+                                <label style="display:inline-flex;align-items:center;gap:0.4rem;font-size:0.85rem;cursor:pointer;margin-bottom:0.5rem;">
+                                    <input type="checkbox" id="lf-disable-http2" role="switch"> Disable HTTP/2
+                                </label>
+                            </fieldset>
+                            <p style="font-size:0.75rem;color:var(--pico-muted-color);margin:0;">When enabled, only HTTP/1.1 connections will be accepted (or H2C disabled for plain HTTP).</p>
                         </div>
 
                         <div class="lf-section">
@@ -289,6 +303,12 @@
                                 </label>
                                 <details class="lf-mw-section" open>
                                     <summary>Middleware Chain</summary>
+                                    <fieldset style="margin:0.5rem 0 0.5rem;padding:0;border:none;">
+                                        <label style="display:inline-flex;align-items:center;gap:0.4rem;font-size:0.8rem;cursor:pointer;">
+                                            <input type="checkbox" id="lf-default-disable-defaults" role="switch"> Disable default middlewares
+                                        </label>
+                                        <p style="font-size:0.72rem;color:var(--pico-muted-color);margin:0.15rem 0 0;">When unchecked, RequestId, RequestLog and Metrics are automatically prepended.</p>
+                                    </fieldset>
                                     <div id="lf-default-mw"></div>
                                 </details>
                                 <details class="lf-mw-section" style="margin-top:0.75rem;">
@@ -318,8 +338,19 @@
                     <div class="lf-panel" id="lf-panel-3" style="display:none;">
                         <div class="lf-section">
                             <h4>Review Configuration</h4>
-                            <p style="font-size:0.8rem;color:var(--pico-muted-color);margin:-0.5rem 0 0.75rem;">Review the full configuration before creating the HTTP proxy server. It will be created in a stopped state.</p>
+                            <p id="lf-review-subtitle" style="font-size:0.8rem;color:var(--pico-muted-color);margin:-0.5rem 0 0.75rem;">Review the full configuration before creating the HTTP proxy server. It will be created in a stopped state.</p>
+                            <div style="display:flex;gap:0.5rem;margin-bottom:0.75rem;">
+                                <button type="button" class="lf-review-tab active" data-review-tab="yaml" style="padding:0.3rem 0.8rem;font-size:0.78rem;">YAML</button>
+                                <button type="button" class="lf-review-tab" data-review-tab="json" style="padding:0.3rem 0.8rem;font-size:0.78rem;">JSON</button>
+                                <button type="button" class="lf-review-tab" data-review-tab="edit-yaml" style="padding:0.3rem 0.8rem;font-size:0.78rem;">✏️ Edit YAML</button>
+                                <button type="button" class="lf-review-tab" data-review-tab="edit-json" style="padding:0.3rem 0.8rem;font-size:0.78rem;">✏️ Edit JSON</button>
+                            </div>
                             <pre class="lf-review-pre" id="lf-review-json"></pre>
+                            <textarea id="lf-review-editor" style="display:none;width:100%;min-height:350px;font-family:monospace;font-size:0.8rem;tab-size:2;white-space:pre;resize:vertical;padding:0.75rem;border-radius:var(--pico-border-radius);background:var(--pico-code-background-color);color:var(--pico-code-color);border:1px solid var(--pico-muted-border-color);"></textarea>
+                            <textarea id="lf-review-editor-json" style="display:none;width:100%;min-height:350px;font-family:monospace;font-size:0.8rem;tab-size:2;white-space:pre;resize:vertical;padding:0.75rem;border-radius:var(--pico-border-radius);background:var(--pico-code-background-color);color:var(--pico-code-color);border:1px solid var(--pico-muted-border-color);"></textarea>
+                            <p id="lf-review-editor-hint" style="display:none;font-size:0.75rem;color:var(--pico-muted-color);margin:0.25rem 0 0;">Edit the YAML directly. Changes here will be used when you submit.</p>
+                            <p id="lf-review-editor-error" style="display:none;font-size:0.75rem;color:var(--pico-del-color);margin:0.25rem 0 0;"></p>
+                            <div id="lf-edit-impact" style="display:none;margin-top:0.75rem;padding:0.6rem 0.8rem;border-radius:0.3rem;font-size:0.8rem;line-height:1.5;"></div>
                         </div>
 
                         <div style="display:flex;justify-content:space-between;gap:0.5rem;">
@@ -1463,6 +1494,7 @@
         var header = el.querySelector('.req-header');
         var row = buildBlockRow(entry);
         header.insertAdjacentElement('afterend', row);
+        // Trim excess rows (children beyond header + MAX_BLOCK_ENTRIES)
         while (el.children.length > MAX_BLOCK_ENTRIES + 1) {
             el.removeChild(el.lastElementChild);
         }
@@ -1918,12 +1950,16 @@
             '<th>ACME</th><th>Status</th><th>Traffic</th><th>Metrics</th><th>Actions</th>' +
             '</tr></thead><tbody>';
         proxies.forEach(function (p) {
-            var actionBtn = p.is_started
-                ? '<button class="badge badge-danger proxy-action-btn" data-port="' + p.port + '" data-action="stop">Stop</button>'
-                : '<button class="badge badge-success proxy-action-btn" data-port="' + p.port + '" data-action="start">Start</button>';
-            var deleteBtn = !p.is_started
-                ? ' <button class="badge badge-danger proxy-delete-btn" data-port="' + p.port + '" style="cursor:pointer;">Delete</button>'
-                : '';
+            var actions = '<div class="proxy-actions">';
+            if (p.is_started) {
+                actions += '<button class="act-btn act-stop proxy-action-btn" data-port="' + p.port + '" data-action="stop" title="Stop">\u25A0\uFE0E</button>';
+                actions += '<button class="act-btn act-edit proxy-edit-btn" data-port="' + p.port + '" title="Edit">\u270E\uFE0E</button>';
+            } else {
+                actions += '<button class="act-btn act-start proxy-action-btn" data-port="' + p.port + '" data-action="start" title="Start">\u25B6\uFE0E</button>';
+                actions += '<button class="act-btn act-edit proxy-edit-btn" data-port="' + p.port + '" title="Edit">\u270E\uFE0E</button>';
+                actions += '<button class="act-btn act-delete proxy-delete-btn" data-port="' + p.port + '" title="Delete">\u2715\uFE0E</button>';
+            }
+            actions += '</div>';
             var sparkHtml = p.is_started
                 ? '<canvas class="sparkline" data-connection="' + connectionKey(p) + '" width="60" height="30"></canvas>'
                 : '<span style="color:var(--pico-muted-color);font-size:0.75rem">–</span>';
@@ -1951,7 +1987,7 @@
                         : '<span class="badge badge-danger">Stopped</span>') + '</td>' +
                 '<td>' + sparkHtml + '</td>' +
                 '<td data-metrics-port="' + p.port + '">' + metricsHtmlFor(livePortMetric(p)) + '</td>' +
-                '<td>' + actionBtn + deleteBtn + '</td>' +
+                '<td>' + actions + '</td>' +
                 '</tr>';
             // Expandable detail row for routes
             if (routeCount > 0) {
@@ -1978,6 +2014,11 @@
         el.querySelectorAll('.proxy-delete-btn').forEach(function (btn) {
             btn.addEventListener('click', function () {
                 deleteProxy(this.getAttribute('data-port'));
+            });
+        });
+        el.querySelectorAll('.proxy-edit-btn').forEach(function (btn) {
+            btn.addEventListener('click', function () {
+                editProxy(parseInt(this.getAttribute('data-port')));
             });
         });
         el.querySelectorAll('.route-toggle-btn').forEach(function (btn) {
@@ -2056,6 +2097,152 @@
             .catch(function () {
                 showToast('Failed to delete proxy on port ' + port, 'error');
             });
+    }
+
+    function editProxy(port) {
+        // Fetch the original creation config for this proxy
+        fetch('/api/v1/proxy/routes/' + port + '/config', {credentials: 'same-origin'})
+            .then(function(resp) {
+                if (resp.status === 401) { window.location.href = '/ui/login'; return null; }
+                if (!resp.ok) return resp.text().then(function(t) { showToast(t || 'Failed to load proxy config', 'error'); return null; });
+                return resp.json();
+            })
+            .then(function(data) {
+                if (!data) return;
+                lfEditOriginalConfig = JSON.parse(JSON.stringify(data));  // deep copy
+                initListenerWizard();
+                // Wait a tick for interfaces dropdown to populate, then fill form
+                setTimeout(function() { lfPopulateForm(data); }, 300);
+            })
+            .catch(function() {
+                showToast('Failed to load proxy config for port ' + port, 'error');
+            });
+    }
+
+    function lfPopulateForm(data) {
+        var savedOrigConfig = lfEditOriginalConfig;  // preserve before reset clears it
+        lfResetForm();
+        lfEditMode = true;
+        lfEditPort = data.port;
+        lfEditOriginalConfig = savedOrigConfig;
+
+        // Update panel title and submit button
+        document.querySelector('#create-proxy-panel > div:first-child h4').textContent = 'Edit HTTP Proxy Server \u2014 Port ' + data.port;
+        document.getElementById('lf-submit').textContent = 'Save Changes';
+        document.getElementById('lf-review-subtitle').textContent = 'Review the changes before applying. The impact indicator below shows whether this edit requires a restart.';
+
+        // Step 1: Server settings
+        document.getElementById('lf-port').value = data.port;
+        document.getElementById('lf-port').readOnly = true;
+        document.getElementById('lf-port').style.opacity = '0.6';
+
+        // Interface
+        var ifaceSel = document.getElementById('lf-interface');
+        if (data.interface) {
+            var found = false;
+            for (var i = 0; i < ifaceSel.options.length; i++) {
+                if (ifaceSel.options[i].value === data.interface) { ifaceSel.value = data.interface; found = true; break; }
+            }
+            if (!found) {
+                var opt = document.createElement('option');
+                opt.value = data.interface; opt.textContent = data.interface;
+                ifaceSel.appendChild(opt); ifaceSel.value = data.interface;
+            }
+        }
+
+        // Bind
+        if (data.bind) document.getElementById('lf-bind').value = data.bind;
+
+        // TLS
+        if (data.tls) {
+            document.getElementById('lf-tls-enable').checked = true;
+            document.getElementById('lf-tls-fields').style.display = '';
+            if (data.tls.use_acme) {
+                document.getElementById('lf-tls-acme').checked = true;
+                document.getElementById('lf-tls-cert-fields').style.display = 'none';
+            } else {
+                document.getElementById('lf-tls-acme').checked = false;
+                document.getElementById('lf-tls-cert-fields').style.display = '';
+                if (data.tls.cert) document.getElementById('lf-tls-cert').value = data.tls.cert;
+                if (data.tls.key) document.getElementById('lf-tls-key').value = data.tls.key;
+            }
+        }
+
+        // Timeouts
+        if (data.disable_http2) document.getElementById('lf-disable-http2').checked = true;
+        if (data.read_timeout) document.getElementById('lf-timeout-read').value = data.read_timeout;
+        if (data.read_header_timeout) document.getElementById('lf-timeout-read-header').value = data.read_header_timeout;
+        if (data.write_timeout) document.getElementById('lf-timeout-write').value = data.write_timeout;
+        if (data.idle_timeout) document.getElementById('lf-timeout-idle').value = data.idle_timeout;
+
+        // Step 2: Default route
+        if (data.default) {
+            document.getElementById('lf-default-enable').checked = true;
+            document.getElementById('lf-default-route-fields').style.display = '';
+            document.getElementById('lf-default-backend').value = data.default.backend || '';
+            if (data.default.disable_default_middlewares) {
+                document.getElementById('lf-default-disable-defaults').checked = true;
+            }
+            if (data.default.middlewares && data.default.middlewares.length > 0 && lfDefaultMwChain) {
+                data.default.middlewares.forEach(function(m) { lfDefaultMwChain.add(m.type, m.options || {}); });
+            }
+            if (data.default.paths && data.default.paths.length > 0) {
+                data.default.paths.forEach(function(p) {
+                    var pathObj = lfCreatePathCard(document.getElementById('lf-default-paths'), lfDefaultPaths);
+                    pathObj.el.querySelector('.lf-path-pattern').value = p.pattern || '';
+                    pathObj.el.querySelector('.lf-path-backend').value = p.backend || '';
+                    if (p.drop_query) pathObj.el.querySelector('.lf-path-drop-query').checked = true;
+                    if (p.strip_prefix) pathObj.el.querySelector('.lf-path-drop-path').checked = true;
+                    if (p.disable_default_middlewares) {
+                        var pddCb = pathObj.el.querySelector('.lf-path-disable-defaults');
+                        if (pddCb) pddCb.checked = true;
+                    }
+                    if (p.middlewares && p.middlewares.length > 0) {
+                        p.middlewares.forEach(function(m) { pathObj.mwChain.add(m.type, m.options || {}); });
+                    }
+                });
+            }
+        }
+
+        // Step 2: Host routes
+        if (data.routes && data.routes.length > 0) {
+            data.routes.forEach(function(route) {
+                var routeObj = lfCreateHostRouteCard();
+                routeObj.el.querySelector('.lf-route-host').value = route.host || '';
+                routeObj.el.querySelector('.lf-route-backend').value = (route.target && route.target.backend) || '';
+                var target = route.target || {};
+                if (target.disable_default_middlewares) {
+                    var ddCb = routeObj.el.querySelector('.lf-route-disable-defaults');
+                    if (ddCb) ddCb.checked = true;
+                }
+                if (target.middlewares && target.middlewares.length > 0) {
+                    target.middlewares.forEach(function(m) { routeObj.mwChain.add(m.type, m.options || {}); });
+                }
+                if (target.paths && target.paths.length > 0) {
+                    var pathsContainer = routeObj.el.querySelector('.lf-route-paths-container');
+                    target.paths.forEach(function(p) {
+                        var pathObj = lfCreatePathCard(pathsContainer, routeObj.paths);
+                        pathObj.el.querySelector('.lf-path-pattern').value = p.pattern || '';
+                        pathObj.el.querySelector('.lf-path-backend').value = p.backend || '';
+                        if (p.drop_query) pathObj.el.querySelector('.lf-path-drop-query').checked = true;
+                        if (p.strip_prefix) pathObj.el.querySelector('.lf-path-drop-path').checked = true;
+                        if (p.disable_default_middlewares) {
+                            var pddCb = pathObj.el.querySelector('.lf-path-disable-defaults');
+                            if (pddCb) pddCb.checked = true;
+                        }
+                        if (p.middlewares && p.middlewares.length > 0) {
+                            p.middlewares.forEach(function(m) { pathObj.mwChain.add(m.type, m.options || {}); });
+                        }
+                    });
+                }
+            });
+        }
+
+        // Open the panel
+        var panel = document.getElementById('create-proxy-panel');
+        panel.style.display = '';
+        document.getElementById('toggle-create-proxy').textContent = '\u2212 Cancel';
+        panel.scrollIntoView({ behavior: 'smooth', block: 'start' });
     }
 
     function badge(val) {
@@ -2516,6 +2703,9 @@
     var lfDefaultPaths = []; // [{id, el, mwChain}]
     var lfIdCounter = 0;
     var lfCurrentStep = 1;
+    var lfEditMode = false;
+    var lfEditPort = null;
+    var lfEditOriginalConfig = null;  // stores the original config fetched for edit
 
     // --- Wizard step navigation ---
     function lfShowStep(step) {
@@ -2566,6 +2756,15 @@
         return true;
     }
 
+    function lfHasTerminatingMiddleware(mwChain) {
+        if (!mwChain || !lfSchemas) return false;
+        var items = mwChain.collect();
+        return items.some(function(m) {
+            var schema = lfSchemas.find(function(s) { return s.name === m.type; });
+            return schema && schema.terminates;
+        });
+    }
+
     function lfValidateStep2() {
         var hasDefault = document.getElementById('lf-default-enable').checked;
         var hasRoutes = lfHostRoutes.length > 0;
@@ -2575,8 +2774,8 @@
         }
         if (hasDefault) {
             var backend = document.getElementById('lf-default-backend').value.trim();
-            if (!backend) {
-                showToast('Default route requires a backend URL.', 'error'); return false;
+            if (!backend && !lfHasTerminatingMiddleware(lfDefaultMwChain)) {
+                showToast('Default route requires a backend URL or a terminating middleware (e.g. Redirect).', 'error'); return false;
             }
         }
         for (var i = 0; i < lfHostRoutes.length; i++) {
@@ -2584,7 +2783,7 @@
             var host = r.el.querySelector('.lf-route-host').value.trim();
             var bk = r.el.querySelector('.lf-route-backend').value.trim();
             if (!host) { showToast('Route #' + (i+1) + ' requires a host.', 'error'); return false; }
-            if (!bk) { showToast('Route "' + host + '" requires a backend URL.', 'error'); return false; }
+            if (!bk && !lfHasTerminatingMiddleware(r.mwChain)) { showToast('Route "' + host + '" requires a backend URL or a terminating middleware (e.g. Redirect).', 'error'); return false; }
         }
         return true;
     }
@@ -2771,19 +2970,10 @@
                         el.querySelectorAll('input:checked').forEach(function(cb) { val.push(cb.value); });
                         if (val.length === 0) return;
                     } else if (otype === 'stringlist') {
-                        val = [];
-                        el.querySelectorAll('.mw-stringlist-row input').forEach(function(inp) {
-                            var v = inp.value.trim(); if (v) val.push(v);
-                        });
+                        val = lfCollectStringListValues(el);
                         if (val.length === 0) return;
                     } else if (otype === 'map') {
-                        val = {};
-                        el.querySelectorAll('.mw-map-row').forEach(function(row) {
-                            var inputs = row.querySelectorAll('input');
-                            var k = inputs[0].value.trim();
-                            var v = inputs[1].value.trim();
-                            if (k) val[k] = v;
-                        });
+                        val = lfCollectMapTagValues(el);
                         if (Object.keys(val).length === 0) return;
                     } else if (otype === 'int') {
                         if (el.value === '') return;
@@ -2914,30 +3104,21 @@
                 sl.setAttribute('data-option-key', f.key);
                 sl.setAttribute('data-option-type', 'stringlist');
                 var arr = Array.isArray(val) ? val : [];
-                arr.forEach(function(v) { lfAddStringListRow(sl, v); });
+                lfInitTagInput(sl, arr);
                 wrap.appendChild(sl);
-                var addBtn = document.createElement('button');
-                addBtn.type = 'button'; addBtn.className = 'mw-stringlist-add';
-                addBtn.textContent = '+ Add';
-                addBtn.addEventListener('click', function() { lfAddStringListRow(sl, ''); });
-                wrap.appendChild(addBtn);
             } else if (f.type === 'map') {
                 var lbl5 = document.createElement('label');
-                lbl5.textContent = f.label + (f.required ? '' : ' (optional)');
+                lbl5.textContent = f.label + ' (key:value)' + (f.required ? '' : ' (optional)');
                 wrap.appendChild(lbl5);
                 var mp = document.createElement('div');
-                mp.className = 'mw-stringlist';
                 mp.setAttribute('data-option-key', f.key);
                 mp.setAttribute('data-option-type', 'map');
+                var initMap = {};
                 if (val && typeof val === 'object' && !Array.isArray(val)) {
-                    Object.keys(val).forEach(function(k) { lfAddMapRow(mp, k, val[k]); });
+                    initMap = val;
                 }
+                lfInitMapTagInput(mp, initMap);
                 wrap.appendChild(mp);
-                var addBtn2 = document.createElement('button');
-                addBtn2.type = 'button'; addBtn2.className = 'mw-stringlist-add';
-                addBtn2.textContent = '+ Add';
-                addBtn2.addEventListener('click', function() { lfAddMapRow(mp, '', ''); });
-                wrap.appendChild(addBtn2);
             } else {
                 var lbl6 = document.createElement('label');
                 lbl6.textContent = f.label + (f.required ? '' : ' (optional)');
@@ -2961,6 +3142,210 @@
             }
             container.appendChild(wrap);
         });
+    }
+
+    function lfSplitTagInput(raw) {
+        return raw.split(/[\t,\n\r]+/).map(function(v) { return v.trim(); }).filter(Boolean);
+    }
+
+    function lfPushUnique(arr, val) {
+        if (arr.indexOf(val) === -1) arr.push(val);
+    }
+
+    function lfAddTag(container, value) {
+        var v = (value || '').trim();
+        if (!v) return;
+        var exists = false;
+        container.querySelectorAll('.mw-tag').forEach(function(tag) {
+            if (tag.getAttribute('data-value') === v) exists = true;
+        });
+        if (exists) return;
+
+        var tag = document.createElement('span');
+        tag.className = 'mw-tag';
+        tag.setAttribute('data-value', v);
+
+        var label = document.createElement('span');
+        label.textContent = v;
+        tag.appendChild(label);
+
+        var btn = document.createElement('button');
+        btn.type = 'button';
+        btn.textContent = 'x';
+        btn.setAttribute('aria-label', 'Remove');
+        btn.addEventListener('click', function() { tag.remove(); });
+        tag.appendChild(btn);
+
+        var list = container.querySelector('.mw-tag-list');
+        if (list) list.appendChild(tag);
+    }
+
+    function lfInitTagInput(container, values) {
+        container.classList.add('mw-tag-input');
+
+        var tagList = document.createElement('div');
+        tagList.className = 'mw-tag-list';
+        var input = document.createElement('input');
+        input.type = 'text';
+        input.className = 'mw-tag-editor';
+        input.placeholder = 'Type and press Enter, comma, or Tab';
+
+        container.appendChild(tagList);
+        container.appendChild(input);
+
+        (values || []).forEach(function(v) { lfAddTag(container, v); });
+
+        input.addEventListener('keydown', function(e) {
+            if ((e.key === ',' || e.key === 'Enter' || e.key === 'Tab') && !e.shiftKey) {
+                e.preventDefault();
+                var raw = input.value;
+                lfSplitTagInput(raw).forEach(function(v) { lfAddTag(container, v); });
+                input.value = '';
+                return;
+            }
+            if (e.key === 'Backspace' && input.value === '') {
+                var tags = container.querySelectorAll('.mw-tag');
+                var last = tags[tags.length - 1];
+                if (last) last.remove();
+            }
+        });
+
+        input.addEventListener('blur', function() {
+            var raw = input.value;
+            lfSplitTagInput(raw).forEach(function(v) { lfAddTag(container, v); });
+            input.value = '';
+        });
+
+        input.addEventListener('paste', function(e) {
+            var text = (e.clipboardData || window.clipboardData).getData('text');
+            if (!text) return;
+            if (/[\t,\n\r]/.test(text)) {
+                e.preventDefault();
+                lfSplitTagInput(text).forEach(function(v) { lfAddTag(container, v); });
+            }
+        });
+    }
+
+    function lfCollectStringListValues(container) {
+        var values = [];
+        var tags = container.querySelectorAll('.mw-tag');
+        if (tags.length > 0) {
+            tags.forEach(function(tag) {
+                var v = tag.getAttribute('data-value');
+                if (v) lfPushUnique(values, v);
+            });
+        }
+
+        var editor = container.querySelector('.mw-tag-editor');
+        if (editor && editor.value.trim()) {
+            lfSplitTagInput(editor.value).forEach(function(v) { lfPushUnique(values, v); });
+        }
+
+        if (tags.length > 0 || editor) return values;
+
+        container.querySelectorAll('.mw-stringlist-row input').forEach(function(inp) {
+            var v = inp.value.trim();
+            if (v) lfPushUnique(values, v);
+        });
+        return values;
+    }
+
+    function lfAddMapTag(container, key, value) {
+        var display = key + ':' + value;
+        // check for duplicate
+        var existing = container.querySelectorAll('.mw-tag');
+        for (var i = 0; i < existing.length; i++) {
+            if (existing[i].getAttribute('data-key') === key) {
+                existing[i].setAttribute('data-value', value);
+                existing[i].querySelector('span').textContent = display;
+                return;
+            }
+        }
+        var tagList = container.querySelector('.mw-tag-list');
+        var tag = document.createElement('span');
+        tag.className = 'mw-tag';
+        tag.setAttribute('data-key', key);
+        tag.setAttribute('data-value', value);
+        tag.innerHTML = '<span>' + display.replace(/</g, '&lt;') + '</span><button type="button">✕</button>';
+        tag.querySelector('button').addEventListener('click', function() { tag.remove(); });
+        tagList.appendChild(tag);
+    }
+
+    function lfParseMapEntry(text) {
+        var idx = text.indexOf(':');
+        if (idx < 1) return null;
+        var k = text.substring(0, idx).trim();
+        var v = text.substring(idx + 1).trim();
+        if (!k) return null;
+        return { key: k, value: v };
+    }
+
+    function lfInitMapTagInput(container, initMap) {
+        container.className = 'mw-tag-input';
+        var tagList = document.createElement('span');
+        tagList.className = 'mw-tag-list';
+        container.appendChild(tagList);
+
+        var input = document.createElement('input');
+        input.type = 'text';
+        input.className = 'mw-tag-editor';
+        input.placeholder = 'key:value then Enter';
+        container.appendChild(input);
+
+        Object.keys(initMap).forEach(function(k) {
+            lfAddMapTag(container, k, initMap[k]);
+        });
+
+        input.addEventListener('keydown', function(e) {
+            if (e.key === 'Backspace' && !input.value) {
+                var tags = tagList.querySelectorAll('.mw-tag');
+                if (tags.length) tags[tags.length - 1].remove();
+                return;
+            }
+            if (e.key === 'Enter' || e.key === 'Tab' || e.key === ',') {
+                var text = input.value.trim();
+                if (!text) { if (e.key !== 'Tab') e.preventDefault(); return; }
+                e.preventDefault();
+                var entry = lfParseMapEntry(text);
+                if (entry) lfAddMapTag(container, entry.key, entry.value);
+                input.value = '';
+            }
+        });
+
+        input.addEventListener('blur', function() {
+            var text = input.value.trim();
+            if (!text) return;
+            var entry = lfParseMapEntry(text);
+            if (entry) { lfAddMapTag(container, entry.key, entry.value); input.value = ''; }
+        });
+
+        input.addEventListener('paste', function(e) {
+            var text = (e.clipboardData || window.clipboardData).getData('text');
+            if (!text) return;
+            if (/[\t,\n\r]/.test(text)) {
+                e.preventDefault();
+                lfSplitTagInput(text).forEach(function(v) {
+                    var entry = lfParseMapEntry(v);
+                    if (entry) lfAddMapTag(container, entry.key, entry.value);
+                });
+            }
+        });
+    }
+
+    function lfCollectMapTagValues(container) {
+        var result = {};
+        container.querySelectorAll('.mw-tag').forEach(function(tag) {
+            var k = tag.getAttribute('data-key');
+            var v = tag.getAttribute('data-value');
+            if (k) result[k] = v || '';
+        });
+        // also grab anything left in the editor
+        var editor = container.querySelector('.mw-tag-editor');
+        if (editor && editor.value.trim()) {
+            var entry = lfParseMapEntry(editor.value.trim());
+            if (entry) result[entry.key] = entry.value;
+        }
+        return result;
     }
 
     function lfAddStringListRow(container, val) {
@@ -3010,6 +3395,12 @@
             '</div>' +
             '<details class="lf-mw-section">' +
             '<summary>Path Middleware Chain</summary>' +
+            '<fieldset style="margin:0.5rem 0 0.5rem;padding:0;border:none;">' +
+            '<label style="display:inline-flex;align-items:center;gap:0.4rem;font-size:0.78rem;cursor:pointer;">' +
+            '<input type="checkbox" class="lf-path-disable-defaults" role="switch"> Disable default middlewares' +
+            '</label>' +
+            '<p style="font-size:0.72rem;color:var(--pico-muted-color);margin:0.15rem 0 0;">When unchecked, RequestId, RequestLog and Metrics are automatically prepended.</p>' +
+            '</fieldset>' +
             '<div class="lf-path-mw-container"></div>' +
             '</details>';
 
@@ -3063,6 +3454,12 @@
             '</div>' +
             '<details class="lf-mw-section" open>' +
             '<summary>Middleware Chain</summary>' +
+            '<fieldset style="margin:0.5rem 0 0.5rem;padding:0;border:none;">' +
+            '<label style="display:inline-flex;align-items:center;gap:0.4rem;font-size:0.8rem;cursor:pointer;">' +
+            '<input type="checkbox" class="lf-route-disable-defaults" role="switch"> Disable default middlewares' +
+            '</label>' +
+            '<p style="font-size:0.72rem;color:var(--pico-muted-color);margin:0.15rem 0 0;">When unchecked, RequestId, RequestLog and Metrics are automatically prepended.</p>' +
+            '</fieldset>' +
             '<div class="lf-route-mw-container"></div>' +
             '</details>' +
             '<details class="lf-mw-section" style="margin-top:0.75rem;">' +
@@ -3112,6 +3509,9 @@
             if (backend) entry.backend = backend;
             if (p.el.querySelector('.lf-path-drop-path').checked) entry.drop_path = true;
             if (p.el.querySelector('.lf-path-drop-query').checked) entry.drop_query = true;
+            if (p.el.querySelector('.lf-path-disable-defaults') && p.el.querySelector('.lf-path-disable-defaults').checked) {
+                entry.disable_default_middlewares = true;
+            }
             var mws = p.mwChain.collect();
             if (mws.length > 0) entry.middlewares = mws;
             result.push(entry);
@@ -3146,11 +3546,19 @@
         if (wt) payload.write_timeout = wt;
         if (it) payload.idle_timeout = it;
 
+        // Disable HTTP/2
+        if (document.getElementById('lf-disable-http2').checked) {
+            payload.disable_http2 = true;
+        }
+
         // Default route
         if (document.getElementById('lf-default-enable').checked) {
             var defTarget = {
                 backend: document.getElementById('lf-default-backend').value.trim()
             };
+            if (document.getElementById('lf-default-disable-defaults').checked) {
+                defTarget.disable_default_middlewares = true;
+            }
             var defMws = lfDefaultMwChain ? lfDefaultMwChain.collect() : [];
             if (defMws.length > 0) defTarget.middlewares = defMws;
             var defPaths = lfCollectPaths(lfDefaultPaths);
@@ -3165,6 +3573,9 @@
                 var target = {
                     backend: r.el.querySelector('.lf-route-backend').value.trim()
                 };
+                if (r.el.querySelector('.lf-route-disable-defaults') && r.el.querySelector('.lf-route-disable-defaults').checked) {
+                    target.disable_default_middlewares = true;
+                }
                 var mws = r.mwChain.collect();
                 if (mws.length > 0) target.middlewares = mws;
                 var paths = lfCollectPaths(r.paths);
@@ -3180,10 +3591,185 @@
     }
 
     // ========== Review step ==========
-    function lfBuildReview() {
-        var payload = lfCollectPayload();
-        document.getElementById('lf-review-json').textContent = JSON.stringify(payload, null, 2);
+
+    var lfReviewMode = 'yaml';    // 'yaml' | 'edit' | 'json'
+    var lfReviewEdited = false;   // true if user touched the textarea
+    var lfReviewLastEditor = null;  // 'yaml' | 'json' — tracks which editor was last used
+
+    // --- JSON-key ↔ YAML-key mapping (matches config struct yaml tags) ---
+    var lfYamlKeyMap = {
+        'use_acme': 'use-acme',
+        'read_timeout': 'read-timeout',
+        'read_header_timeout': 'read-header-timeout',
+        'write_timeout': 'write-timeout',
+        'idle_timeout': 'idle-timeout',
+        'drop_query': 'drop-query',
+        'strip_prefix': 'strip-prefix',
+        'disable_http2': 'disable-http2',
+        'disable_default_middlewares': 'disable-default-middlewares'
+    };
+    var lfJsonKeyMap = {};
+    Object.keys(lfYamlKeyMap).forEach(function(k) { lfJsonKeyMap[lfYamlKeyMap[k]] = k; });
+
+    function lfRenameKeys(obj, map) {
+        if (Array.isArray(obj)) return obj.map(function(v) { return lfRenameKeys(v, map); });
+        if (obj && typeof obj === 'object') {
+            var out = {};
+            Object.keys(obj).forEach(function(k) {
+                out[map[k] || k] = lfRenameKeys(obj[k], map);
+            });
+            return out;
+        }
+        return obj;
     }
+
+    function lfPayloadToYaml(payload) {
+        var yamlObj = lfRenameKeys(payload, lfYamlKeyMap);
+        return jsyaml.dump(yamlObj, { indent: 2, lineWidth: -1, noRefs: true, sortKeys: false });
+    }
+
+    function lfYamlToPayload(yamlText) {
+        var parsed = jsyaml.load(yamlText);
+        return lfRenameKeys(parsed, lfJsonKeyMap);
+    }
+
+    // --- Review tab switching ---
+    document.querySelectorAll('.lf-review-tab').forEach(function(btn) {
+        btn.addEventListener('click', function() {
+            var tab = this.getAttribute('data-review-tab');
+            lfReviewMode = tab;
+            document.querySelectorAll('.lf-review-tab').forEach(function(b) { b.classList.remove('active'); });
+            this.classList.add('active');
+            lfRenderReview();
+        });
+    });
+
+    function lfBuildReview() {
+        lfReviewEdited = false;
+        lfReviewLastEditor = null;
+        lfRenderReview();
+    }
+
+    function lfRenderReview() {
+        var formPayload = lfCollectPayload();
+        var preEl = document.getElementById('lf-review-json');
+        var yamlEditorEl = document.getElementById('lf-review-editor');
+        var jsonEditorEl = document.getElementById('lf-review-editor-json');
+        var hintEl = document.getElementById('lf-review-editor-hint');
+        var errEl = document.getElementById('lf-review-editor-error');
+        errEl.style.display = 'none';
+
+        // Determine the "current" payload: if user edited, parse from the last-edited textarea
+        var currentPayload = formPayload;
+        if (lfReviewEdited && lfReviewLastEditor) {
+            try {
+                if (lfReviewLastEditor === 'json') {
+                    currentPayload = JSON.parse(jsonEditorEl.value);
+                } else {
+                    currentPayload = lfYamlToPayload(yamlEditorEl.value);
+                }
+            } catch (e) { /* keep formPayload on parse error */ }
+        }
+
+        // Hide all, then show the right one
+        preEl.style.display = 'none';
+        yamlEditorEl.style.display = 'none';
+        jsonEditorEl.style.display = 'none';
+        hintEl.style.display = 'none';
+
+        if (lfReviewMode === 'yaml') {
+            preEl.style.display = '';
+            preEl.textContent = lfPayloadToYaml(currentPayload);
+        } else if (lfReviewMode === 'json') {
+            preEl.style.display = '';
+            preEl.textContent = JSON.stringify(currentPayload, null, 2);
+        } else if (lfReviewMode === 'edit-yaml') {
+            yamlEditorEl.style.display = '';
+            hintEl.style.display = '';
+            if (!lfReviewEdited || lfReviewLastEditor !== 'yaml') {
+                yamlEditorEl.value = lfPayloadToYaml(currentPayload);
+                lfReviewLastEditor = 'yaml';
+            }
+        } else if (lfReviewMode === 'edit-json') {
+            jsonEditorEl.style.display = '';
+            hintEl.style.display = '';
+            if (!lfReviewEdited || lfReviewLastEditor !== 'json') {
+                jsonEditorEl.value = JSON.stringify(currentPayload, null, 2);
+                lfReviewLastEditor = 'json';
+            }
+        }
+
+        // Show edit impact banner
+        var impactEl = document.getElementById('lf-edit-impact');
+        if (!lfEditMode || !lfEditOriginalConfig) {
+            impactEl.style.display = 'none';
+            return;
+        }
+        lfShowImpactBanner(impactEl, lfServerLevelChanged(lfEditOriginalConfig, currentPayload));
+    }
+
+    function lfShowImpactBanner(el, willRebuild) {
+        el.style.display = 'block';
+        el.style.color = '#fff';
+        if (willRebuild) {
+            el.style.background = 'rgba(231,76,60,0.12)';
+            el.style.borderLeft = '3px solid #e74c3c';
+            el.innerHTML = '<strong>\u26A0 Full rebuild required</strong><br>' +
+                'Server-level settings changed (TLS, timeouts, bind, or interface). ' +
+                'The proxy will be stopped, rebuilt, and restarted. ' +
+                'Active connections will be dropped and middleware state will be reset.';
+        } else {
+            el.style.background = 'rgba(46,204,113,0.1)';
+            el.style.borderLeft = '3px solid #2ecc71';
+            el.innerHTML = '<strong>\u2713 Hot-swap (zero downtime)</strong><br>' +
+                'Only routes and middleware changed. The handler will be swapped live \u2014 ' +
+                'active connections are preserved.';
+        }
+    }
+
+    // Mirror of serverLevelChanged() from the Go backend
+    function lfServerLevelChanged(old, neu) {
+        if ((old.bind || 3) !== (neu.bind || 3)) return true;
+        if ((old.interface || '') !== (neu.interface || '')) return true;
+        if (!!old.disable_http2 !== !!neu.disable_http2) return true;
+        if ((old.read_timeout || '') !== (neu.read_timeout || '')) return true;
+        if ((old.read_header_timeout || '') !== (neu.read_header_timeout || '')) return true;
+        if ((old.write_timeout || '') !== (neu.write_timeout || '')) return true;
+        if ((old.idle_timeout || '') !== (neu.idle_timeout || '')) return true;
+        var oldTLS = old.tls || null;
+        var newTLS = neu.tls || null;
+        if (!!oldTLS !== !!newTLS) return true;
+        if (oldTLS && newTLS) {
+            if (oldTLS.use_acme !== newTLS.use_acme) return true;
+            if ((oldTLS.cert || '') !== (newTLS.cert || '')) return true;
+            if ((oldTLS.key || '') !== (newTLS.key || '')) return true;
+        }
+        return false;
+    }
+
+    // Live update on YAML editor input
+    document.getElementById('lf-review-editor').addEventListener('input', function() {
+        lfReviewEdited = true;
+        lfReviewLastEditor = 'yaml';
+        if (lfEditMode && lfEditOriginalConfig) {
+            try {
+                var p = lfYamlToPayload(this.value);
+                lfShowImpactBanner(document.getElementById('lf-edit-impact'), lfServerLevelChanged(lfEditOriginalConfig, p));
+            } catch (e) { /* not valid yet */ }
+        }
+    });
+
+    // Live update on JSON editor input
+    document.getElementById('lf-review-editor-json').addEventListener('input', function() {
+        lfReviewEdited = true;
+        lfReviewLastEditor = 'json';
+        if (lfEditMode && lfEditOriginalConfig) {
+            try {
+                var p = JSON.parse(this.value);
+                lfShowImpactBanner(document.getElementById('lf-edit-impact'), lfServerLevelChanged(lfEditOriginalConfig, p));
+            } catch (e) { /* not valid yet */ }
+        }
+    });
 
     // ========== Form submission ==========
     document.getElementById('create-listener-form').addEventListener('submit', function(e) {
@@ -3191,15 +3777,41 @@
         var resultEl = document.getElementById('lf-result');
         resultEl.innerHTML = '';
 
-        if (!lfValidateStep1() || !lfValidateStep2()) return;
+        var payload;
+        var errEl = document.getElementById('lf-review-editor-error');
+        errEl.style.display = 'none';
 
-        var payload = lfCollectPayload();
+        // If the user edited a textarea, parse it and use that as the payload
+        if (lfReviewEdited) {
+            try {
+                if (lfReviewLastEditor === 'json') {
+                    payload = JSON.parse(document.getElementById('lf-review-editor-json').value);
+                } else {
+                    payload = lfYamlToPayload(document.getElementById('lf-review-editor').value);
+                }
+                if (!payload || typeof payload !== 'object') throw new Error('Expected a mapping');
+                // Ensure port and bind are numbers
+                if (payload.port) payload.port = parseInt(payload.port, 10);
+                if (payload.bind) payload.bind = parseInt(payload.bind, 10);
+            } catch (ex) {
+                errEl.textContent = 'Parse error: ' + ex.message;
+                errEl.style.display = '';
+                return;
+            }
+        } else {
+            if (!lfValidateStep1() || !lfValidateStep2()) return;
+            payload = lfCollectPayload();
+        }
         var submitBtn = document.getElementById('lf-submit');
         submitBtn.disabled = true;
-        submitBtn.textContent = 'Creating…';
 
-        fetch('/api/v1/proxy/routes/http', {
-            method: 'POST',
+        var isEdit = lfEditMode && lfEditPort;
+        var url = isEdit ? '/api/v1/proxy/routes/' + lfEditPort : '/api/v1/proxy/routes/http';
+        var method = isEdit ? 'PUT' : 'POST';
+        submitBtn.textContent = isEdit ? 'Saving…' : 'Creating…';
+
+        fetch(url, {
+            method: method,
             credentials: 'same-origin',
             headers: {'Content-Type': 'application/json'},
             body: JSON.stringify(payload)
@@ -3207,17 +3819,19 @@
         .then(function(resp) {
             if (resp.status === 401) { window.location.href = '/ui/login'; return null; }
             if (!resp.ok) return resp.text().then(function(t) {
-                resultEl.innerHTML = '<div class="error-alert">' + (t || 'Failed to create listener.') + '</div>';
+                resultEl.innerHTML = '<div class="error-alert">' + (t || (isEdit ? 'Failed to update proxy.' : 'Failed to create listener.')) + '</div>';
                 return null;
             });
             return resp.json();
         })
         .then(function(result) {
             if (result === null) return;
-            showToast('HTTP proxy server on port ' + payload.port + ' created successfully.', 'success');
+            showToast(isEdit
+                ? 'Proxy on port ' + payload.port + ' updated successfully.'
+                : 'HTTP proxy server on port ' + payload.port + ' created successfully.', 'success');
             lfResetForm();
+            lastRouteFingerprint = '';
             loadProxyRoutes();
-            // Collapse the create proxy panel
             document.getElementById('create-proxy-panel').style.display = 'none';
             document.getElementById('toggle-create-proxy').textContent = '+ Create Proxy';
         })
@@ -3226,7 +3840,7 @@
         })
         .finally(function() {
             submitBtn.disabled = false;
-            submitBtn.textContent = 'Create HTTP Proxy';
+            submitBtn.textContent = lfEditMode ? 'Save Changes' : 'Create HTTP Proxy';
         });
     });
 
@@ -3241,6 +3855,7 @@
         document.getElementById('lf-tls-cert').value = '';
         document.getElementById('lf-tls-key').value = '';
         document.getElementById('lf-tls-cert-fields').style.display = '';
+        document.getElementById('lf-disable-http2').checked = false;
         document.getElementById('lf-timeout-read').value = '';
         document.getElementById('lf-timeout-read-header').value = '';
         document.getElementById('lf-timeout-write').value = '';
@@ -3248,6 +3863,7 @@
         document.getElementById('lf-default-enable').checked = false;
         document.getElementById('lf-default-route-fields').style.display = 'none';
         document.getElementById('lf-default-backend').value = '';
+        document.getElementById('lf-default-disable-defaults').checked = false;
         if (lfDefaultMwChain) lfDefaultMwChain.clear();
         lfDefaultPaths.forEach(function(p) { p.el.remove(); });
         lfDefaultPaths = [];
@@ -3255,22 +3871,48 @@
         lfHostRoutes = [];
         document.getElementById('lf-result').innerHTML = '';
         lfShowStep(1);
+
+        // Reset edit mode
+        lfEditMode = false;
+        lfEditPort = null;
+        lfEditOriginalConfig = null;
+        document.getElementById('lf-port').readOnly = false;
+        document.getElementById('lf-port').style.opacity = '';
+        document.querySelector('#create-proxy-panel > div:first-child h4').textContent = 'Create HTTP Proxy Server';
+        document.getElementById('lf-submit').textContent = 'Create HTTP Proxy';
+        document.getElementById('lf-review-subtitle').textContent = 'Review the full configuration before creating the HTTP proxy server. It will be created in a stopped state.';
+
+        // Reset review tabs
+        lfReviewMode = 'yaml';
+        lfReviewEdited = false;
+        document.getElementById('lf-review-editor').value = '';
+        document.getElementById('lf-review-editor-json').value = '';
+        document.getElementById('lf-review-editor-error').style.display = 'none';
+        document.querySelectorAll('.lf-review-tab').forEach(function(b) {
+            b.classList.toggle('active', b.getAttribute('data-review-tab') === 'yaml');
+        });
     }
 
     // ---------- Create Proxy Panel Toggle ----------
     document.getElementById('toggle-create-proxy').addEventListener('click', function () {
         var panel = document.getElementById('create-proxy-panel');
         var isVisible = panel.style.display !== 'none';
-        panel.style.display = isVisible ? 'none' : '';
-        this.textContent = isVisible ? '+ Create Proxy' : '− Cancel';
-        if (!isVisible) {
+        if (isVisible) {
+            panel.style.display = 'none';
+            this.textContent = '+ Create Proxy';
+            lfResetForm();
+        } else {
+            lfResetForm();
             initListenerWizard();
+            panel.style.display = '';
+            this.textContent = '− Cancel';
             panel.scrollIntoView({ behavior: 'smooth', block: 'start' });
         }
     });
     document.getElementById('close-create-proxy').addEventListener('click', function () {
         document.getElementById('create-proxy-panel').style.display = 'none';
         document.getElementById('toggle-create-proxy').textContent = '+ Create Proxy';
+        lfResetForm();
     });
 
     // ---------- Bootstrap ----------

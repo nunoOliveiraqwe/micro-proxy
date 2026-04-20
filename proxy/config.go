@@ -82,6 +82,7 @@ func buildHttpServer(ctx context.Context, conf config.HTTPListener, global *conf
 			middlewareChain:   mwNames,
 			backends:          backends,
 			routes:            routeSnapshots,
+			currentConfig:     conf,
 		}, nil
 	}
 
@@ -100,5 +101,6 @@ func buildHttpServer(ctx context.Context, conf config.HTTPListener, global *conf
 		middlewareChain:   mwNames,
 		backends:          backends,
 		routes:            routeSnapshots,
+		currentConfig:     conf,
 	}, nil
 }

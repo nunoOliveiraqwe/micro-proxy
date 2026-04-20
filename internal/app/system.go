@@ -46,6 +46,8 @@ type SystemService interface {
 	StopProxy(port int) error
 	DeleteProxy(port int) error
 	AddHttpListener(conf config.HTTPListener) error
+	GetProxyConfig(port int) *config.HTTPListener
+	EditProxy(port int, conf config.HTTPListener) error
 	GetSystemHealth() *SystemHealth
 	GetRecentErrors(n int) []metrics.ErrorLogEntry
 	GetRecentRequests(n int) []metrics.RequestLogEntry
@@ -260,4 +262,53 @@ func (sm *systemService) AddHttpListener(conf config.HTTPListener) error {
 func (sm *systemService) GetConfiguredProxyServers() []*proxy.ProxySnapshot {
 	zap.S().Infof("Getting running proxies")
 	return sm.micro.GetProxyConfSnapshots()
+}
+
+func (sm *systemService) GetProxyConfig(port int) *config.HTTPListener {
+	return sm.micro.GetProxyConfig(port)
+}
+
+func (sm *systemService) EditProxy(port int, conf config.HTTPListener) error {
+	zap.S().Infof("Editing proxy on port %d", port)
+	ctx := context.WithValue(context.Background(), ctxkeys.MetricsMgr, sm.globalMetricsManager)
+
+	requiresRestart, err := sm.micro.DoesConfigRequireServerRestart(port, conf)
+	zap.S().Debugf("Config change for port %d requires server restart: %v", port, requiresRestart)
+	if err != nil {
+		return err
+	}
+
+	if requiresRestart {
+		//i need to stop, delete, recreate, and restart if it was running before
+		zap.S().Infof("Config change for port %d requires server restart, performing full restart", port)
+		wasStarted := sm.micro.IsStarted(port)
+
+		if wasStarted {
+			if err := sm.micro.StopHttpProxy(port); err != nil {
+				return fmt.Errorf("failed to stop old proxy on port %d: %w", port, err)
+			}
+		}
+		if err := sm.micro.DeleteHttpProxy(port); err != nil {
+			return fmt.Errorf("failed to delete old proxy on port %d: %w", port, err)
+		}
+		if err := sm.micro.AddHttpServer(ctx, conf, nil); err != nil {
+			return fmt.Errorf("failed to recreate proxy on port %d: %w", port, err)
+		}
+		if wasStarted {
+			//we start right away, if it was started before
+			if err := sm.micro.StartHttpProxy(port); err != nil {
+				return fmt.Errorf("proxy recreated but failed to start on port %d: %w", port, err)
+			}
+		}
+		zap.S().Infof("Proxy on port %d rebuilt successfully", port)
+		return nil
+	}
+
+	// Only routes/middleware changed — hot-swap the handler (preserves connections + middleware caches)
+	//H2C is a special case
+	if err := sm.micro.HotSwapHandler(ctx, port, conf, nil); err != nil {
+		return fmt.Errorf("failed to edit proxy on port %d: %w", port, err)
+	}
+	zap.S().Infof("Proxy on port %d edited successfully", port)
+	return nil
 }

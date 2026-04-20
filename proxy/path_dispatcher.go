@@ -39,7 +39,7 @@ func buildPathDispatcher(ctx context.Context, defaultHandler http.HandlerFunc, p
 
 		pattern := normalizePattern(rule.Pattern)
 		ctx2 := context.WithValue(ctx, ctxkeys.Path, rule.Pattern)
-		handler, err := buildMiddlewareChain(ctx2, pathBaseHandler, rule.Middlewares)
+		handler, err := buildMiddlewareChain(ctx2, pathBaseHandler, rule.Middlewares, rule.DisableDefaults)
 		if err != nil {
 			return nil, nil, nil, err
 		}

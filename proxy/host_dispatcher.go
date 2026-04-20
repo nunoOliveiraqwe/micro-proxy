@@ -134,7 +134,7 @@ func buildRouteHandler(ctx context.Context, target config.RouteTarget) (http.Han
 		baseHandler = pathHandler.ServeHTTP
 	}
 	//global mw → route mw → path mw → proxy
-	defaultHandler, err := buildMiddlewareChain(ctx, baseHandler, target.Middlewares)
+	defaultHandler, err := buildMiddlewareChain(ctx, baseHandler, target.Middlewares, target.DisableDefaults)
 	if err != nil {
 		return nil, nil, nil, fmt.Errorf("failed to build middleware chain for backend %s: %w", target.Backend, err)
 	}

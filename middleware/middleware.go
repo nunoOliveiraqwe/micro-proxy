@@ -43,12 +43,14 @@ func init() {
 	}
 }
 
-func ApplyMiddlewares(ctx context.Context, handler http.HandlerFunc, middlewares []Config) (http.HandlerFunc, error) {
+func ApplyMiddlewares(ctx context.Context, handler http.HandlerFunc, middlewares []Config, disableDefaults bool) (http.HandlerFunc, error) {
 	if handler == nil {
 		zap.S().Errorf("Handler cannot be nil when applying middleware chain")
 		return nil, errors.New("handler cannot be nil when applying middleware chain")
 	}
-	middlewares = applyDefaultMiddlewares(middlewares)
+	if !disableDefaults {
+		middlewares = applyDefaultMiddlewares(middlewares)
+	}
 	zap.S().Debugf("Applying middleware chain with size %d", len(middlewares))
 	for i := len(middlewares) - 1; i >= 0; i-- {
 		entry, err := GetMiddleware(middlewares[i].Type)
@@ -137,8 +139,6 @@ func applyDefaultMiddlewares(middlewares []Config) []Config {
 
 	zap.S().Infof("Prepending %d missing default middleware(s) to chain", len(missing))
 
-	// Prepend missing defaults so they run first (outermost), then the
-	// user-configured chain follows.
 	result := make([]Config, 0, len(missing)+len(middlewares))
 	result = append(result, missing...)
 	result = append(result, middlewares...)

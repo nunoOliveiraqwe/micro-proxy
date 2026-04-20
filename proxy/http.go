@@ -9,6 +9,7 @@ import (
 	"sync/atomic"
 	"time"
 
+	"github.com/nunoOliveiraqwe/torii/config"
 	"github.com/nunoOliveiraqwe/torii/metrics"
 	"github.com/nunoOliveiraqwe/torii/proxy/acme"
 	"go.uber.org/zap"
@@ -33,6 +34,7 @@ type ToriiHttpServer struct {
 	backends          []string
 	routes            []RouteSnapshot
 	errorMessage      string
+	currentConfig     config.HTTPListener
 }
 
 func (m *ToriiHttpServer) GetProxySnapshot(metrics []*metrics.Metric) *ProxySnapshot {
@@ -52,6 +54,39 @@ func (m *ToriiHttpServer) GetProxySnapshot(metrics []*metrics.Metric) *ProxySnap
 
 func (m *ToriiHttpServer) GetServerId() string {
 	return m.serverId
+}
+
+func (m *ToriiHttpServer) GetCurrentConfig() config.HTTPListener {
+	return m.currentConfig
+}
+
+func (m *ToriiHttpServer) DoesConfigChangeRequireServerRestart(newConf config.HTTPListener) bool {
+
+	//Bind stack or interface change is a hard restart because we need to rebind the listeners
+	if m.currentConfig.Bind != newConf.Bind || m.currentConfig.Interface != newConf.Interface {
+		return true
+	}
+
+	//port rebind required restart
+	if m.currentConfig.Port != newConf.Port {
+		return true
+	}
+	//any time change requires server restart
+	if m.currentConfig.ReadTimeout != newConf.ReadTimeout || m.currentConfig.ReadHeaderTimeout != newConf.ReadHeaderTimeout ||
+		m.currentConfig.WriteTimeout != newConf.WriteTimeout || m.currentConfig.IdleTimeout != newConf.IdleTimeout {
+		return true
+	}
+	//http2 is configured internally for TLS
+	if newConf.DisableHTTP2 != m.currentConfig.DisableHTTP2 {
+		return true
+	}
+
+	if newConf.TLS != nil {
+		//HTTP to HTTPS
+		return true
+	}
+
+	return false
 }
 
 func (m *ToriiHttpServer) start(_ *acme.LegoAcmeManager) error {

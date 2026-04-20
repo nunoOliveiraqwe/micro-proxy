@@ -40,7 +40,7 @@ func buildGlobalDispatcher(ctx context.Context, global *config.GlobalConfig, nex
 		return d, nil
 	}
 
-	wrapped, err := buildMiddlewareChain(ctx, d.ServeHTTP, global.Middlewares)
+	wrapped, err := buildMiddlewareChain(ctx, d.ServeHTTP, global.Middlewares, global.DisableDefaults)
 	if err != nil {
 		return nil, err
 	}

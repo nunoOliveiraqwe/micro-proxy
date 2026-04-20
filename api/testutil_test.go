@@ -150,11 +150,13 @@ func (t *testSystemService) GetConfiguredProxyServers() []*proxy.ProxySnapshot {
 func (t *testSystemService) GetGlobalMetricsManager() *metrics.ConnectionMetricsManager {
 	return t.metricsManager
 }
-func (t *testSystemService) GetSSEBroker() *app.SSEBroker                { return nil }
-func (t *testSystemService) StartProxy(port int) error                   { return nil }
-func (t *testSystemService) StopProxy(port int) error                    { return nil }
-func (t *testSystemService) DeleteProxy(port int) error                  { return nil }
-func (t *testSystemService) AddHttpListener(_ config.HTTPListener) error { return nil }
+func (t *testSystemService) GetSSEBroker() *app.SSEBroker                       { return nil }
+func (t *testSystemService) StartProxy(port int) error                          { return nil }
+func (t *testSystemService) StopProxy(port int) error                           { return nil }
+func (t *testSystemService) DeleteProxy(port int) error                         { return nil }
+func (t *testSystemService) AddHttpListener(_ config.HTTPListener) error        { return nil }
+func (t *testSystemService) GetProxyConfig(port int) *config.HTTPListener       { return nil }
+func (t *testSystemService) EditProxy(port int, conf config.HTTPListener) error { return nil }
 func (t *testSystemService) GetSystemHealth() *app.SystemHealth {
 	return &app.SystemHealth{}
 }

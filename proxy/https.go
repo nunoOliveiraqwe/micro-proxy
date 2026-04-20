@@ -10,6 +10,7 @@ import (
 	"sync/atomic"
 	"time"
 
+	"github.com/nunoOliveiraqwe/torii/config"
 	"github.com/nunoOliveiraqwe/torii/internal/fsutil"
 	"github.com/nunoOliveiraqwe/torii/metrics"
 	"github.com/nunoOliveiraqwe/torii/proxy/acme"
@@ -37,6 +38,7 @@ type ToriiHttpsServer struct {
 	backends          []string
 	routes            []RouteSnapshot
 	errorMessage      string
+	currentConfig     config.HTTPListener
 }
 
 func (m *ToriiHttpsServer) GetProxySnapshot(metrics []*metrics.Metric) *ProxySnapshot {
@@ -56,6 +58,43 @@ func (m *ToriiHttpsServer) GetProxySnapshot(metrics []*metrics.Metric) *ProxySna
 
 func (m *ToriiHttpsServer) GetServerId() string {
 	return m.serverId
+}
+
+func (m *ToriiHttpsServer) GetCurrentConfig() config.HTTPListener {
+	return m.currentConfig
+}
+
+func (m *ToriiHttpsServer) DoesConfigChangeRequireServerRestart(newConf config.HTTPListener) bool {
+	//Bind stack or interface change is a hard restart because we need to rebind the listeners
+	if m.currentConfig.Bind != newConf.Bind || m.currentConfig.Interface != newConf.Interface {
+		return true
+	}
+	//port rebind required restart
+	if m.currentConfig.Port != newConf.Port {
+		return true
+	}
+	//any time change requires server restart
+	if m.currentConfig.ReadTimeout != newConf.ReadTimeout || m.currentConfig.ReadHeaderTimeout != newConf.ReadHeaderTimeout ||
+		m.currentConfig.WriteTimeout != newConf.WriteTimeout || m.currentConfig.IdleTimeout != newConf.IdleTimeout {
+		return true
+	}
+	//http2 is configured internally for TLS
+	if newConf.DisableHTTP2 != m.currentConfig.DisableHTTP2 {
+		return true
+	}
+	//ACME configuration change requires restart since it changes how TLS is configured
+	newHasTLS := newConf.TLS != nil
+	if !newHasTLS {
+		//changes from HTTPS to HTTP
+		return true
+	}
+
+	if m.currentConfig.TLS.UseAcme != newConf.TLS.UseAcme || m.currentConfig.TLS.Cert != newConf.TLS.Cert ||
+		m.currentConfig.TLS.Key != newConf.TLS.Key {
+		return true
+	}
+
+	return false
 }
 
 func (m *ToriiHttpsServer) start(acmeManager *acme.LegoAcmeManager) error {

@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"net/http"
+	"reflect"
 	"sync"
 
 	"github.com/nunoOliveiraqwe/torii/config"
@@ -13,9 +14,13 @@ import (
 	"go.uber.org/zap"
 )
 
+var ErrProxyNotFound = fmt.Errorf("proxy does not exist")
+
 type MicroHttpServer interface {
 	GetServerId() string
 	GetProxySnapshot(metric []*metrics.Metric) *ProxySnapshot
+	GetCurrentConfig() config.HTTPListener
+	DoesConfigChangeRequireServerRestart(newConf config.HTTPListener) bool
 	start(acmeManager *acme.LegoAcmeManager) error
 	getHandler() http.Handler
 	updateHandler(handler http.Handler) error
@@ -197,7 +202,6 @@ func (m *Torii) AddHttpServer(ctx context.Context, conf config.HTTPListener, glo
 	return nil
 }
 
-// TODO -> implement edit endpoint to use this
 func (m *Torii) HotSwapHandler(ctx context.Context, port int, conf config.HTTPListener, globalConf *config.GlobalConfig) error {
 	m.lock.Lock()
 	defer m.lock.Unlock()
@@ -210,8 +214,17 @@ func (m *Torii) HotSwapHandler(ctx context.Context, port int, conf config.HTTPLi
 		return fmt.Errorf("no HTTP server found for port %d", port)
 	}
 
+	//skip the swap entirely if the config hasn't changed.
+	currentConfig := server.GetCurrentConfig()
+	if reflect.DeepEqual(currentConfig, conf) {
+		zap.S().Infof("Config unchanged for port %d, skipping hot-swap", port)
+		return nil
+	}
+
 	ctx = context.WithValue(ctx, ctxkeys.MetricsMgr, m.metricsManager)
 
+	//TODO -> optimize by only rebuilding the affected route's handler's instead of the whole handler chain.
+	//only swap what's changed
 	handler, mwNames, backends, routeSnapshots, err := buildHandlerChain(ctx, server.GetServerId(), conf, globalConf)
 	if err != nil {
 		return fmt.Errorf("failed to build handler chain: %w", err)
@@ -221,8 +234,7 @@ func (m *Torii) HotSwapHandler(ctx context.Context, port int, conf config.HTTPLi
 		return fmt.Errorf("failed to swap handler: %w", err)
 	}
 
-	// Update snapshot metadata so dashboards reflect the new config.
-	m.updateServerMetadata(server, mwNames, backends, routeSnapshots)
+	m.updateServerMetadata(server, mwNames, backends, routeSnapshots, conf)
 
 	zap.S().Infof("Hot-swapped handler for server on port %d", port)
 	return nil
@@ -249,6 +261,40 @@ func (m *Torii) GetProxyConfSnapshots() []*ProxySnapshot {
 		proxySnapshots = append(proxySnapshots, server.GetProxySnapshot(mts))
 	}
 	return proxySnapshots
+}
+
+func (m *Torii) GetProxyConfig(port int) *config.HTTPListener {
+	m.lock.Lock()
+	defer m.lock.Unlock()
+	if server, ok := m.stoppedHttpServers[port]; ok {
+		c := server.GetCurrentConfig()
+		return &c
+	}
+	if server, ok := m.startedHttpServers[port]; ok {
+		c := server.GetCurrentConfig()
+		return &c
+	}
+	return nil
+}
+
+func (m *Torii) IsStarted(port int) bool {
+	m.lock.Lock()
+	defer m.lock.Unlock()
+	_, ok := m.startedHttpServers[port]
+	return ok
+}
+
+func (m *Torii) DoesConfigRequireServerRestart(oldPort int, newConf config.HTTPListener) (bool, error) {
+	m.lock.Lock()
+	defer m.lock.Unlock()
+	server, ok := m.startedHttpServers[oldPort]
+	if !ok {
+		server, ok = m.stoppedHttpServers[oldPort]
+	}
+	if !ok {
+		return false, ErrProxyNotFound
+	}
+	return server.DoesConfigChangeRequireServerRestart(newConf), nil
 }
 
 func (m *Torii) initializeHttpNetworkStackFromConf(ctx context.Context, conf config.NetworkConfig) error {
@@ -301,15 +347,17 @@ func appendDomainsFromServers(servers map[int]MicroHttpServer, domains []string)
 	return domains
 }
 
-func (m *Torii) updateServerMetadata(server MicroHttpServer, mwNames []string, backends []string, routes []RouteSnapshot) {
+func (m *Torii) updateServerMetadata(server MicroHttpServer, mwNames []string, backends []string, routes []RouteSnapshot, conf config.HTTPListener) {
 	switch s := server.(type) {
 	case *ToriiHttpServer:
 		s.middlewareChain = mwNames
 		s.backends = backends
 		s.routes = routes
+		s.currentConfig = conf
 	case *ToriiHttpsServer:
 		s.middlewareChain = mwNames
 		s.backends = backends
 		s.routes = routes
+		s.currentConfig = conf
 	}
 }
