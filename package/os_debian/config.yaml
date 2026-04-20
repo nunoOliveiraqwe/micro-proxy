@@ -16,14 +16,3 @@ api-server:
 session:
   cookie-secure: false
 
-net-config:
-  http:
-    - port: 80
-      bind: 3
-      default:
-        backend: http://localhost:8080
-        middlewares:
-          - type: "RequestId"
-          - type: "RequestLog"
-          - type: "Metrics"
-
