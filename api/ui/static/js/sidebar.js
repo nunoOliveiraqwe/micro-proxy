@@ -19,6 +19,39 @@ sidebarToggle.addEventListener('click', function () {
     applySidebarState();
 });
 
+// ---------- Theme toggle ----------
+var themeToggleBtn = document.getElementById('theme-toggle');
+var themeKnob = document.getElementById('theme-knob');
+function getTheme() {
+    return document.documentElement.getAttribute('data-theme') || 'dark';
+}
+function applyThemeState() {
+    if (themeKnob) themeKnob.textContent = getTheme() === 'dark' ? '🌙' : '☀️';
+}
+applyThemeState();
+
+if (themeToggleBtn) {
+    themeToggleBtn.addEventListener('click', function () {
+        var next = getTheme() === 'dark' ? 'light' : 'dark';
+        document.documentElement.setAttribute('data-theme', next);
+        localStorage.setItem('torii-theme', next);
+        applyThemeState();
+        updateChartTheme();
+    });
+}
+
+function updateChartTheme() {
+    if (typeof chart === 'undefined' || !chart) return;
+    var isDark = getTheme() === 'dark';
+    var gridColor = isDark ? 'rgba(255,255,255,0.06)' : 'rgba(0,0,0,0.08)';
+    var tickColor = isDark ? 'rgba(255,255,255,0.5)' : 'rgba(0,0,0,0.5)';
+    chart.options.scales.x.grid.color = gridColor;
+    chart.options.scales.x.ticks.color = tickColor;
+    chart.options.scales.y.grid.color = gridColor;
+    chart.options.scales.y.ticks.color = tickColor;
+    chart.update();
+}
+
 // ---------- Page navigation ----------
 var navLinks = document.querySelectorAll('.nav-link');
 var pages = document.querySelectorAll('.page');

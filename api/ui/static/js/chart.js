@@ -30,6 +30,9 @@ var metricMeta = {
 function initChart() {
     var ctx = document.getElementById('metricsChart').getContext('2d');
     var meta = metricMeta[selectedMetric];
+    var isDark = (document.documentElement.getAttribute('data-theme') || 'dark') === 'dark';
+    var gridColor = isDark ? 'rgba(255,255,255,0.06)' : 'rgba(0,0,0,0.08)';
+    var tickColor = isDark ? 'rgba(255,255,255,0.5)' : 'rgba(0,0,0,0.5)';
     chart = new Chart(ctx, {
         type: 'line',
         data: {
@@ -49,14 +52,14 @@ function initChart() {
             plugins: {legend: {display: false}},
             scales: {
                 x: {
-                    grid: {color: 'rgba(255,255,255,0.06)'},
-                    ticks: {color: 'rgba(255,255,255,0.5)', maxRotation: 0, maxTicksLimit: 10}
+                    grid: {color: gridColor},
+                    ticks: {color: tickColor, maxRotation: 0, maxTicksLimit: 10}
                 },
                 y: {
                     beginAtZero: true,
-                    grid: {color: 'rgba(255,255,255,0.06)'},
+                    grid: {color: gridColor},
                     ticks: {
-                        color: 'rgba(255,255,255,0.5)',
+                        color: tickColor,
                         callback: function (value) {
                             var m = metricMeta[selectedMetric];
                             if (m && m.isBytes) return fmtBytes(value);

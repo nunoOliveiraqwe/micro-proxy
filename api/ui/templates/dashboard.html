@@ -35,6 +35,11 @@
             </a></li>
         </ul>
         <div class="sidebar-footer">
+            <div class="theme-pill-row">
+                <button type="button" class="theme-pill" id="theme-toggle" title="Toggle theme">
+                    <span class="theme-pill-knob" id="theme-knob">🌙</span>
+                </button>
+            </div>
             <div class="sidebar-user">
                 <div class="sidebar-user-avatar" id="sidebar-avatar">{{ slice .Username 0 1}}</div>
                 <span class="sidebar-user-name" id="sidebar-username">{{.Username}}</span>
@@ -463,7 +468,7 @@
             <div class="inner-tab-panel" id="acme-tab-config">
                 <!-- Locked notice (shown when config exists) -->
                 <div id="acme-locked-notice" style="display:none;margin-bottom:1rem;">
-                    <div style="background:rgba(124,110,240,0.1);border:1px solid rgba(124,110,240,0.25);border-radius:0.35rem;padding:0.6rem 1rem;font-size:0.85rem;color:rgba(255,255,255,0.7);">
+                    <div class="acme-locked-banner">
                         🔒 Configuration is locked. Use <strong>Reset ACME</strong> to start fresh.
                     </div>
                 </div>

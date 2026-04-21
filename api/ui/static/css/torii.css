@@ -1,4 +1,108 @@
 :root { --pico-font-size: 16px; }
+
+/* Theme-aware custom properties (dark defaults) */
+:root, [data-theme="dark"] {
+    --torii-sidebar-bg: #13111c;
+    --torii-sidebar-border: rgba(255,255,255,0.07);
+    --torii-sidebar-text: rgba(255,255,255,0.55);
+    --torii-sidebar-text-hover: rgba(255,255,255,0.9);
+    --torii-sidebar-section: rgba(255,255,255,0.3);
+    --torii-sidebar-brand: #fff;
+    --torii-sidebar-user: rgba(255,255,255,0.8);
+    --torii-sidebar-footer-link: rgba(255,255,255,0.4);
+    --torii-sidebar-collapse-btn: rgba(255,255,255,0.35);
+    --torii-sidebar-collapse-hover: rgba(255,255,255,0.8);
+    --torii-sidebar-collapse-hover-bg: rgba(255,255,255,0.08);
+    --torii-nav-hover-bg: rgba(124,110,240,0.08);
+    --torii-nav-active-bg: rgba(124,110,240,0.15);
+    --torii-accent: #7c6ef0;
+    --torii-act-btn-border: rgba(255,255,255,0.12);
+    --torii-act-btn-bg: rgba(255,255,255,0.04);
+    --torii-row-even: rgba(255,255,255,0.015);
+    --torii-row-hover: rgba(124,110,240,0.06);
+    --torii-row-border: rgba(255,255,255,0.04);
+    --torii-header-bg: rgba(0,0,0,0.2);
+    --torii-header-border: rgba(255,255,255,0.08);
+    --torii-inner-tab-text: rgba(255,255,255,0.45);
+    --torii-inner-tab-hover: rgba(255,255,255,0.8);
+    --torii-gauge-bar-bg: rgba(255,255,255,0.06);
+    --torii-feed-link: rgba(255,255,255,0.3);
+    --torii-feed-link-hover: rgba(255,255,255,0.6);
+    --torii-feed-link-active: rgba(255,255,255,0.85);
+    --torii-lf-route-bg: rgba(255,255,255,0.02);
+    --torii-lf-path-bg: rgba(0,0,0,0.1);
+    --torii-mw-chain-opts-bg: rgba(0,0,0,0.15);
+    --torii-mw-tag-input-bg: rgba(0,0,0,0.1);
+    --torii-mw-tag-bg: rgba(124,110,240,0.2);
+    --torii-mw-tag-color: #dcd7ff;
+    --torii-mw-tag-border: rgba(124,110,240,0.4);
+    --torii-review-pre-bg: rgba(0,0,0,0.3);
+    --torii-review-pre-color: rgba(255,255,255,0.8);
+    --torii-review-tab-bg: rgba(255,255,255,0.05);
+    --torii-review-tab-border: rgba(255,255,255,0.1);
+    --torii-review-tab-color: rgba(255,255,255,0.5);
+    --torii-review-tab-hover-color: rgba(255,255,255,0.8);
+    --torii-review-tab-hover-bg: rgba(255,255,255,0.08);
+    --torii-step-color: rgba(255,255,255,0.35);
+    --torii-step-hover: rgba(255,255,255,0.7);
+    --torii-chart-grid: rgba(255,255,255,0.06);
+    --torii-chart-tick: rgba(255,255,255,0.5);
+    --torii-card-hover-shadow: rgba(0,0,0,0.25);
+    --torii-toast-shadow: rgba(0,0,0,0.3);
+}
+
+[data-theme="light"] {
+    --pico-background-color: #f0eff4;
+    --pico-card-background-color: #e8e7ed;
+    --pico-card-sectioning-background-color: #e4e3e9;
+    --torii-sidebar-bg: #e4e3ea;
+    --torii-sidebar-border: rgba(0,0,0,0.08);
+    --torii-sidebar-text: rgba(0,0,0,0.55);
+    --torii-sidebar-text-hover: rgba(0,0,0,0.85);
+    --torii-sidebar-section: rgba(0,0,0,0.35);
+    --torii-sidebar-brand: #1a1a2e;
+    --torii-sidebar-user: rgba(0,0,0,0.75);
+    --torii-sidebar-footer-link: rgba(0,0,0,0.45);
+    --torii-sidebar-collapse-btn: rgba(0,0,0,0.35);
+    --torii-sidebar-collapse-hover: rgba(0,0,0,0.7);
+    --torii-sidebar-collapse-hover-bg: rgba(0,0,0,0.06);
+    --torii-nav-hover-bg: rgba(124,110,240,0.08);
+    --torii-nav-active-bg: rgba(124,110,240,0.12);
+    --torii-accent: #6c5ce7;
+    --torii-act-btn-border: rgba(0,0,0,0.12);
+    --torii-act-btn-bg: rgba(0,0,0,0.03);
+    --torii-row-even: rgba(0,0,0,0.02);
+    --torii-row-hover: rgba(124,110,240,0.06);
+    --torii-row-border: rgba(0,0,0,0.06);
+    --torii-header-bg: rgba(0,0,0,0.03);
+    --torii-header-border: rgba(0,0,0,0.1);
+    --torii-inner-tab-text: rgba(0,0,0,0.45);
+    --torii-inner-tab-hover: rgba(0,0,0,0.75);
+    --torii-gauge-bar-bg: rgba(0,0,0,0.08);
+    --torii-feed-link: rgba(0,0,0,0.35);
+    --torii-feed-link-hover: rgba(0,0,0,0.6);
+    --torii-feed-link-active: rgba(0,0,0,0.85);
+    --torii-lf-route-bg: rgba(0,0,0,0.02);
+    --torii-lf-path-bg: rgba(0,0,0,0.04);
+    --torii-mw-chain-opts-bg: rgba(0,0,0,0.04);
+    --torii-mw-tag-input-bg: rgba(0,0,0,0.03);
+    --torii-mw-tag-bg: rgba(124,110,240,0.12);
+    --torii-mw-tag-color: #4a3fb5;
+    --torii-mw-tag-border: rgba(124,110,240,0.3);
+    --torii-review-pre-bg: rgba(0,0,0,0.04);
+    --torii-review-pre-color: rgba(0,0,0,0.8);
+    --torii-review-tab-bg: rgba(0,0,0,0.04);
+    --torii-review-tab-border: rgba(0,0,0,0.1);
+    --torii-review-tab-color: rgba(0,0,0,0.5);
+    --torii-review-tab-hover-color: rgba(0,0,0,0.8);
+    --torii-review-tab-hover-bg: rgba(0,0,0,0.06);
+    --torii-step-color: rgba(0,0,0,0.4);
+    --torii-step-hover: rgba(0,0,0,0.7);
+    --torii-chart-grid: rgba(0,0,0,0.08);
+    --torii-chart-tick: rgba(0,0,0,0.5);
+    --torii-card-hover-shadow: rgba(0,0,0,0.1);
+    --torii-toast-shadow: rgba(0,0,0,0.15);
+}
 .badge {
     display: inline-block;
     padding: 0.15em 0.55em;
@@ -984,3 +1088,264 @@
 .lf-review-tab:hover{color:rgba(255,255,255,0.8);background:rgba(255,255,255,0.08);}
 .lf-review-tab.active{background:#7c6ef0;color:#fff;border-color:#7c6ef0;}
 
+/* Theme pill toggle — own row just above user info in footer */
+.theme-pill-row {
+    display: flex;
+    padding-bottom: 0.7rem;
+}
+.sidebar.collapsed .theme-pill-row {
+    padding-bottom: 0.5rem;
+    justify-content: center;
+}
+.sidebar.collapsed .theme-pill {
+    width: 40px;
+    height: 24px;
+}
+.sidebar.collapsed .theme-pill-knob {
+    width: 18px;
+    height: 18px;
+    font-size: 0.58rem;
+}
+.theme-pill {
+    position: relative;
+    width: 56px;
+    height: 28px;
+    border-radius: 14px;
+    border: none;
+    cursor: pointer;
+    padding: 0;
+    background: linear-gradient(135deg, #1a1a2e 0%, #2d2b55 100%);
+    box-shadow: inset 0 1px 3px rgba(0,0,0,0.4), 0 1px 2px rgba(0,0,0,0.2);
+    transition: background 0.4s ease, box-shadow 0.3s ease;
+    outline: none;
+}
+.theme-pill-knob {
+    position: absolute;
+    top: 3px;
+    left: 3px;
+    width: 22px;
+    height: 22px;
+    border-radius: 50%;
+    background: linear-gradient(135deg, #2d2b55, #3d3a6e);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 0.72rem;
+    transition: transform 0.35s cubic-bezier(0.68, -0.2, 0.27, 1.2), background 0.4s ease;
+    box-shadow: 0 2px 6px rgba(0,0,0,0.3);
+    line-height: 1;
+}
+[data-theme="light"] .theme-pill {
+    background: linear-gradient(135deg, #c9c5dc 0%, #dbd8ee 100%);
+    box-shadow: inset 0 1px 3px rgba(0,0,0,0.1), 0 1px 2px rgba(0,0,0,0.08);
+}
+[data-theme="light"] .theme-pill-knob {
+    transform: translateX(28px);
+    background: linear-gradient(135deg, #fff, #f0eff4);
+    box-shadow: 0 2px 6px rgba(0,0,0,0.12);
+}
+[data-theme="light"] .sidebar.collapsed .theme-pill-knob {
+    transform: translateX(18px);
+}
+
+/* ACME locked banner */
+.acme-locked-banner {
+    background: rgba(124,110,240,0.1);
+    border: 1px solid rgba(124,110,240,0.25);
+    border-radius: 0.35rem;
+    padding: 0.6rem 1rem;
+    font-size: 0.85rem;
+    color: var(--pico-color);
+    opacity: 0.8;
+}
+
+/* Light mode icon & text contrast fixes */
+[data-theme="light"] .sidebar-nav .nav-icon {
+    filter: saturate(1.4) contrast(1.2);
+}
+[data-theme="light"] .stat-card .stat-value {
+    color: #5b4ed4;
+}
+[data-theme="light"] .latency-value {
+    color: #5b4ed4;
+}
+[data-theme="light"] .gauge-fill {
+    background: #5b4ed4;
+}
+[data-theme="light"] .sidebar-nav a.active {
+    border-left-color: #5b4ed4;
+}
+[data-theme="light"] .sidebar.collapsed .sidebar-nav a.active {
+    border-left-color: #5b4ed4;
+}
+[data-theme="light"] .inner-tab.active {
+    color: #5b4ed4;
+    border-bottom-color: #5b4ed4;
+}
+[data-theme="light"] .create-proxy-toggle {
+    border-color: #5b4ed4;
+    color: #5b4ed4;
+}
+[data-theme="light"] .create-proxy-toggle:hover {
+    background: #5b4ed4;
+}
+[data-theme="light"] .mw-chain-cfg-btn {
+    background: rgba(91,78,212,0.15);
+    color: #5b4ed4;
+}
+[data-theme="light"] .badge-success { color: #fff; }
+[data-theme="light"] .req-status.s2xx { color: #1e9e55; }
+[data-theme="light"] .req-status.s4xx { color: #c77d0a; }
+[data-theme="light"] .error-entry .error-status { color: #c0392b; }
+[data-theme="light"] .block-entry .block-mw { color: #b95d0e; }
+[data-theme="light"] .activity-entry .act-reason { color: #b95d0e; }
+[data-theme="light"] .feed-link[data-feed-type="requests"].active { color: #1e9e55; }
+[data-theme="light"] .feed-link[data-feed-type="errors"].active { color: #c0392b; }
+[data-theme="light"] .feed-link[data-feed-type="blocked"].active { color: #b95d0e; }
+[data-theme="light"] .sse-indicator.connected { background: #1e9e55; }
+[data-theme="light"] .sse-indicator.connecting { background: #c77d0a; }
+[data-theme="light"] .lf-mw-section summary:hover { color: #5b4ed4; }
+[data-theme="light"] .mw-drop-zone.drag-over { border-color: #5b4ed4; background: rgba(91,78,212,0.06); }
+[data-theme="light"] .mw-tag-input:focus-within { border-color: #5b4ed4; box-shadow: 0 0 0 1px rgba(91,78,212,0.3); }
+
+/* ===== Light theme overrides ===== */
+[data-theme="light"] .sidebar {
+    background: var(--torii-sidebar-bg);
+    border-right-color: var(--torii-sidebar-border);
+}
+[data-theme="light"] .sidebar-brand {
+    border-bottom-color: var(--torii-sidebar-border);
+}
+[data-theme="light"] .sidebar-brand strong {
+    color: var(--torii-sidebar-brand);
+}
+[data-theme="light"] .sidebar-collapse-btn {
+    color: var(--torii-sidebar-collapse-btn);
+}
+[data-theme="light"] .sidebar-collapse-btn:hover {
+    color: var(--torii-sidebar-collapse-hover);
+    background: var(--torii-sidebar-collapse-hover-bg);
+}
+[data-theme="light"] .sidebar-section {
+    color: var(--torii-sidebar-section);
+}
+[data-theme="light"] .sidebar-nav a {
+    color: var(--torii-sidebar-text);
+}
+[data-theme="light"] .sidebar-nav a:hover {
+    background: var(--torii-nav-hover-bg);
+    color: var(--torii-sidebar-text-hover);
+}
+[data-theme="light"] .sidebar-nav a.active {
+    background: var(--torii-nav-active-bg);
+    color: var(--torii-accent);
+}
+[data-theme="light"] .sidebar-footer {
+    border-top-color: var(--torii-sidebar-border);
+}
+[data-theme="light"] .sidebar-footer .sidebar-user-name {
+    color: var(--torii-sidebar-user);
+}
+[data-theme="light"] .sidebar-footer a {
+    color: var(--torii-sidebar-footer-link);
+}
+[data-theme="light"] .inner-tabs {
+    border-bottom-color: var(--torii-header-border);
+}
+[data-theme="light"] .inner-tab {
+    color: var(--torii-inner-tab-text);
+}
+[data-theme="light"] .inner-tab:hover {
+    color: var(--torii-inner-tab-hover);
+}
+[data-theme="light"] .gauge-bar {
+    background: var(--torii-gauge-bar-bg);
+}
+[data-theme="light"] .activity-entry {
+    border-bottom-color: var(--torii-row-border);
+}
+[data-theme="light"] .activity-entry:nth-child(even) {
+    background: var(--torii-row-even);
+}
+[data-theme="light"] .activity-entry:hover {
+    background: var(--torii-row-hover);
+}
+[data-theme="light"] .activity-header,
+[data-theme="light"] .activity-header:hover {
+    background: var(--torii-header-bg);
+    border-bottom-color: var(--torii-header-border);
+}
+[data-theme="light"] .req-entry {
+    border-bottom-color: var(--torii-row-border);
+}
+[data-theme="light"] .req-entry:hover {
+    background: var(--torii-row-hover);
+}
+[data-theme="light"] .req-header,
+[data-theme="light"] .req-header:hover {
+    border-bottom-color: var(--torii-header-border);
+}
+[data-theme="light"] .error-entry {
+    border-bottom-color: var(--torii-row-border);
+}
+[data-theme="light"] .block-entry {
+    border-bottom-color: var(--torii-row-border);
+}
+[data-theme="light"] .feed-link {
+    color: var(--torii-feed-link);
+}
+[data-theme="light"] .feed-link:hover {
+    color: var(--torii-feed-link-hover);
+}
+[data-theme="light"] .feed-link.active {
+    color: var(--torii-feed-link-active);
+}
+[data-theme="light"] .proxy-actions .act-btn {
+    border-color: var(--torii-act-btn-border);
+    background: var(--torii-act-btn-bg);
+}
+[data-theme="light"] .stat-card:hover {
+    box-shadow: 0 4px 12px var(--torii-card-hover-shadow);
+}
+[data-theme="light"] .toast {
+    box-shadow: 0 4px 12px var(--torii-toast-shadow);
+}
+[data-theme="light"] .lf-route-card {
+    background: var(--torii-lf-route-bg);
+}
+[data-theme="light"] .lf-path-card {
+    background: var(--torii-lf-path-bg);
+}
+[data-theme="light"] .mw-chain-opts {
+    background: var(--torii-mw-chain-opts-bg);
+}
+[data-theme="light"] .mw-tag-input {
+    background: var(--torii-mw-tag-input-bg);
+}
+[data-theme="light"] .mw-tag {
+    background: var(--torii-mw-tag-bg);
+    color: var(--torii-mw-tag-color);
+    border-color: var(--torii-mw-tag-border);
+}
+[data-theme="light"] .lf-review-pre {
+    background: var(--torii-review-pre-bg);
+    color: var(--torii-review-pre-color);
+}
+[data-theme="light"] .lf-step-bar {
+    border-bottom-color: var(--torii-header-border);
+}
+[data-theme="light"] .lf-step {
+    color: var(--torii-step-color);
+}
+[data-theme="light"] .lf-step:hover {
+    color: var(--torii-step-hover);
+}
+[data-theme="light"] .lf-review-tab {
+    background: var(--torii-review-tab-bg);
+    border-color: var(--torii-review-tab-border);
+    color: var(--torii-review-tab-color);
+}
+[data-theme="light"] .lf-review-tab:hover {
+    color: var(--torii-review-tab-hover-color);
+    background: var(--torii-review-tab-hover-bg);
+}
