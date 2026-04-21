@@ -32,21 +32,18 @@ func buildHandlerChain(ctx context.Context, serverId string, conf config.HTTPLis
 func buildHttpServer(ctx context.Context, conf config.HTTPListener, global *config.GlobalConfig) (MicroHttpServer, error) {
 	zap.S().Infof("Building HTTP server on port %d", conf.Port)
 	zap.S().Info("Middleware order apply is global mw → route mw → path mw → proxy")
-	ifFace := "lo"
+	var ipv4, ipv6 string
 	if conf.Interface == "" {
-		zap.S().Warn("No interface in configuration, defaulting to loopback")
-		i, err := netutil.GetLoopBackInterface()
-		if err != nil {
-			return nil, fmt.Errorf("failed to get loopback interface: %w", err)
-		}
-		ifFace = i.Name
+		zap.S().Info("No interface specified, binding to all interfaces")
+		ipv4 = "0.0.0.0"
+		ipv6 = "::"
 	} else {
-		ifFace = conf.Interface
-	}
-
-	ipv4, ipv6, err := netutil.GetNetworkBindAddressesFromInterface(ifFace)
-	if err != nil {
-		return nil, fmt.Errorf("failed to get bind addresses from interface %s: %w", ifFace, err)
+		ifFace := conf.Interface
+		var err error
+		ipv4, ipv6, err = netutil.GetNetworkBindAddressesFromInterface(ifFace)
+		if err != nil {
+			return nil, fmt.Errorf("failed to get bind addresses from interface %s: %w", ifFace, err)
+		}
 	}
 	if conf.Bind&config.Ipv4Flag != 0 && ipv4 == "" {
 		return nil, fmt.Errorf("IPv4 bind interface %s has no valid IPv4 address", conf.Interface)

@@ -409,16 +409,15 @@ function lfPopulateForm(data) {
 
     // Interface
     var ifaceSel = document.getElementById('lf-interface');
-    if (data.interface) {
-        var found = false;
-        for (var i = 0; i < ifaceSel.options.length; i++) {
-            if (ifaceSel.options[i].value === data.interface) { ifaceSel.value = data.interface; found = true; break; }
-        }
-        if (!found) {
-            var opt = document.createElement('option');
-            opt.value = data.interface; opt.textContent = data.interface;
-            ifaceSel.appendChild(opt); ifaceSel.value = data.interface;
-        }
+    var ifaceVal = data.interface || '';
+    var found = false;
+    for (var i = 0; i < ifaceSel.options.length; i++) {
+        if (ifaceSel.options[i].value === ifaceVal) { ifaceSel.value = ifaceVal; found = true; break; }
+    }
+    if (!found) {
+        var opt = document.createElement('option');
+        opt.value = ifaceVal; opt.textContent = ifaceVal || 'All Interfaces';
+        ifaceSel.appendChild(opt); ifaceSel.value = ifaceVal;
     }
 
     // Bind

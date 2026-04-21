@@ -59,7 +59,7 @@ func (a *Application) RunDebugMode() {
 		for _, backend := range httpListenerBackends(ln) {
 			port, err := extractPort(backend)
 			if err != nil {
-				zap.S().Errorf("Failed to parse backend address %q for HTTP listener on port %d: %v", backend, ln.Port, err)
+				zap.S().Warnf("Failed to parse backend address %q for HTTP listener on port %d: %v", backend, ln.Port, err)
 				continue
 			}
 			a.startDebugHTTPServer(port)

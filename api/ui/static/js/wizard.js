@@ -54,7 +54,7 @@ function lfValidateStep1() {
     if (!port || parseInt(port) <= 0 || parseInt(port) > 65535) {
         showToast('Please enter a valid port (1-65535).', 'error'); return false;
     }
-    if (!iface) {
+    if (iface === '__unselected__') {
         showToast('Please select a network interface.', 'error'); return false;
     }
     return true;
@@ -112,10 +112,10 @@ function lfLoadInterfaces() {
         .then(function(ifaces) {
             lfInterfaces = ifaces || [];
             var sel = document.getElementById('lf-interface');
-            sel.innerHTML = '<option value="">Select interface…</option>';
+            sel.innerHTML = '<option value="__unselected__">Select interface…</option>';
             ifaces.forEach(function(i) {
                 var opt = document.createElement('option');
-                opt.value = i.name;
+                opt.value = i.ipv4 === '0.0.0.0' ? '' : i.name;
                 var desc = i.name;
                 if (i.ipv4 || i.ipv6) desc += ' (' + [i.ipv4, i.ipv6].filter(Boolean).join(' / ') + ')';
                 opt.textContent = desc;
@@ -1151,7 +1151,7 @@ document.getElementById('create-listener-form').addEventListener('submit', funct
 // ========== Reset form ==========
 function lfResetForm() {
     document.getElementById('lf-port').value = '';
-    document.getElementById('lf-interface').value = '';
+    document.getElementById('lf-interface').value = '__unselected__';
     document.getElementById('lf-bind').value = '3';
     document.getElementById('lf-tls-enable').checked = false;
     document.getElementById('lf-tls-fields').style.display = 'none';
