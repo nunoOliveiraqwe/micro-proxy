@@ -347,9 +347,9 @@ func TestIsKeyValidForScope_WrongScope(t *testing.T) {
 	hasher := auth.NewHMACHasher(testHmacSecret)
 	hashed := hasher.Hash("raw-key")
 
-	ms.On("IsKeyValidForScope", mock.Anything, hashed, "write_config").Return(false, nil)
+	ms.On("IsKeyValidForScope", mock.Anything, hashed, "nonexistent_scope").Return(false, nil)
 
-	valid, err := svc.IsKeyValidForScope("raw-key", "write_config")
+	valid, err := svc.IsKeyValidForScope("raw-key", "nonexistent_scope")
 	require.NoError(t, err)
 	assert.False(t, valid)
 }

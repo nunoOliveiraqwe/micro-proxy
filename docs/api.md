@@ -47,6 +47,4 @@ API keys support scoped access for external integrations:
 | Scope | Description |
 |---|---|
 | `read_stats` | Read metrics and request/error logs |
-| `read_config` | Read proxy and ACME configuration |
-| `write_config` | Modify proxy and ACME configuration |
 

@@ -112,10 +112,10 @@ func TestApiKeyGuard_ValidKeyCorrectScope_Passes(t *testing.T) {
 
 func TestApiKeyGuard_ValidKeyWrongScope_Returns403(t *testing.T) {
 	f := newTestFixture(t)
-	apiKey := createTestApiKey(t, f, "wrong-scope", []string{"read_config"}, time.Time{})
+	apiKey := createTestApiKey(t, f, "wrong-scope", []string{"read_stats"}, time.Time{})
 
 	called := false
-	guarded := isAuthenticatedBySessionOrApiKey(successHandler(&called), []domain.Scope{domain.WRITE_CONFIG_SCOPE}, f.svc)
+	guarded := isAuthenticatedBySessionOrApiKey(successHandler(&called), []domain.Scope{"nonexistent_scope"}, f.svc)
 
 	req := httptest.NewRequest(http.MethodGet, "/test", nil)
 	req.Header.Set("Authorization", "Bearer "+apiKey.Key)
@@ -152,11 +152,11 @@ func TestApiKeyGuard_ValidSession_PassesWithoutApiKey(t *testing.T) {
 
 func TestApiKeyGuard_MultipleRequiredScopes_AnyMatch_Passes(t *testing.T) {
 	f := newTestFixture(t)
-	apiKey := createTestApiKey(t, f, "multi", []string{"read_config"}, time.Time{})
+	apiKey := createTestApiKey(t, f, "multi", []string{"read_stats"}, time.Time{})
 
 	called := false
-	// Route requires read_stats OR read_config — key has read_config
-	guarded := isAuthenticatedBySessionOrApiKey(successHandler(&called), []domain.Scope{domain.READ_STATS_SCOPE, domain.READ_CONFIG_SCOPE}, f.svc)
+	// Route requires read_stats or a nonexistent scope — key has read_stats
+	guarded := isAuthenticatedBySessionOrApiKey(successHandler(&called), []domain.Scope{domain.READ_STATS_SCOPE, "other_scope"}, f.svc)
 
 	req := httptest.NewRequest(http.MethodGet, "/test", nil)
 	req.Header.Set("Authorization", "Bearer "+apiKey.Key)
@@ -168,10 +168,10 @@ func TestApiKeyGuard_MultipleRequiredScopes_AnyMatch_Passes(t *testing.T) {
 
 func TestApiKeyGuard_MultipleRequiredScopes_NoneMatch_Returns403(t *testing.T) {
 	f := newTestFixture(t)
-	apiKey := createTestApiKey(t, f, "none-match", []string{"read_config"}, time.Time{})
+	apiKey := createTestApiKey(t, f, "none-match", []string{"read_stats"}, time.Time{})
 
 	called := false
-	guarded := isAuthenticatedBySessionOrApiKey(successHandler(&called), []domain.Scope{domain.READ_STATS_SCOPE, domain.WRITE_CONFIG_SCOPE}, f.svc)
+	guarded := isAuthenticatedBySessionOrApiKey(successHandler(&called), []domain.Scope{"scope_a", "scope_b"}, f.svc)
 
 	req := httptest.NewRequest(http.MethodGet, "/test", nil)
 	req.Header.Set("Authorization", "Bearer "+apiKey.Key)
@@ -292,7 +292,7 @@ func TestHandleGetAllApiKeys_ReturnsCreatedKeys(t *testing.T) {
 	f := newTestFixture(t)
 
 	createTestApiKey(t, f, "key-1", []string{"read_stats"}, time.Time{})
-	createTestApiKey(t, f, "key-2", []string{"read_config"}, time.Time{})
+	createTestApiKey(t, f, "key-2", []string{"read_stats"}, time.Time{})
 
 	req := httptest.NewRequest(http.MethodGet, "/api/v1/apiKeys", nil)
 	rec := serveWithSession(f, handleGetAllApiKey(f.svc), req)

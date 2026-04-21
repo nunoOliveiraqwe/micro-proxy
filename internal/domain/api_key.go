@@ -5,15 +5,11 @@ import "time"
 type Scope string
 
 const (
-	READ_STATS_SCOPE   = Scope("read_stats")
-	READ_CONFIG_SCOPE  = Scope("read_config")
-	WRITE_CONFIG_SCOPE = Scope("write_config")
+	READ_STATS_SCOPE = Scope("read_stats")
 )
 
 var AvailableScopesMap = map[Scope]byte{
-	READ_STATS_SCOPE:   1 << 0,
-	READ_CONFIG_SCOPE:  1 << 1,
-	WRITE_CONFIG_SCOPE: 1 << 2,
+	READ_STATS_SCOPE: 1 << 0,
 }
 
 type ApiKey struct {

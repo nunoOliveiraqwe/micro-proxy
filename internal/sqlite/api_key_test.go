@@ -75,7 +75,7 @@ func TestApiKeyStore_NewApiKey_WithoutExpiry_ExpiresIsZero(t *testing.T) {
 	key := &domain.ApiKey{
 		Alias:     "no-expiry",
 		Key:       "raw-key-456",
-		Scopes:    map[domain.Scope]byte{domain.READ_CONFIG_SCOPE: 1},
+		Scopes:    map[domain.Scope]byte{domain.READ_STATS_SCOPE: 1},
 		CreatedAt: time.Now().Unix(),
 	}
 
@@ -143,8 +143,7 @@ func TestApiKeyStore_NewApiKey_MultipleScopes(t *testing.T) {
 		Alias: "multi-scope",
 		Key:   "raw-multi",
 		Scopes: map[domain.Scope]byte{
-			domain.READ_STATS_SCOPE:  1,
-			domain.READ_CONFIG_SCOPE: 1,
+			domain.READ_STATS_SCOPE: 1,
 		},
 		CreatedAt: time.Now().Unix(),
 	}
@@ -152,9 +151,8 @@ func TestApiKeyStore_NewApiKey_MultipleScopes(t *testing.T) {
 
 	fetched, err := store.GetApiKey(ctx, "multi-scope")
 	require.NoError(t, err)
-	assert.Len(t, fetched.Scopes, 2)
+	assert.Len(t, fetched.Scopes, 1)
 	assert.Contains(t, fetched.Scopes, domain.READ_STATS_SCOPE)
-	assert.Contains(t, fetched.Scopes, domain.READ_CONFIG_SCOPE)
 }
 
 func TestApiKeyStore_NewApiKey_NoScopes(t *testing.T) {
@@ -235,7 +233,7 @@ func TestApiKeyStore_GetApiKeyByRawKey_Success(t *testing.T) {
 	key := &domain.ApiKey{
 		Alias:     "by-raw",
 		Key:       "the-raw-key",
-		Scopes:    map[domain.Scope]byte{domain.WRITE_CONFIG_SCOPE: 1},
+		Scopes:    map[domain.Scope]byte{domain.READ_STATS_SCOPE: 1},
 		CreatedAt: time.Now().Unix(),
 	}
 	require.NoError(t, store.NewApiKey(ctx, key))
@@ -244,7 +242,7 @@ func TestApiKeyStore_GetApiKeyByRawKey_Success(t *testing.T) {
 	require.NoError(t, err)
 	require.NotNil(t, fetched)
 	assert.Equal(t, "by-raw", fetched.Alias)
-	assert.Contains(t, fetched.Scopes, domain.WRITE_CONFIG_SCOPE)
+	assert.Contains(t, fetched.Scopes, domain.READ_STATS_SCOPE)
 }
 
 func TestApiKeyStore_GetApiKeyByRawKey_NotFound(t *testing.T) {
@@ -269,7 +267,7 @@ func TestApiKeyStore_IsKeyValidForScope_ValidScope(t *testing.T) {
 	key := &domain.ApiKey{
 		Alias:     "scope-check",
 		Key:       "raw-scope",
-		Scopes:    map[domain.Scope]byte{domain.READ_STATS_SCOPE: 1, domain.READ_CONFIG_SCOPE: 1},
+		Scopes:    map[domain.Scope]byte{domain.READ_STATS_SCOPE: 1},
 		CreatedAt: time.Now().Unix(),
 	}
 	require.NoError(t, store.NewApiKey(ctx, key))
@@ -292,7 +290,7 @@ func TestApiKeyStore_IsKeyValidForScope_InvalidScope(t *testing.T) {
 	}
 	require.NoError(t, store.NewApiKey(ctx, key))
 
-	valid, err := store.IsKeyValidForScope(ctx, "raw-scope2", string(domain.WRITE_CONFIG_SCOPE))
+	valid, err := store.IsKeyValidForScope(ctx, "raw-scope2", "nonexistent_scope")
 	require.NoError(t, err)
 	assert.False(t, valid)
 }
