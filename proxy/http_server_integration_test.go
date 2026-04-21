@@ -521,7 +521,7 @@ func TestMiddleware_IpBlock_PassesThrough(t *testing.T) {
 	backend := newEchoBackend(t)
 	port := getFreePort(t)
 	mws := []middleware.Config{{
-		Type: "IpBlock",
+		Type: "IpFilter",
 		Options: map[string]interface{}{
 			"list-mode": "block",
 			"list":      []interface{}{"127.0.0.1"},
@@ -2886,8 +2886,8 @@ func TestEveryMiddleware_CanBuildAndStart(t *testing.T) {
 			}},
 		},
 		{
-			name: "IpBlock",
-			mw: middleware.Config{Type: "IpBlock", Options: map[string]interface{}{
+			name: "IpFilter",
+			mw: middleware.Config{Type: "IpFilter", Options: map[string]interface{}{
 				"list-mode": "block",
 				"list":      []interface{}{"10.0.0.1"},
 			}},
