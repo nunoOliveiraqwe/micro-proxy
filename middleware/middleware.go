@@ -40,6 +40,7 @@ func init() {
 		"UserAgentBlocker": {Fn: UserAgentBlockMiddleware},
 		"CircuitBreaker":   {Fn: CircuitBreakerMiddleware},
 		"Cors":             {Fn: CorsMiddleware},
+		"StaticResponse":   {Fn: StaticResponseMiddleware, Terminates: true},
 	}
 }
 

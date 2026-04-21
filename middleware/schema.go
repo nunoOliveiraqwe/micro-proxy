@@ -92,7 +92,7 @@ func GetMiddlewareSchemas() []MiddlewareSchema {
 			},
 		},
 		{
-			Name:        "CORS",
+			Name:        "Cors",
 			Description: "Handles Cross-Origin Resource Sharing (CORS) preflight and response headers.",
 			Fields: []OptionField{
 				{Key: "allowed-origins", Label: "Allowed Origins", Type: FieldTypeStringList, Default: []string{"*"},
@@ -266,6 +266,24 @@ func GetMiddlewareSchemas() []MiddlewareSchema {
 					Placeholder: "e.g. my-good-bot",
 					HelpText:    "Custom User-Agent substrings to always allow. If a UA matches both allow and block, allow wins."},
 			}, cacheFields...),
+		},
+		{
+			Name:        "StaticResponse",
+			Description: "Returns a fixed HTTP response without forwarding to any backend. Useful for maintenance pages, health stubs, or canned API responses.",
+			Terminates:  true,
+			Fields: []OptionField{
+				{Key: "status-code", Label: "Status Code", Type: FieldTypeInt, Required: true,
+					Placeholder: "e.g. 200, 404, 503",
+					HelpText:    "HTTP status code to return (100-599)."},
+				{Key: "response-body", Label: "Response Body", Type: FieldTypeString,
+					Placeholder: "e.g. {\"status\":\"ok\"} or <h1>Under Maintenance</h1>",
+					HelpText:    "Body text to return. Leave empty for a body-less response (e.g. 204)."},
+				{Key: "content-type", Label: "Content-Type", Type: FieldTypeString,
+					Default:  "text/plain; charset=utf-8",
+					HelpText: "Content-Type header for the response body. Only sent when a body is set."},
+				{Key: "headers", Label: "Custom Headers", Type: FieldTypeMap,
+					HelpText: "Additional headers to include in the response (e.g. Retry-After, Cache-Control)."},
+			},
 		},
 		{
 			Name:        "CircuitBreaker",
