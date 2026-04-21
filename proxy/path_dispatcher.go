@@ -25,6 +25,7 @@ func buildPathDispatcher(ctx context.Context, defaultHandler http.HandlerFunc, p
 
 	mwNames := make([]string, 0)
 	backends := make([]string, 0)
+	hasCatchAll := false
 	for _, rule := range pathRules {
 		pathBaseHandler := defaultHandler
 		if rule.Backend != "" {
@@ -46,6 +47,9 @@ func buildPathDispatcher(ctx context.Context, defaultHandler http.HandlerFunc, p
 
 		mux.HandleFunc(pattern, handler)
 
+		if pattern == "/" || pattern == "/{path...}" {
+			hasCatchAll = true
+		}
 		// When the rule has its own backend and the pattern is a bare path
 		// (e.g. "/jellyfino"), Go's ServeMux treats it as an exact match
 		// only.  We also need a catch-all so that sub-paths like
@@ -60,7 +64,10 @@ func buildPathDispatcher(ctx context.Context, defaultHandler http.HandlerFunc, p
 	}
 
 	// Default catch-all: the route-level middleware chain wrapping the backend.
-	mux.HandleFunc("/", defaultHandler)
+	// Skip if a path rule already registered a catch-all (e.g. "/*" → "/{path...}").
+	if !hasCatchAll {
+		mux.HandleFunc("/", defaultHandler)
+	}
 
 	return &PathDispatcher{mux: mux}, mwNames, backends, nil
 }
