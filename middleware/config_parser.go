@@ -120,3 +120,15 @@ func ParseStringSliceOpt(opts map[string]interface{}, key string, defaultVal []s
 	}
 	return result, nil
 }
+
+func ParseRawSliceRequired(opts map[string]interface{}, key string) ([]interface{}, error) {
+	raw, ok := opts[key]
+	if !ok {
+		return nil, fmt.Errorf("missing required option '%s'", key)
+	}
+	slice, ok := raw.([]interface{})
+	if !ok {
+		return nil, fmt.Errorf("'%s' option must be an array of interface, got %T", key, raw)
+	}
+	return slice, nil
+}
