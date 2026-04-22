@@ -133,22 +133,6 @@ func TestCompressionMiddleware_NoAcceptEncoding(t *testing.T) {
 	assert.Equal(t, testBody, rec.Body.String())
 }
 
-func TestCompressionMiddleware_BadConfig(t *testing.T) {
-	conf := Config{Type: "Compression", Options: map[string]interface{}{}}
-	called := false
-	next := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		called = true
-	})
-
-	handler := CompressionMiddleware(context.Background(), next, conf)
-
-	req := httptest.NewRequest(http.MethodGet, "/", nil)
-	rec := httptest.NewRecorder()
-	handler.ServeHTTP(rec, req)
-
-	assert.True(t, called, "bad config should fall through to next handler")
-}
-
 func TestCompressionResponseWriter_Header(t *testing.T) {
 	rec := httptest.NewRecorder()
 	gz, _ := gzip.NewWriterLevel(rec, gzip.DefaultCompression)

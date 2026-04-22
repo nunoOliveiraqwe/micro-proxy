@@ -169,6 +169,8 @@ func (t *testSystemService) GetRecentRequests(n int) []metrics.RequestLogEntry {
 func (t *testSystemService) GetRecentBlockedEntries(n int) []metrics.BlockLogEntry {
 	return []metrics.BlockLogEntry{}
 }
+func (t *testSystemService) PersistConfig() error { return nil }
+func (t *testSystemService) IsReadOnly() bool     { return false }
 
 // ---------------------------------------------------------------------------
 // Test fixture builder
