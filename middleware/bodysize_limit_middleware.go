@@ -18,8 +18,6 @@ func BodySizeLimitMiddleware(_ context.Context, next http.HandlerFunc, conf Conf
 		}
 	}
 	return func(writer http.ResponseWriter, request *http.Request) {
-		logger := GetRequestLoggerFromContext(request)
-		logger.Info("Applying body size limit middleware for request", zap.Int64("max_size", maxSize))
 		request.Body = http.MaxBytesReader(writer, request.Body, maxSize)
 		next(writer, request)
 	}
