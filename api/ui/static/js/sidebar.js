@@ -112,9 +112,9 @@ function showPage(pageId) {
 
     if (pageId === 'system') {
         fetchSystemHealth();
-        loadRecentRequests();
-        loadRecentErrors();
-        loadRecentBlocked();
+        activityEntries = [];
+        Promise.all([loadRecentRequests(), loadRecentErrors(), loadRecentBlocked()])
+            .then(rebuildActivityFromFeeds);
         if (!healthInterval) healthInterval = setInterval(fetchSystemHealth, 5000);
     } else {
         if (healthInterval) {

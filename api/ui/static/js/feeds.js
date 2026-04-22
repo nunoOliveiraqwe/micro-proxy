@@ -119,7 +119,7 @@ function renderErrorFeed() {
 }
 
 function loadRecentErrors() {
-    fetch('/api/v1/proxy/errors', {credentials: 'same-origin'})
+    return fetch('/api/v1/proxy/errors', {credentials: 'same-origin'})
         .then(function (resp) {
             return resp.ok ? resp.json() : [];
         })
@@ -127,12 +127,6 @@ function loadRecentErrors() {
             if (entries && entries.length) {
                 errorEntries = entries.slice(0, MAX_ERROR_ENTRIES);
                 renderErrorFeed();
-                entries.slice(0, MAX_ERROR_ENTRIES).forEach(function(e) {
-                    activityEntries.push({type:'error', ts:new Date(e.timestamp), entry:e});
-                });
-                activityEntries.sort(function(a,b){ return b.ts - a.ts; });
-                if (activityEntries.length > MAX_ACTIVITY_ENTRIES) activityEntries.length = MAX_ACTIVITY_ENTRIES;
-                renderActivityFeed();
             }
         })
         .catch(function () {
@@ -225,7 +219,7 @@ function renderRequestFeed() {
 }
 
 function loadRecentRequests() {
-    fetch('/api/v1/proxy/requests', {credentials: 'same-origin'})
+    return fetch('/api/v1/proxy/requests', {credentials: 'same-origin'})
         .then(function (resp) {
             return resp.ok ? resp.json() : [];
         })
@@ -233,12 +227,6 @@ function loadRecentRequests() {
             if (entries && entries.length) {
                 requestEntries = entries.slice(0, MAX_REQUEST_ENTRIES);
                 renderRequestFeed();
-                entries.slice(0, MAX_REQUEST_ENTRIES).forEach(function(e) {
-                    activityEntries.push({type:'request', ts:new Date(e.timestamp), entry:e});
-                });
-                activityEntries.sort(function(a,b){ return b.ts - a.ts; });
-                if (activityEntries.length > MAX_ACTIVITY_ENTRIES) activityEntries.length = MAX_ACTIVITY_ENTRIES;
-                renderActivityFeed();
             }
         })
         .catch(function () {
@@ -316,7 +304,7 @@ function renderBlockFeed() {
 }
 
 function loadRecentBlocked() {
-    fetch('/api/v1/proxy/blocked', {credentials: 'same-origin'})
+    return fetch('/api/v1/proxy/blocked', {credentials: 'same-origin'})
         .then(function (resp) {
             return resp.ok ? resp.json() : [];
         })
@@ -324,12 +312,6 @@ function loadRecentBlocked() {
             if (entries && entries.length) {
                 blockEntries = entries.slice(0, MAX_BLOCK_ENTRIES);
                 renderBlockFeed();
-                entries.slice(0, MAX_BLOCK_ENTRIES).forEach(function(e) {
-                    activityEntries.push({type:'blocked', ts:new Date(e.timestamp), entry:e});
-                });
-                activityEntries.sort(function(a,b){ return b.ts - a.ts; });
-                if (activityEntries.length > MAX_ACTIVITY_ENTRIES) activityEntries.length = MAX_ACTIVITY_ENTRIES;
-                renderActivityFeed();
             }
         })
         .catch(function () {
@@ -343,6 +325,22 @@ var feedShowRequests = true;
 var feedShowErrors = true;
 var feedShowBlocked = true;
 var activityLogFilter = '';
+
+function rebuildActivityFromFeeds() {
+    activityEntries = [];
+    requestEntries.forEach(function(e) {
+        activityEntries.push({type:'request', ts:new Date(e.timestamp), entry:e});
+    });
+    errorEntries.forEach(function(e) {
+        activityEntries.push({type:'error', ts:new Date(e.timestamp), entry:e});
+    });
+    blockEntries.forEach(function(e) {
+        activityEntries.push({type:'blocked', ts:new Date(e.timestamp), entry:e});
+    });
+    activityEntries.sort(function(a,b){ return b.ts - a.ts; });
+    if (activityEntries.length > MAX_ACTIVITY_ENTRIES) activityEntries.length = MAX_ACTIVITY_ENTRIES;
+    renderActivityFeed();
+}
 
 function activityBadge(type) {
     switch (type) {

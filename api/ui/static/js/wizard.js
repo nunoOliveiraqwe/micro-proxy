@@ -612,7 +612,7 @@ function lfInitMapTagInput(container, initMap) {
             if (tags.length) tags[tags.length - 1].remove();
             return;
         }
-        if (e.key === 'Enter' || e.key === 'Tab' || e.key === ',') {
+        if (e.key === 'Enter' || e.key === 'Tab') {
             var text = input.value.trim();
             if (!text) { if (e.key !== 'Tab') e.preventDefault(); return; }
             e.preventDefault();
@@ -632,9 +632,9 @@ function lfInitMapTagInput(container, initMap) {
     input.addEventListener('paste', function(e) {
         var text = (e.clipboardData || window.clipboardData).getData('text');
         if (!text) return;
-        if (/[\t,\n\r]/.test(text)) {
+        if (/[\t\n\r]/.test(text)) {
             e.preventDefault();
-            lfSplitTagInput(text).forEach(function(v) {
+            text.split(/[\t\n\r]+/).map(function(v) { return v.trim(); }).filter(Boolean).forEach(function(v) {
                 var entry = lfParseMapEntry(v);
                 if (entry) lfAddMapTag(container, entry.key, entry.value);
             });
@@ -708,9 +708,11 @@ function lfCreatePathCard(pathsContainer, pathsList) {
         '</div>' +
         '<div style="display:flex;gap:1.5rem;margin-bottom:0.5rem;">' +
         '<label style="display:inline-flex;align-items:center;gap:0.3rem;font-size:0.78rem;cursor:pointer;margin:0;">' +
-        '<input type="checkbox" class="lf-path-drop-path"> Drop path</label>' +
+        '<input type="checkbox" class="lf-path-strip-prefix"> Strip prefix</label>' +
         '<label style="display:inline-flex;align-items:center;gap:0.3rem;font-size:0.78rem;cursor:pointer;margin:0;">' +
         '<input type="checkbox" class="lf-path-drop-query"> Drop query</label>' +
+        '<label style="display:inline-flex;align-items:center;gap:0.3rem;font-size:0.78rem;cursor:pointer;margin:0;">' +
+        '<input type="checkbox" class="lf-path-replace-host"> Replace Host header</label>' +
         '</div>' +
         '<details class="lf-mw-section">' +
         '<summary>Path Middleware Chain <span class="lf-mw-badge lf-path-mw-badge"></span></summary>' +
@@ -773,6 +775,8 @@ function lfCreateHostRouteCard() {
         '<label style="font-size:0.85rem;margin-bottom:0.25rem;">Backend URL' +
         '<input type="text" class="lf-route-backend" placeholder="e.g. http://192.168.1.100:8096" style="margin-bottom:0.5rem;"></label>' +
         '</div>' +
+        '<label style="display:inline-flex;align-items:center;gap:0.3rem;font-size:0.78rem;cursor:pointer;margin:0 0 0.5rem;">' +
+        '<input type="checkbox" class="lf-route-replace-host"> Replace Host header with backend host</label>' +
         '<details class="lf-mw-section" open>' +
         '<summary>Middleware Chain <span class="lf-mw-badge lf-route-mw-badge"></span></summary>' +
         '<fieldset style="margin:0.5rem 0 0.5rem;padding:0;border:none;">' +
@@ -827,8 +831,11 @@ function lfCollectPaths(pathsList) {
         if (!pattern) return;
         var entry = { pattern: pattern };
         var backend = p.el.querySelector('.lf-path-backend').value.trim();
-        if (backend) entry.backend = backend;
-        if (p.el.querySelector('.lf-path-drop-path').checked) entry.drop_path = true;
+        if (backend) {
+            entry.backend = { address: backend };
+            if (p.el.querySelector('.lf-path-replace-host').checked) entry.backend.replace_host_header = true;
+        }
+        if (p.el.querySelector('.lf-path-strip-prefix').checked) entry.strip_prefix = true;
         if (p.el.querySelector('.lf-path-drop-query').checked) entry.drop_query = true;
         if (p.el.querySelector('.lf-path-disable-defaults') && p.el.querySelector('.lf-path-disable-defaults').checked) {
             entry.disable_default_middlewares = true;
@@ -875,7 +882,10 @@ function lfCollectPayload() {
     // Default route
     if (document.getElementById('lf-default-enable').checked) {
         var defTarget = {
-            backend: document.getElementById('lf-default-backend').value.trim()
+            backend: {
+                address: document.getElementById('lf-default-backend').value.trim(),
+                replace_host_header: document.getElementById('lf-default-replace-host').checked
+            }
         };
         if (document.getElementById('lf-default-disable-defaults').checked) {
             defTarget.disable_default_middlewares = true;
@@ -892,7 +902,10 @@ function lfCollectPayload() {
         payload.routes = [];
         lfHostRoutes.forEach(function(r) {
             var target = {
-                backend: r.el.querySelector('.lf-route-backend').value.trim()
+                backend: {
+                    address: r.el.querySelector('.lf-route-backend').value.trim(),
+                    replace_host_header: r.el.querySelector('.lf-route-replace-host').checked
+                }
             };
             if (r.el.querySelector('.lf-route-disable-defaults') && r.el.querySelector('.lf-route-disable-defaults').checked) {
                 target.disable_default_middlewares = true;
@@ -927,7 +940,8 @@ var lfYamlKeyMap = {
     'drop_query': 'drop-query',
     'strip_prefix': 'strip-prefix',
     'disable_http2': 'disable-http2',
-    'disable_default_middlewares': 'disable-default-middlewares'
+    'disable_default_middlewares': 'disable-default-middlewares',
+    'replace_host_header': 'replace-host-header'
 };
 var lfJsonKeyMap = {};
 Object.keys(lfYamlKeyMap).forEach(function(k) { lfJsonKeyMap[lfYamlKeyMap[k]] = k; });
@@ -1184,6 +1198,7 @@ function lfResetForm() {
     document.getElementById('lf-default-enable').checked = false;
     document.getElementById('lf-default-route-fields').style.display = 'none';
     document.getElementById('lf-default-backend').value = '';
+    document.getElementById('lf-default-replace-host').checked = false;
     document.getElementById('lf-default-disable-defaults').checked = false;
     if (lfDefaultMwChain) lfDefaultMwChain.clear();
     lfDefaultPaths.forEach(function(p) { p.el.remove(); });
