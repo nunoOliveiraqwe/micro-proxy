@@ -286,6 +286,32 @@ func GetMiddlewareSchemas() []MiddlewareSchema {
 			},
 		},
 		{
+			Name:        "Compression",
+			Description: "Compresses response bodies using gzip or zlib to reduce bandwidth usage.",
+			Fields: []OptionField{
+				{Key: "type", Label: "Compression Type", Type: FieldTypeSelect, Required: true,
+					Choices:  []string{"gzip", "zlib"},
+					Default:  "gzip",
+					HelpText: "Compression algorithm to use. gzip is the most widely supported by browsers."},
+				{Key: "level", Label: "Compression Level", Type: FieldTypeInt,
+					Default:     9,
+					Placeholder: "1-9",
+					HelpText:    "Compression level (1=fastest/least compression, 9=slowest/best compression). Defaults to best compression."},
+			},
+		},
+		{
+			Name:        "BasicAuth",
+			Description: "Protects routes with HTTP Basic Authentication. Passwords are verified using Argon2id hashing.",
+			Fields: []OptionField{
+				{Key: "realm", Label: "Realm", Type: FieldTypeString, Required: true,
+					Placeholder: "e.g. Internal",
+					HelpText:    "Authentication realm displayed in the browser's login prompt."},
+				{Key: "credentials", Label: "Credentials", Type: FieldTypeMap, Required: true,
+					Placeholder: "username → argon2id hash",
+					HelpText:    "Map of usernames to Argon2id password hashes. Generate hashes with the included argon2 CLI tool."},
+			},
+		},
+		{
 			Name:        "CircuitBreaker",
 			Description: "Implements the circuit breaker pattern to stop sending requests to a failing backend, giving it time to recover.",
 			Fields: []OptionField{
