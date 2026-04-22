@@ -63,8 +63,6 @@ func MetricsMiddleware(ctx context.Context, next http.HandlerFunc, _ Config) htt
 			next.ServeHTTP(w, r)
 			return
 		}
-		logger := GetRequestLoggerFromContext(r)
-		logger.Info("Applying metrics middleware for request")
 		metric := initializeRequestMetrics(r)
 		responseWriter := &responseWriterWithMetrics{ResponseWriter: w,
 			reqMetrics: metric}
@@ -84,7 +82,6 @@ func MetricsMiddleware(ctx context.Context, next http.HandlerFunc, _ Config) htt
 		}
 		blockInfo := metrics.GetBlockInfo(r)
 		if blockInfo != nil {
-			logger.Info("Request was blocked by middleware", zap.String("middleware", blockInfo.Middleware), zap.String("reason", blockInfo.Reason))
 			metric.IsMiddlewareBlockedRequest = true
 			metric.BlockingMiddleware = blockInfo.Middleware
 			metric.BlockReason = blockInfo.Reason

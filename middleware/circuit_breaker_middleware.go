@@ -61,7 +61,6 @@ func CircuitBreakerMiddleware(_ context.Context, next http.HandlerFunc, conf Con
 	}
 	return func(w http.ResponseWriter, r *http.Request) {
 		logger := GetRequestLoggerFromContext(r)
-		logger.Info("Applying circuit breaker for request")
 
 		count := m.currentFailureCount.Load()
 		if count >= m.failureThreshold {

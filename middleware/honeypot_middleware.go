@@ -79,7 +79,7 @@ func HoneyPotMiddleware(_ context.Context, next http.HandlerFunc, conf Config) h
 			return
 		}
 
-		logger.Debug("HoneyPotMiddleware: checking if request path is a honeypot path", zap.String("path", r.URL.Path), zap.Bool("is_honeypot_path", isHoneyPotted))
+		logger.Debug("HoneyPotMiddleware: checking if request path is a honeypot path", zap.String("path", r.URL.Path))
 		isHoneyPath := honeyServer.IsHoneyPotPath(r.URL.Path)
 
 		if isHoneyPath {
