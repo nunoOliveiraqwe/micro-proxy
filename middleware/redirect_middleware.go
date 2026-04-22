@@ -38,7 +38,7 @@ type externalRedirecter struct {
 func (e *externalRedirecter) redirect(w http.ResponseWriter, r *http.Request) {
 	redirectURL := e.buildRedirectURL(r)
 	logger := GetRequestLoggerFromContext(r)
-	logger.Info(fmt.Sprintf("Redirecting request from %s to %s", r.Host, redirectURL))
+	logger.Debug("Redirecting request", zap.String("from", r.Host), zap.String("to", redirectURL), zap.Int("status", e.opts.statusCode))
 	http.Redirect(w, r, redirectURL, e.opts.statusCode)
 }
 
@@ -75,7 +75,7 @@ type schemeOnlyRedirecter struct {
 func (e *schemeOnlyRedirecter) redirect(w http.ResponseWriter, r *http.Request) {
 	redirectURL := e.buildRedirectURL(r)
 	logger := GetRequestLoggerFromContext(r)
-	logger.Info(fmt.Sprintf("Scheme-only redirecting request from %s to %s", r.Host, redirectURL))
+	logger.Debug("Scheme-only redirecting request", zap.String("from", r.Host), zap.String("to", redirectURL), zap.Int("status", e.opts.statusCode))
 	http.Redirect(w, r, redirectURL, e.opts.statusCode)
 }
 
@@ -106,7 +106,7 @@ func newInternalRedirecter(opts *redirectOptions) (*internalRedirecter, error) {
 
 func (e *internalRedirecter) redirect(w http.ResponseWriter, r *http.Request) {
 	logger := GetRequestLoggerFromContext(r)
-	logger.Info(fmt.Sprintf("Internally redirecting request from %s to %s", r.Host, e.opts.targetUrl.String()))
+	logger.Debug("Internally redirecting request", zap.String("from", r.Host), zap.String("to", e.opts.targetUrl.String()))
 	e.proxy.ServeHTTP(w, r)
 }
 
