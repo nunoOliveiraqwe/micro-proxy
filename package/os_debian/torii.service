@@ -32,9 +32,24 @@ PrivateTmp=yes
 PrivateDevices=yes
 ProtectKernelTunables=yes
 ProtectKernelModules=yes
+ProtectKernelLogs=yes
 ProtectControlGroups=yes
+ProtectClock=yes
+ProtectHostname=yes
+ProtectProc=invisible
 RestrictSUIDSGID=yes
-ReadWritePaths=/var/lib/torii
+ReadWritePaths=/var/lib/torii /etc/torii
+
+
+RestrictAddressFamilies=AF_INET AF_INET6 AF_UNIX
+SystemCallFilter=~@mount @reboot @swap @clock @cpu-emulation @debug @module @obsolete @raw-io @privileged
+SystemCallArchitectures=native
+
+RestrictNamespaces=yes
+RestrictRealtime=yes
+
+SecureBits=noroot-locked
+LockPersonality=yes
 
 LimitNOFILE=65536
 

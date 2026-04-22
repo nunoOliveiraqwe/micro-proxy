@@ -97,6 +97,8 @@ func handleDeleteProxy(service app.SystemService) http.HandlerFunc {
 		}
 		if err := service.PersistConfig(); err != nil {
 			logger.Error("Proxy deleted but failed to persist config", zap.Error(err))
+			WriteResponseAsJSON(map[string]string{"status": "deleted", "warning": "Changes applied in memory but failed to persist to disk: " + err.Error()}, writer)
+			return
 		}
 		WriteResponseAsJSON(map[string]string{"status": "deleted"}, writer)
 	}
@@ -187,6 +189,12 @@ func handleCreateHttpProxyServer(svc app.SystemService) http.HandlerFunc {
 		}
 		if err := svc.PersistConfig(); err != nil {
 			logger.Error("Listener created but failed to persist config", zap.Error(err))
+			WriteResponseAsJSON(map[string]interface{}{
+				"status":  "created",
+				"port":    req.Port,
+				"warning": "Changes applied in memory but failed to persist to disk: " + err.Error(),
+			}, w)
+			return
 		}
 		logger.Info("HTTP listener created", zap.Int("port", req.Port))
 		WriteResponseAsJSON(map[string]interface{}{
@@ -435,6 +443,12 @@ func handleEditProxy(svc app.SystemService) http.HandlerFunc {
 		logger.Info("Proxy edited", zap.Int("port", portInt))
 		if err := svc.PersistConfig(); err != nil {
 			logger.Error("Proxy edited but failed to persist config", zap.Error(err))
+			WriteResponseAsJSON(map[string]interface{}{
+				"status":  "updated",
+				"port":    conf.Port,
+				"warning": "Changes applied in memory but failed to persist to disk: " + err.Error(),
+			}, w)
+			return
 		}
 		WriteResponseAsJSON(map[string]interface{}{
 			"status": "updated",
