@@ -355,6 +355,7 @@ var activityFeedHeader = '<div class="activity-entry activity-header">' +
     '<span class="activity-badge"></span>' +
     '<span class="act-time">Time</span>' +
     '<span class="act-remote">Address</span>' +
+    '<span class="act-host">Host</span>' +
     '<span class="act-method">Method</span>' +
     '<span class="act-status">Code</span>' +
     '<span class="act-latency">Latency</span>' +
@@ -388,6 +389,7 @@ function buildActivityRow(item) {
         row.innerHTML = activityBadge('request') +
             '<span class="act-time">' + time + '</span>' +
             '<span class="act-remote">' + (e.remote_address || '–') + '</span>' +
+            '<span class="act-host" title="' + (e.host||'').replace(/"/g,'&quot;') + '">' + (e.host || '–') + '</span>' +
             '<span class="act-method">' + (e.method || '?') + '</span>' +
             '<span class="act-status ' + scClass + '">' + (sc || '–') + '</span>' +
             '<span class="act-latency">' + (e.latency_ms || 0) + ' ms</span>' +
@@ -397,6 +399,7 @@ function buildActivityRow(item) {
         row.innerHTML = activityBadge('error') +
             '<span class="act-time">' + time + '</span>' +
             '<span class="act-remote">' + (e.remote_address || '–') + '</span>' +
+            '<span class="act-host" title="' + (e.host||'').replace(/"/g,'&quot;') + '">' + (e.host || '–') + '</span>' +
             '<span class="act-method">' + (e.method || '?') + '</span>' +
             '<span class="act-status s5xx">' + (e.status_code || '5xx') + '</span>' +
             '<span class="act-latency">' + (e.latency_ms || 0) + ' ms</span>' +
@@ -410,6 +413,7 @@ function buildActivityRow(item) {
         row.innerHTML = activityBadge('blocked') +
             '<span class="act-time">' + time + '</span>' +
             '<span class="act-remote">' + (e.remote_address || '–') + '</span>' +
+            '<span class="act-host" title="' + (e.host||'').replace(/"/g,'&quot;') + '">' + (e.host || '–') + '</span>' +
             '<span class="act-method">' + (e.method || '?') + '</span>' +
             '<span class="act-status" style="color:#e67e22;">' + icon + '</span>' +
             '<span class="act-latency"></span>' +
