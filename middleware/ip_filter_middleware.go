@@ -32,7 +32,7 @@ func IpFilterMiddleware(ctx context.Context, next http.HandlerFunc, conf Config)
 		blocked, err := filter.IsBlocked(clientIP)
 		if err != nil {
 			logger.Error("IpFilterMiddleware: error checking IP", zap.String("clientIp", clientIP), zap.Error(err))
-			metrics.CreateAndAddBlockInfo(r, "IpBlock", fmt.Sprintf("An error occurred check if IP %s is blocked. err = %s",
+			metrics.CreateAndAddBlockInfo(r, "ip-filter", fmt.Sprintf("An error occurred check if IP %s is blocked. err = %s",
 				clientIP,
 				err.Error()))
 			http.Error(w, "Forbidden", http.StatusForbidden)
@@ -41,7 +41,7 @@ func IpFilterMiddleware(ctx context.Context, next http.HandlerFunc, conf Config)
 
 		if blocked {
 			logger.Warn("IpFilterMiddleware: blocked request", zap.String("clientIp", clientIP))
-			metrics.CreateAndAddBlockInfo(r, "IpBlock", fmt.Sprintf("Blocked IP: %s", clientIP))
+			metrics.CreateAndAddBlockInfo(r, "ip-filter", fmt.Sprintf("Blocked IP: %s", clientIP))
 			http.Error(w, "Forbidden", http.StatusForbidden)
 			return
 		}
