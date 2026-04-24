@@ -57,8 +57,8 @@ func NewGlobalMetricsHandler(numberOfWorkers int, ctx context.Context) *Connecti
 		cancel:               cancel,
 		listeners:            make(map[int]*metricListener),
 		errorLog:             NewErrorLog(200), //maybe add a conf flag
-		requestLog:           NewRequestLog(200),
-		blockedLog:           NewBlockLog(200),
+		requestLog:           NewRequestLog(500),
+		blockedLog:           NewBlockLog(500),
 	}
 	zap.S().Info("Creating a new global connection metric")
 	h.TrackMetricsForConnection(globalMetricsConName, globalMetricsConName)
