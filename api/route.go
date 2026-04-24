@@ -112,7 +112,7 @@ var routes = []ApplicationRoute{
 		HandlerFunc:        handleGetNetworkInterfaces,
 	},
 	{
-		Name:               "Active Proxy Routes",
+		Name:               "Active HTTP Routes",
 		Description:        "Fetches the configured proxy routes",
 		Method:             "GET",
 		Pattern:            "/proxy/routes",

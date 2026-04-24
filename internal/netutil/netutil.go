@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"net"
 	"net/http"
+	"strconv"
 	"strings"
 
 	"go.uber.org/zap"
@@ -106,4 +107,16 @@ func GetClientIP(r *http.Request) (string, error) {
 		return "", fmt.Errorf("invalid IP address: %s", ip)
 	}
 	return ip, nil
+}
+
+func SplitHostPort(addr string) (string, int) {
+	host, portStr, err := net.SplitHostPort(addr)
+	if err != nil {
+		return addr, 0
+	}
+	port, err := strconv.Atoi(portStr)
+	if err != nil {
+		return host, 0
+	}
+	return host, port
 }

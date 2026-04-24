@@ -69,7 +69,9 @@ function blockIcon(mw) {
         case 'country-block': return '🌍';
         case 'ua-block':      return '🤖';
         case 'rate-limit':    return '⏱';
-        default:              return '🚫';
+        case 'coraza-waf':    return '🛡️';
+        case 'ip-block':      return '🚫';
+        default:              return '🛡️';
     }
 }
 
@@ -80,6 +82,7 @@ function blockMwIcon(mw) {
         case 'ua-block':      return '🤖';
         case 'rate-limit':    return '⏱';
         case 'ip-block':      return '🚫';
+        case 'coraza-waf':    return '🛡️';
         default:              return '🛡️';
     }
 }

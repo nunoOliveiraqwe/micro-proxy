@@ -198,7 +198,7 @@ function renderProxyRoutes(proxies) {
         el.innerHTML =
             '<div class="empty-state"><div class="empty-icon">🔌</div>' +
             '<p><strong>No proxy routes configured</strong></p>' +
-            '<p><small>Add proxy routes in your configuration file and restart the server.</small></p></div>';
+            '<p><small>Add HTTP routes in your configuration file and restart the server.</small></p></div>';
         return;
     }
 

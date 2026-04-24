@@ -1,0 +1,504 @@
+# ═══════════════════════════════════════════════════════════════════
+# Torii — Full Configuration Example
+# ═══════════════════════════════════════════════════════════════════
+# This file documents every available configuration option.
+# Copy it to your desired path and adjust as needed.
+# Start torii with: torii --config /path/to/config.yaml
+
+# ─────────────────────────────────────────────────────────────────
+# Logging
+# ─────────────────────────────────────────────────────────────────
+log:
+  debug: false                     # Enable debug mode (verbose internal logging)
+  log-level: INFO                  # Log level: DEBUG, INFO, WARN, ERROR
+  log-path: ""                     # File path for log output. Empty = stdout only.
+  encoding: console                # Log encoding: "console" (human-readable) or "json" (structured)
+  color: true                      # Colored log levels (only applies when encoding is "console")
+
+# ─────────────────────────────────────────────────────────────────
+# API Server (Dashboard & Management API)
+# ─────────────────────────────────────────────────────────────────
+api-server:
+  host: 127.0.0.1                  # Bind address for the API server (use 0.0.0.0 for all interfaces)
+  port: 27000                      # Port for the API/dashboard
+  access-log-path: api-access.log  # Optional path to write API access logs
+  idle-timeout: 60                 # Idle connection timeout in seconds
+  read-timeout: 60                 # Read timeout in seconds
+  write-timeout: 60                # Write timeout in seconds
+
+# ─────────────────────────────────────────────────────────────────
+# Session (Dashboard login sessions)
+# ─────────────────────────────────────────────────────────────────
+session:
+  lifetime: 16h                    # Maximum session lifetime (e.g., 16h, 24h)
+  idle-timeout: 60m                # Session expires after this idle period (e.g., 60m, 30m)
+  cleanup-interval: 1h             # How often expired sessions are purged
+  cookie-domain: ""                # Cookie domain (empty = auto from request host)
+  cookie-secure: false             # Set Secure flag on cookies (true if serving over HTTPS)
+  cookie-http-only: true           # Set HttpOnly flag (prevents JS access to session cookie)
+  cookie-same-site: lax            # SameSite policy: strict, lax, none
+
+# ─────────────────────────────────────────────────────────────────
+# Network Configuration
+# ─────────────────────────────────────────────────────────────────
+net-config:
+
+  # ───────────────────────────────────────────────────────────────
+  # Global middlewares (applied to ALL HTTP listeners/routes)
+  # These run before any listener-specific or route-specific middlewares.
+  # ───────────────────────────────────────────────────────────────
+  global:
+    disable-default-middlewares: false  # If true, RequestId/RequestLog/Metrics are NOT auto-prepended
+    middlewares:
+      - type: "CorazaWaf"
+        options:
+          paranoia-level: 1
+          mode: "detect"
+      - type: "UserAgentBlocker"
+        options:
+          block-empty-ua: true
+          block-defaults:
+            - "scanners"
+            - "recon"
+            - "malicious"
+
+  # ───────────────────────────────────────────────────────────────
+  # TCP Listeners (raw TCP proxying)
+  # ───────────────────────────────────────────────────────────────
+  tcp:
+    - port: 3306                       # Listen port
+      bind: 1                          # 1 = IPv4, 2 = IPv6, 3 = both
+      interface: eth0                  # Optional: bind to specific network interface
+      backend: 192.168.1.50:3306       # Backend address (host:port)
+      disable-default-middlewares: false
+
+  # ───────────────────────────────────────────────────────────────
+  # HTTP Listeners
+  # ───────────────────────────────────────────────────────────────
+  http:
+
+    # ─────────────────────────────────────────────────────────────
+    # Listener 1: Plain HTTP with full middleware showcase
+    # ─────────────────────────────────────────────────────────────
+    - port: 8091
+      bind: 3                          # 1 = IPv4 only, 2 = IPv6 only, 3 = both
+      # interface: eth0                # Optional: bind to specific network interface
+      # disable-http2: false           # Set true to disable HTTP/2 (H2C for plain HTTP)
+      # read-timeout: 30s              # Server-level read timeout
+      # read-header-timeout: 10s       # Server-level read-header timeout
+      # write-timeout: 30s             # Server-level write timeout
+      # idle-timeout: 120s             # Server-level idle timeout
+
+      default:
+        backend: http://localhost:8095
+        # disable-default-middlewares: false  # If true, RequestId/RequestLog/Metrics won't be auto-prepended
+        middlewares:
+
+          #──────────────────────────────────────────────
+          # RequestId
+          # Generates unique request IDs for tracing.
+          #──────────────────────────────────────────────
+          - type: "RequestId"
+            options:
+              prefix: "my-proxy"                  # Custom prefix for request IDs. Auto-generated from hostname if not set.
+
+          #──────────────────────────────────────────────
+          # RequestLog
+          # Logs every incoming request.
+          #──────────────────────────────────────────────
+          - type: "RequestLog"
+            options:
+              request-log-path: access.log        # File path for access logs. Empty = stdout only.
+
+          #──────────────────────────────────────────────
+          # Metrics
+          # Collects request/response metrics for the dashboard.
+          # No options required.
+          #──────────────────────────────────────────────
+          - type: "Metrics"
+
+          #──────────────────────────────────────────────
+          # Headers
+          # Manipulates request/response headers.
+          #──────────────────────────────────────────────
+          - type: "Headers"
+            options:
+              set-headers-req:                    # Headers to add/override on incoming requests (supports $env:VAR, $file:/path)
+                X-Forwarded-Proto: "https"
+              set-headers-res:                    # Headers to add/override on outgoing responses
+                X-Api-Version: "1.0"
+                X-Frame-Options: "DENY"
+              strip-headers-req:                  # Header names to remove from incoming requests
+                - "X-Debug"
+              strip-headers-res:                  # Header names to remove from outgoing responses
+                - "Server"
+              cmp-headers-req:                    # Headers that must match exact values (401 if mismatch)
+                X-Proxy-Id: "Torii"
+
+          #──────────────────────────────────────────────
+          # Cors
+          # Handles CORS preflight and response headers.
+          #──────────────────────────────────────────────
+          - type: "Cors"
+            options:
+              allowed-origins:                    # Origins allowed for cross-origin requests (* = all)
+                - "*"
+              allowed-methods:                    # HTTP methods allowed
+                - "GET"
+                - "POST"
+                - "PUT"
+                - "DELETE"
+                - "PATCH"
+                - "OPTIONS"
+              allowed-headers:                    # Headers the client can send
+                - "Content-Type"
+                - "Authorization"
+              expose-headers:                     # Response headers accessible from JS
+                - "X-Request-Id"
+              allow-credentials: false            # Allow cookies/credentials (cannot be used with origin *)
+              max-age: 3600                       # How long browsers cache preflight results (seconds, 0 = no cache)
+
+          #──────────────────────────────────────────────
+          # RateLimiter
+          # Enforces request rate limits.
+          #──────────────────────────────────────────────
+          - type: "RateLimiter"
+            options:
+              mode: "per-client"                  # "global" (shared limit) or "per-client" (per IP)
+              limiter-req:
+                rate-per-second: 5                # Max sustained req/sec
+                burst: 10                         # Max burst above sustained rate
+              cache-ttl: 24h                      # TTL for per-client entries
+              cleanup-interval: 1h                # Cache cleanup sweep interval
+              max-cache-size: 100000              # Max cache entries
+
+          #──────────────────────────────────────────────
+          # IpFilter
+          # Blocks/allows requests by IP or CIDR range.
+          #──────────────────────────────────────────────
+          - type: "IpFilter"
+            options:
+              allow:                              # Always allowed (overrides block list)
+                - 192.168.1.1/24
+                - 2001:db8::/32
+                - 10.10.10.180
+              block:                              # Denied IPs/CIDRs (ignored when AbuseIPDB is configured)
+                - 94.0.0.1/24
+                - 2001:db8:1234::/48
+                - 182.78.86.62
+              # --- AbuseIPDB (optional) ---
+              # When configured, fetches block list from AbuseIPDB instead of using the static block list.
+              # abuseipdb-api-key: "$env:ABUSEIPDB_API_KEY"   # Supports $env:VAR, $file:/path, or raw key
+              # abuseipdb-confidence-minimum: 90               # Min abuse confidence score (1-100)
+              # abuseipdb-refresh-interval: "24h"              # How often to re-fetch
+
+          #──────────────────────────────────────────────
+          # CountryBlock
+          # Blocks/allows by geographic location (MaxMind GeoIP).
+          #──────────────────────────────────────────────
+          - type: "CountryBlock"
+            options:
+              source:
+                mode: "remote"                    # "local" (file) or "remote" (download URL)
+                path: "https://github.com/iplocate/ip-address-databases/raw/refs/heads/main/ip-to-country/ip-to-country.mmdb"
+                country-field: "country_code"     # Field name in MMDB (use dots for nesting, e.g., country.iso_code)
+                continent-field: "continent_code" # Optional continent field
+                max-size: 300m                    # Max download size (ignored for local)
+                refresh-interval: 24h             # Re-download interval (ignored for local)
+              on-unknown: block                   # Action when country can't be resolved: allow | block
+              # --- Policy ---
+              # If BOTH country and continent lists are defined, continent is the broad policy
+              # and country acts as an exception override.
+              country-list-mode: allow            # allow | block
+              country-list:
+                - PT
+                - CA
+              continent-list-mode: block          # allow | block
+              continent-list:
+                - EU
+              cache-ttl: 24h
+              cleanup-interval: 1h
+              max-cache-size: 10000
+
+          #──────────────────────────────────────────────
+          # UserAgentBlocker
+          # Blocks bots/scanners by user-agent pattern.
+          #──────────────────────────────────────────────
+          - type: "UserAgentBlocker"
+            options:
+              block-empty-ua: true                # Block requests with no User-Agent header
+              block-defaults:                     # Built-in UA pattern categories to block
+                - "scanners"
+                - "recon"
+                - "scrapers"
+                - "headless"
+                - "malicious"
+                - "http-clients"
+                - "cli-tools"
+                - "ai-crawlers"
+              block:                              # Custom UA substrings to block (case-insensitive)
+                - "bad-bot-that-i-want-to-block"
+              allow-defaults:                     # Built-in categories to always allow (overrides blocks)
+                - "search-engines"
+              allow:                              # Custom UA substrings to always allow (overrides blocks)
+                - "googlebot"
+              cache-ttl: 24h
+              cleanup-interval: 1h
+              max-cache-size: 100000
+
+          #──────────────────────────────────────────────
+          # HoneyPot
+          # Traps bots accessing known attack paths.
+          #──────────────────────────────────────────────
+          - type: "HoneyPot"
+            options:
+              defaults:                           # Predefined path groups: php, git, infra, backups, cgi
+                - "git"
+                - "infra"
+                - "backups"
+                - "cgi"
+              paths:                              # Custom honeypot paths
+                - "/my-custom-trap-path"
+              response:
+                trickster-mode: true              # Reply with deceptive responses to waste bot resources (overrides status-code and body)
+                max-slow-tricks: 10               # Max concurrent slow-trick responses (ties up connections on both sides)
+                status-code: 403                  # HTTP status for honeypot hits (ignored if trickster-mode is true)
+                body: "Forbidden"                 # Response body (ignored if trickster-mode is true)
+              cache-ttl: 24h
+              cleanup-interval: 1h
+              max-cache-size: 100000
+
+          #──────────────────────────────────────────────
+          # CircuitBreaker
+          # Stops sending requests to a failing backend.
+          #──────────────────────────────────────────────
+          - type: "CircuitBreaker"
+            options:
+              failure-threshold: 5                # Consecutive 5xx/timeout failures to open the circuit
+              recovery-time: 30s                  # Wait time before allowing a test request (half-open)
+              half-open-success-threshold: 3      # Successes in half-open state to close the circuit
+
+          #──────────────────────────────────────────────
+          # Timeout
+          # Maximum time allowed for the entire request.
+          #──────────────────────────────────────────────
+          - type: "Timeout"
+            options:
+              request-timeout: 30s                # Max request duration (e.g., 30s, 1m, 5m)
+
+          #──────────────────────────────────────────────
+          # BodySizeLimit
+          # Limits incoming request body size.
+          #──────────────────────────────────────────────
+          - type: "BodySizeLimit"
+            options:
+              max-size: 100m                      # Max body size (e.g., 10m, 1g, 512k)
+
+          #──────────────────────────────────────────────
+          # Compression
+          # Compresses response bodies.
+          #──────────────────────────────────────────────
+          - type: "Compression"
+            options:
+              type: "gzip"                        # Compression algorithm: gzip | zlib
+              level: 9                            # Compression level 1 (fastest) to 9 (best compression)
+
+          #──────────────────────────────────────────────
+          # BasicAuth
+          # HTTP Basic Authentication with Argon2id hashes.
+          #──────────────────────────────────────────────
+          - type: "BasicAuth"
+            options:
+              realm: "Internal"                   # Realm shown in browser login prompt
+              credentials:                        # Map of username → argon2id password hash
+                admin: "$argon2id$v=19$m=65536,t=3,p=4$abc123$hashedpassword"
+
+          #──────────────────────────────────────────────
+          # CorazaWaf
+          # Web Application Firewall (Coraza + OWASP CRS).
+          # Inspects headers/URI by default (phase 1).
+          # Enable body inspection for deeper analysis.
+          #──────────────────────────────────────────────
+          - type: "CorazaWaf"
+            options:
+              paranoia-level: 1                   # CRS paranoia level 1-4 (higher = more aggressive, more false positives)
+              inbound-threshold: 5                # Inbound anomaly score to trigger block (lower = stricter)
+              outbound-threshold: 4               # Outbound anomaly score to trigger flag (lower = stricter)
+              mode: "detect"                      # detect (log only) | block (reject requests exceeding threshold)
+              inspect-request-body: false          # Buffer and inspect request bodies (phases 2-3). Adds latency/memory.
+              inspect-response-body: false         # Inspect response bodies (phase 4). Only useful in detect mode.
+              exclusions:                         # CRS rule IDs to suppress (for known false positives)
+                - "920170"
+                - "941100"
+
+          #──────────────────────────────────────────────
+          # Redirect
+          # Redirects requests to a different target.
+          # Terminates the middleware chain.
+          #──────────────────────────────────────────────
+          - type: "Redirect"
+            options:
+              mode: "internal"                    # internal (transparent proxy) | external (HTTP 3xx) | external-scheme-only (change scheme, keep host)
+              target: "192.168.1.109:8092"        # Target URL/host:port. For external-scheme-only, use just "https" or "http".
+              status-code: 302                    # HTTP redirect code: 301 (permanent), 302 (temporary), 307/308 (preserve method). External modes only.
+              drop-path: true                     # Strip original request path when redirecting
+              drop-query: true                    # Strip original query parameters when redirecting
+
+          #──────────────────────────────────────────────
+          # StaticResponse
+          # Returns a fixed HTTP response (no backend).
+          # Terminates the middleware chain.
+          #──────────────────────────────────────────────
+          - type: "StaticResponse"
+            options:
+              status-code: 503                    # HTTP status code (100-599)
+              response-body: '{"status":"maintenance"}' # Response body (leave empty for body-less, e.g., 204)
+              content-type: "application/json"    # Content-Type header (only sent when body is set)
+              headers:                            # Additional response headers
+                Retry-After: "3600"
+                Cache-Control: "no-store"
+
+        # ─────────────────────────────────────────────
+        # Path rules — override middlewares per path
+        # ─────────────────────────────────────────────
+        paths:
+          - pattern: /health
+            # disable-default-middlewares: true   # Opt out of RequestId/RequestLog/Metrics for this path
+            middlewares:
+              - type: "RequestId"
+
+          - pattern: /api/v1/users/*
+            middlewares:
+              - type: "Metrics"
+              - type: "RequestId"
+              - type: "RequestLog"
+              - type: "Headers"
+                options:
+                  set-headers-res:
+                    X-Api-Version: "1.0"
+                  cmp-headers-req:
+                    X-Proxy-Id: Torii
+
+          - pattern: /api/v1/users/*/start
+            middlewares:
+              - type: "Metrics"
+              - type: "RequestId"
+              - type: "RequestLog"
+              - type: "Headers"
+                options:
+                  set-headers-res:
+                    X-Api-Version: "1.0"
+
+          - pattern: /users/*/start
+            middlewares:
+              - type: "RequestId"
+              - type: "RequestLog"
+                options:
+                   request-log-path: access.log
+              - type: "Metrics"
+
+          - pattern: /users/admin/start
+            middlewares:
+              - type: "RequestId"
+              - type: "Metrics"
+
+          - pattern: /static/
+            middlewares:
+              - type: "RequestId"
+
+
+    # ─────────────────────────────────────────────────────────────
+    # Listener 2: HTTPS with TLS, host-based routing, path rules
+    # ─────────────────────────────────────────────────────────────
+    - port: 8092
+      bind: 1                          # IPv4 only
+      interface: en0                   # Bind to specific interface
+      tls:
+        use-acme: true                 # Automatic TLS via ACME (configure via dashboard)
+        # cert: /path/to/cert.pem      # Manual TLS certificate (ignored if use-acme is true)
+        # key: /path/to/key.pem        # Manual TLS private key (ignored if use-acme is true)
+      # disable-http2: false
+      # read-timeout: 30s
+      # read-header-timeout: 10s
+      # write-timeout: 30s
+      # idle-timeout: 120s
+
+      routes:
+        # ── Host-based route: Immich ──
+        - host: immitch.mydomain.pt
+          target:
+            backend: http://192.168.1.27:2283
+            # backend:
+            #   address: http://192.168.1.27:2283
+            #   replace-host-header: true        # Replace Host header with backend's host
+            middlewares:
+              - type: "RequestId"
+              - type: "RequestLog"
+                options:
+                  request-log-path: access.log
+              - type: "Metrics"
+              - type: "CountryBlock"
+                options:
+                  source:
+                    mode: "remote"
+                    path: "https://github.com/iplocate/ip-address-databases/raw/refs/heads/main/ip-to-country/ip-to-country.mmdb"
+                    country-field: "country_code"
+                    continent-field: "continent_code"
+                    max-size: 300m
+                    refresh-interval: 24h
+                  cache-ttl: 24h
+                  cleanup-interval: 1h
+                  max-cache-size: 10000
+                  on-unknown: block
+                  country-list-mode: allow
+                  country-list:
+                    - PT
+                    - CA
+                  continent-list-mode: block
+                  continent-list:
+                    - EU
+
+        # ── Host-based route with path sub-rules ──
+        - host: static.localhost:8092
+          target:
+            backend: http://localhost:8095
+            middlewares:
+              - type: "RequestId"
+
+            paths:
+              - pattern: /jellyfin/*
+                backend: http://192.168.1.100:8096  # Override backend for this path
+                strip-prefix: true                  # Strip the matched path prefix (/jellyfin/foo → /foo)
+                drop-query: false                   # Preserve query parameters (default: false)
+                middlewares:
+                  - type: "Metrics"
+                  - type: "RequestId"
+                  - type: "RequestLog"
+                    options:
+                       request-log-path: access.log
+                  - type: "IpFilter"
+                    options:
+                      allow:
+                       - 192.1.1.1
+                       - 192.168.1.1/24
+                       - 2001:db8::/32
+                  - type: "RateLimiter"
+                    options:
+                      mode: "per-client"
+                      cache-ttl: 24h
+                      cleanup-interval: 1h
+                      max-cache-size: 10000
+                      limiter-req:
+                        rate-per-second: 5
+                        burst: 10
+                  - type: "Headers"
+                    options:
+                      cmp-headers-req:
+                        X-Host-Name: immitch.omeudominio.it
+
+      # Fallback for unmatched hosts on this listener
+      default:
+        backend: http://localhost:8095
+        middlewares:
+          - type: "RequestId"
+

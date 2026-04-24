@@ -36,7 +36,7 @@ func (d *VirtualHostDispatcher) ServeHTTP(w http.ResponseWriter, r *http.Request
 		return
 	}
 	zap.S().Debugf("No route found for host %s", r.Host)
-	http.Error(w, "no route", http.StatusBadGateway)
+	http.Error(w, "Bad Gateway", http.StatusBadGateway)
 }
 
 func buildHostDispatcher(ctx context.Context, defaultTarget *config.RouteTarget, routes []config.Route) (http.Handler, []string, []RouteSnapshot, error) {

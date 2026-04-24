@@ -43,6 +43,7 @@ func init() {
 		"StaticResponse":   {Fn: StaticResponseMiddleware, Terminates: true},
 		"Compression":      {Fn: CompressionMiddleware},
 		"BasicAuth":        {Fn: BasicAuthMiddleware},
+		"CorazaWaf":        {Fn: CorazaWAFMiddleware},
 	}
 }
 

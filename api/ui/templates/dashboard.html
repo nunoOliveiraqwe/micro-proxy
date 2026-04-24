@@ -18,7 +18,7 @@
                 <span class="nav-icon">📊</span><span class="nav-label">Dashboard</span>
             </a></li>
             <li><a href="#" class="nav-link" data-page="proxy-routes">
-                <span class="nav-icon">🔌</span><span class="nav-label">Proxy Routes</span>
+                <span class="nav-icon">🔌</span><span class="nav-label">HTTP Routes</span>
             </a></li>
             <li><a href="#" class="nav-link" data-page="system">
                 <span class="nav-icon">📡</span><span class="nav-label">Activity</span>
@@ -170,17 +170,22 @@
                     <p class="stat-label">⏱ Rate Limit</p>
                     <p class="stat-sub">Rate limiter rejections</p>
                 </div>
+                <div class="stat-card">
+                    <p class="stat-value" id="stat-blocked-waf" style="color:#c0392b">–</p>
+                    <p class="stat-label">🛡️ WAF</p>
+                    <p class="stat-sub">Coraza WAF blocks</p>
+                </div>
             </div>
             <div class="last-updated" id="last-updated">
                 <span class="dot"></span>Waiting for data…
             </div>
         </section>
 
-        <!-- PAGE: Proxy Routes -->
+        <!-- PAGE: HTTP Routes -->
         <section class="page" data-page="proxy-routes" style="display:none;">
             <div style="display:flex;justify-content:space-between;align-items:flex-start;flex-wrap:wrap;gap:1rem;margin-bottom:1.5rem;">
                 <hgroup style="margin:0;">
-                    <h2>Proxy Routes</h2>
+                    <h2>HTTP Routes</h2>
                     <p>Configured proxy server routes</p>
                 </hgroup>
                 <button type="button" class="create-proxy-toggle" id="toggle-create-proxy">+ Create Proxy</button>
@@ -374,7 +379,7 @@
             </div><!-- /create-proxy-panel -->
 
             <div id="proxy-routes">
-                <p aria-busy="true">Loading proxy routes…</p>
+                <p aria-busy="true">Loading HTTP routes…</p>
             </div>
         </section>
 

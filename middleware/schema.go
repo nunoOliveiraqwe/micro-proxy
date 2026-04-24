@@ -325,6 +325,31 @@ func GetMiddlewareSchemas() []MiddlewareSchema {
 					HelpText: "Number of consecutive successful requests in half-open state needed to close the circuit and resume normal traffic."},
 			},
 		},
+		{
+			Name:        "CorazaWaf",
+			Description: "Web Application Firewall powered by Coraza and the OWASP Core Rule Set (CRS). Inspects requests and responses for common attacks such as SQL injection, XSS, and protocol violations.",
+			Fields: []OptionField{
+				{Key: "paranoia-level", Label: "Paranoia Level", Type: FieldTypeSelect, Default: "1",
+					Choices:  []string{"1", "2", "3", "4"},
+					HelpText: "CRS paranoia level (1–4). Higher levels enable more aggressive rules but may increase false positives. Level 1 is recommended for most deployments."},
+				{Key: "inbound-threshold", Label: "Inbound Anomaly Threshold", Type: FieldTypeInt, Default: 5,
+					Placeholder: "e.g. 5",
+					HelpText:    "Cumulative anomaly score a request must reach before being blocked. Lower values are stricter."},
+				{Key: "outbound-threshold", Label: "Outbound Anomaly Threshold", Type: FieldTypeInt, Default: 4,
+					Placeholder: "e.g. 4",
+					HelpText:    "Cumulative anomaly score a response must reach before being flagged. Lower values are stricter."},
+				{Key: "mode", Label: "Mode", Type: FieldTypeSelect, Default: "detect",
+					Choices:  []string{"detect", "block"},
+					HelpText: "Detect: log rule matches but allow the request through. Block: actively reject requests that exceed the anomaly threshold."},
+				{Key: "inspect-request-body", Label: "Inspect Request Body", Type: FieldTypeBool, Default: false,
+					HelpText: "Buffer and inspect request bodies (phases 2–3). Adds latency and memory usage. Disable for routes that only need header/URL inspection."},
+				{Key: "inspect-response-body", Label: "Inspect Response Body", Type: FieldTypeBool, Default: false,
+					HelpText: "Inspect response bodies (phase 4). Only useful in detect mode since the response has already been sent to the client."},
+				{Key: "exclusions", Label: "Rule Exclusions", Type: FieldTypeStringList,
+					Placeholder: "e.g. 920170, 941100",
+					HelpText:    "CRS rule IDs to exclude. Use this to suppress known false positives for your application."},
+			},
+		},
 	}
 	for i, s := range schemas {
 		if entry, exists := registry[s.Name]; exists && entry.Terminates {
