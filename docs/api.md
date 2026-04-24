@@ -21,6 +21,8 @@ Most endpoints require a valid session. Log in via `POST /api/v1/auth/login` to 
 | `/system/interfaces` | `GET` | Yes | Available network interfaces |
 | `/proxy/routes` | `GET` | Yes | List all configured proxy servers |
 | `/proxy/routes/http` | `POST` | Yes | Create a new HTTP proxy server |
+| `/proxy/routes/{serverId}` | `PUT` | Yes | Edit an existing proxy (hot-swap handler) |
+| `/proxy/routes/{serverId}/config` | `GET` | Yes | Get the original creation config for a proxy |
 | `/proxy/routes/{serverId}/start` | `POST` | Yes | Start a stopped proxy |
 | `/proxy/routes/{serverId}/stop` | `POST` | Yes | Stop a running proxy |
 | `/proxy/routes/{serverId}` | `DELETE` | Yes | Delete a proxy |
@@ -30,6 +32,7 @@ Most endpoints require a valid session. Log in via `POST /api/v1/auth/login` to 
 | `/proxy/middlewares/schema` | `GET` | Yes | Middleware field schemas |
 | `/proxy/requests` | `GET` | Yes | Recent proxied request log |
 | `/proxy/errors` | `GET` | Yes | Recent 5xx error log |
+| `/proxy/blocked` | `GET` | Yes | Recent blocked request log |
 | `/acme/config` | `GET` | Yes | Get ACME configuration |
 | `/acme/config` | `POST` | Yes | Save ACME configuration |
 | `/acme/config` | `PATCH` | Yes | Toggle ACME enabled/disabled |
@@ -47,4 +50,3 @@ API keys support scoped access for external integrations:
 | Scope | Description |
 |---|---|
 | `read_stats` | Read metrics and request/error logs |
-

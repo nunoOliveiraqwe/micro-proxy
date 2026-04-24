@@ -61,7 +61,7 @@ func TestGetMiddleware_EmptyKey(t *testing.T) {
 
 func TestGetAvailableMiddlewares(t *testing.T) {
 	names := GetAvailableMiddlewares()
-	assert.Len(t, names, 17)
+	assert.Len(t, names, 19)
 	assert.Contains(t, names, "Metrics")
 	assert.Contains(t, names, "RequestId")
 	assert.Contains(t, names, "RequestLog")
@@ -79,6 +79,8 @@ func TestGetAvailableMiddlewares(t *testing.T) {
 	assert.Contains(t, names, "Cors")
 	assert.Contains(t, names, "Compression")
 	assert.Contains(t, names, "BasicAuth")
+	assert.Contains(t, names, "CorazaWaf")
+	assert.Contains(t, names, "StaticFileServer")
 }
 
 // ---------------------------------------------------------------------------

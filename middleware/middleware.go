@@ -41,6 +41,7 @@ func init() {
 		"CircuitBreaker":   {Fn: CircuitBreakerMiddleware},
 		"Cors":             {Fn: CorsMiddleware},
 		"StaticResponse":   {Fn: StaticResponseMiddleware, Terminates: true},
+		"StaticFileServer": {Fn: StaticFileServerMiddleware, Terminates: true},
 		"Compression":      {Fn: CompressionMiddleware},
 		"BasicAuth":        {Fn: BasicAuthMiddleware},
 		"CorazaWaf":        {Fn: CorazaWAFMiddleware},

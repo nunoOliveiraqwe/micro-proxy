@@ -15,7 +15,7 @@
   - [Cors](#cors)
   - [Headers](#headers)
   - [RateLimiter](#ratelimiter)
-  - [IpBlock](#ipblock)
+  - [IpFilter](#ipfilter)
   - [CountryBlock](#countryblock)
   - [UserAgentBlocker](#useragentblocker)
   - [HoneyPot](#honeypot)
@@ -23,6 +23,11 @@
   - [Redirect](#redirect)
   - [BodySizeLimit](#bodysizelimit)
   - [Timeout](#timeout)
+  - [Compression](#compression)
+  - [BasicAuth](#basicauth)
+  - [CorazaWaf](#corazawaf)
+  - [StaticResponse](#staticresponse)
+  - [StaticFileServer](#staticfileserver)
 - [Full Example](#full-example)
 
 ---
@@ -38,6 +43,10 @@
 | `log.color` | `bool` | `true` | Colored log levels (only applies to `console` encoding). |
 | `api-server.host` | `string` | `127.0.0.1` | Management API bind address. |
 | `api-server.port` | `int` | `27000` | Management API port. |
+| `api-server.access-log-path` | `string` | | Optional path to write API access logs. |
+| `api-server.idle-timeout` | `int` | `60` | Idle connection timeout in seconds. |
+| `api-server.read-timeout` | `int` | `60` | Read timeout in seconds. |
+| `api-server.write-timeout` | `int` | `60` | Write timeout in seconds. |
 
 ## HTTP Listener (`net-config.http[]`)
 
@@ -46,6 +55,7 @@
 | `port` | `int` | Port to listen on. |
 | `bind` | `int` | `1` = IPv4, `2` = IPv6, `3` = both. |
 | `interface` | `string` | Network interface name to bind to (e.g. `en0`). Defaults to loopback. |
+| `disable-http2` | `bool` | Set `true` to disable HTTP/2 (H2C for plain HTTP). |
 | `read-timeout` | `duration` | Server read timeout. |
 | `read-header-timeout` | `duration` | Server read-header timeout. |
 | `write-timeout` | `duration` | Server write timeout. |
@@ -53,12 +63,22 @@
 | `tls.use-acme` | `bool` | Enable automatic TLS via ACME DNS-01. |
 | `tls.cert` | `string` | Path to TLS certificate (manual TLS). |
 | `tls.key` | `string` | Path to TLS private key (manual TLS). |
-| `routes[].host` | `string` | Hostname to match (virtual hosting). |
+| `routes[].host` | `string` | Hostname to match (virtual hosting). Supports wildcards (e.g. `*.home.example.com`). |
 | `routes[].target.backend` | `string` | Backend URL to proxy to. |
 | `routes[].target.middlewares` | `list` | Middleware chain for this route. |
 | `routes[].target.paths[]` | `list` | Path-specific rules with their own middleware chains. |
+| `routes[].target.disable-default-middlewares` | `bool` | If `true`, `RequestId`/`RequestLog`/`Metrics` are not auto-prepended for this route. |
 | `default.backend` | `string` | Catch-all backend when no host matches. |
 | `default.middlewares` | `list` | Middleware chain for the default route. |
+| `default.disable-default-middlewares` | `bool` | If `true`, `RequestId`/`RequestLog`/`Metrics` are not auto-prepended for the default route. |
+
+The `backend` field can also be an object with additional options:
+
+```yaml
+backend:
+  address: http://192.168.1.27:2283
+  replace-host-header: true    # Replace the Host header with the backend's host
+```
 
 ## Path Rules (`paths[]`)
 
@@ -66,13 +86,16 @@
 |---|---|---|
 | `pattern` | `string` | URL pattern to match (supports `*` wildcards). |
 | `backend` | `string` | Optional backend override for this path. |
+| `strip-prefix` | `bool` | Strip the matched path prefix before proxying (e.g. `/jellyfin/foo` → `/foo`). |
 | `drop-query` | `bool` | Strip query parameters before proxying. |
+| `disable-default-middlewares` | `bool` | If `true`, `RequestId`/`RequestLog`/`Metrics` are not auto-prepended for this path. |
 | `middlewares` | `list` | Middleware chain for this path. |
 
 ## Global Middlewares (`net-config.global`)
 
 | Key | Type | Description |
 |---|---|---|
+| `disable-default-middlewares` | `bool` | If `true`, `RequestId`/`RequestLog`/`Metrics` are not auto-prepended globally. |
 | `middlewares` | `list` | Middleware chain applied to all requests on all listeners. |
 
 ## Session (`session`)
@@ -82,6 +105,7 @@
 | `lifetime` | `duration` | `16h` | Maximum session lifetime. |
 | `idle-timeout` | `duration` | `60m` | Session idle timeout. |
 | `cleanup-interval` | `duration` | `1h` | Expired session cleanup interval. |
+| `cookie-domain` | `string` | | Cookie domain (empty = auto from request host). |
 | `cookie-secure` | `bool` | `true` | Set the `Secure` flag on session cookies. |
 | `cookie-http-only` | `bool` | `true` | Set the `HttpOnly` flag on session cookies. |
 | `cookie-same-site` | `string` | `lax` | `SameSite` cookie attribute: `strict`, `lax`, or `none`. |
@@ -92,6 +116,7 @@
 --config <path>       Path to the YAML configuration file.
 --debug               Start stub servers for all configured backends.
 --log-level <level>   Override the log level from config.
+--read-only           Prevent UI mutations from modifying the config file or proxy state.
 ```
 
 ---
@@ -105,6 +130,8 @@ Global middlewares → Route / Default middlewares → Path middlewares → Reve
 ```
 
 Within each layer, they run in the order you list them.
+
+By default, `RequestId`, `RequestLog`, and `Metrics` are automatically prepended to every middleware chain (unless already present or disabled with `disable-default-middlewares`).
 
 ---
 
@@ -122,10 +149,12 @@ Generates a unique ID per request. If applied at multiple layers, deduplicates a
 
 ### RequestLog
 
-Structured request logging. No options.
+Structured request logging. Optionally writes to a file in addition to stdout.
 
 ```yaml
 - type: "RequestLog"
+  options:
+    request-log-path: access.log  # optional file path for access logs
 ```
 
 ---
@@ -147,9 +176,21 @@ Handles CORS preflight and response headers.
 ```yaml
 - type: "Cors"
   options:
-    allow-origin: "*"
-    allow-methods: "GET, POST, PUT, DELETE"
-    allow-headers: "Content-Type, Authorization"
+    allowed-origins:
+      - "*"
+    allowed-methods:
+      - "GET"
+      - "POST"
+      - "PUT"
+      - "DELETE"
+      - "PATCH"
+      - "OPTIONS"
+    allowed-headers:
+      - "Content-Type"
+      - "Authorization"
+    expose-headers:
+      - "X-Request-Id"
+    allow-credentials: false
     max-age: 3600
 ```
 
@@ -196,20 +237,26 @@ Token-bucket rate limiting. Returns `429 Too Many Requests` with a `Retry-After`
 
 ---
 
-### IpBlock
+### IpFilter
 
-IP-based allow/block lists with CIDR support.
+IP-based allow/block lists with CIDR support. Optionally fetches block lists from [AbuseIPDB](https://www.abuseipdb.com/).
 
-> **Note:** The middleware is registered but the filtering logic is not yet fully implemented.
+The allow list always takes priority — IPs matching it are never blocked. When AbuseIPDB is configured, it replaces the static block list.
 
 ```yaml
-- type: "IpBlock"
+- type: "IpFilter"
   options:
-    list-mode: allow               # "allow" or "block"
-    list:
+    allow:                               # always allowed (overrides block list)
       - 192.168.1.0/24
       - 10.0.0.1
       - 2001:db8::/32
+    block:                               # denied (ignored when AbuseIPDB is configured)
+      - 94.0.0.1/24
+      - 182.78.86.62
+    # --- AbuseIPDB (optional) ---
+    # abuseipdb-api-key: "$env:ABUSEIPDB_API_KEY"     # supports $env:VAR, $file:/path
+    # abuseipdb-confidence-minimum: 90                  # min abuse score (1-100)
+    # abuseipdb-refresh-interval: "24h"                 # how often to re-fetch
 ```
 
 ---
@@ -322,17 +369,18 @@ Stops sending requests to a failing backend after consecutive 5xx or timeout fai
 
 ### Redirect
 
-Redirects requests to a different target.
+Redirects requests to a different target. Terminates the middleware chain — no backend is needed.
 
 - **Internal**: proxies the request transparently (the client doesn't know).
-- **External**: sends an HTTP 3xx redirect response.
+- **External**: sends an HTTP 3xx redirect response to a fixed target.
+- **External-scheme-only**: sends an HTTP 3xx redirect preserving the incoming host, only changing the scheme. Ideal for HTTP→HTTPS across multiple subdomains.
 
 ```yaml
 - type: "Redirect"
   options:
-    mode: "external"               # "internal" or "external"
-    status-code: 302               # external mode only (301, 302, 307, 308)
-    target: "http://192.168.1.100:8080"
+    mode: "external"               # "internal", "external", or "external-scheme-only"
+    status-code: 302               # external modes only (301, 302, 307, 308)
+    target: "http://192.168.1.100:8080"  # URL for internal/external; "https" for external-scheme-only
     drop-path: true
     drop-query: true
 ```
@@ -363,7 +411,85 @@ Sets the maximum time allowed for the entire request to complete.
 
 ---
 
+### Compression
+
+Compresses response bodies to reduce bandwidth usage.
+
+```yaml
+- type: "Compression"
+  options:
+    type: "gzip"                   # "gzip" or "zlib"
+    level: 9                       # 1 (fastest) to 9 (best compression)
+```
+
+---
+
+### BasicAuth
+
+HTTP Basic Authentication with Argon2id password hashes. Generate hashes with the included `argon2` CLI tool (`go run ./cmd/argon2`).
+
+```yaml
+- type: "BasicAuth"
+  options:
+    realm: "Internal"
+    credentials:
+      admin: "$argon2id$v=19$m=65536,t=3,p=4$abc123$hashedpassword"
+```
+
+---
+
+### CorazaWaf
+
+Web Application Firewall powered by [Coraza](https://coraza.io/) and the OWASP Core Rule Set (CRS). Inspects requests for SQL injection, XSS, protocol violations, and more.
+
+```yaml
+- type: "CorazaWaf"
+  options:
+    paranoia-level: 1              # CRS paranoia level 1-4 (higher = stricter, more false positives)
+    inbound-threshold: 5           # anomaly score to trigger block (lower = stricter)
+    outbound-threshold: 4          # outbound anomaly score threshold
+    mode: "detect"                 # "detect" (log only) or "block" (reject)
+    inspect-request-body: false    # buffer and inspect request bodies (adds latency)
+    inspect-response-body: false   # inspect response bodies (detect mode only)
+    exclusions:                    # CRS rule IDs to suppress (for known false positives)
+      - "920170"
+      - "941100"
+```
+
+---
+
+### StaticResponse
+
+Returns a fixed HTTP response without forwarding to any backend. Useful for maintenance pages, health stubs, or canned API responses. Terminates the middleware chain — no backend is needed.
+
+```yaml
+- type: "StaticResponse"
+  options:
+    status-code: 503
+    response-body: '{"status":"maintenance"}'
+    content-type: "application/json"
+    headers:
+      Retry-After: "3600"
+      Cache-Control: "no-store"
+```
+
+---
+
+### StaticFileServer
+
+Serves static files from a local directory. Supports SPA fallback, index files, and dotfile protection. Terminates the middleware chain — no backend is needed.
+
+```yaml
+- type: "StaticFileServer"
+  options:
+    root: "/var/www/html"          # path to the directory to serve
+    index-file: "index.html"       # file to serve for directory requests
+    spa: false                     # SPA mode: unmatched paths fall back to index
+    allow-dot-files: false         # allow serving hidden files (.env, .git, etc.)
+```
+
+---
+
 ## Full Example
 
-See [`config-example.config`](../config-example.config) for a complete configuration file with all middleware types.
-
+See [`config-example.yaml`](../config-example.yaml) for a complete configuration file with all middleware types.

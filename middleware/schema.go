@@ -286,6 +286,22 @@ func GetMiddlewareSchemas() []MiddlewareSchema {
 			},
 		},
 		{
+			Name:        "StaticFileServer",
+			Description: "Serves static files from a local directory. Supports SPA fallback, index files, cache control, and dotfile protection. Terminates the request — no backend is needed.",
+			Terminates:  true,
+			Fields: []OptionField{
+				{Key: "root", Label: "Root Directory", Type: FieldTypeString, Required: true,
+					Placeholder: "e.g. /var/www/html or ./public",
+					HelpText:    "Absolute or relative path to the directory containing static files to serve."},
+				{Key: "index-file", Label: "Index File", Type: FieldTypeString, Default: "index.html",
+					HelpText: "File to serve when a directory is requested. Defaults to index.html."},
+				{Key: "spa", Label: "SPA Mode", Type: FieldTypeBool, Default: false,
+					HelpText: "Single Page Application mode. When enabled, unmatched paths fall back to the root index file instead of returning 404."},
+				{Key: "allow-dot-files", Label: "Allow Dotfiles", Type: FieldTypeBool, Default: false,
+					HelpText: "Allow serving hidden files (names starting with a dot, e.g. .env, .git). Disabled by default for security."},
+			},
+		},
+		{
 			Name:        "Compression",
 			Description: "Compresses response bodies using gzip or zlib to reduce bandwidth usage.",
 			Fields: []OptionField{
