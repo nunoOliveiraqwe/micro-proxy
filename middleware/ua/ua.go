@@ -40,6 +40,7 @@ func NewUaBlocker(conf *UaBlockerConfig) (*Blocker, error) {
 	if !hasPatterns && !conf.BlockEmptyUA {
 		return nil, fmt.Errorf("UaBlockerConfig: no patterns configured and block-empty-ua is false — nothing to do")
 	}
+
 	cache, err := util.NewCache[*uaCacheEntry](conf.CacheOpt)
 	if err != nil {
 		return nil, fmt.Errorf("UaBlockerConfig: failed to create cache: %v", err)

@@ -4,7 +4,6 @@ import (
 	"context"
 	"errors"
 	"net/http"
-	"strconv"
 	"time"
 
 	"github.com/nunoOliveiraqwe/torii/internal/ctxkeys"
@@ -91,37 +90,13 @@ func MetricsMiddleware(ctx context.Context, next http.HandlerFunc, _ Config) htt
 }
 
 func resolveReportFunc(ctx context.Context) metrics.MetricsReportFunc {
-	port := ctx.Value(ctxkeys.Port)
-	if port == nil || port == "" {
-		zap.S().Warnf("Port not found in middleware options for metrics resolution")
+
+	conName, err := buildNameForConnection(ctx, "metric")
+
+	if err != nil {
+		zap.S().Warnf("Failed to build connection name for metrics resolution: %v", err)
 		return nil
 	}
-	portStr, ok := port.(string)
-	if !ok {
-		_, isInt := port.(int)
-		if !isInt {
-			zap.S().Warnf("Port is not of type string")
-			return nil
-		}
-		portStr = strconv.Itoa(port.(int))
-	}
-	hostStr := ""
-	host := ctx.Value(ctxkeys.Host)
-	if host != nil {
-		hostStr2, ok := host.(string)
-		if ok {
-			hostStr = hostStr2
-		}
-	}
-	pathStr := ""
-	path := ctx.Value(ctxkeys.Path)
-	if path != nil {
-		pathStr2, ok := path.(string)
-		if ok {
-			pathStr = pathStr2
-		}
-	}
-	conName := metrics.ProxyHostPathMetricsName(portStr, hostStr, pathStr)
 
 	mgrManager := ctx.Value(ctxkeys.MetricsMgr)
 	if mgrManager == nil {

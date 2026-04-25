@@ -95,8 +95,8 @@ func (l *perClientLimiter) limit(r *http.Request, w http.ResponseWriter) bool {
 	return false
 }
 
-func RateLimitMiddleware(_ context.Context, next http.HandlerFunc, conf Config) http.HandlerFunc {
-	limitConf, err := parseRateLimitConfig(conf)
+func RateLimitMiddleware(ctx context.Context, next http.HandlerFunc, conf Config) http.HandlerFunc {
+	limitConf, err := parseRateLimitConfig(ctx, conf)
 	if err != nil {
 		zap.S().Errorf("Failed to parse rate limit middleware configuration: %v. Failing closed.", err)
 		return func(w http.ResponseWriter, _ *http.Request) {
@@ -150,7 +150,7 @@ func newLimiter(c *rateLimitConf) (limiter, error) {
 	}, nil
 }
 
-func parseRateLimitConfig(conf Config) (*rateLimitConf, error) {
+func parseRateLimitConfig(ctx context.Context, conf Config) (*rateLimitConf, error) {
 	zap.S().Debug("Parsing rate limit middleware configuration")
 	reqLimit, ok := conf.Options["limiter-req"]
 	if !ok {

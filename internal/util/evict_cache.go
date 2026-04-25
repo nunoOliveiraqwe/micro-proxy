@@ -23,18 +23,24 @@ type EvictableEntry interface {
 }
 
 type CacheOptions struct {
-	MaxEntries      int
-	TTL             time.Duration
-	CleanupInterval time.Duration
+	manager                 *CacheInsightManager //if defined cache is registered with manager
+	IsUsingDefaultCacheName bool
+	TrackRate               bool
+	CacheName               string
+	MaxEntries              int
+	TTL                     time.Duration
+	CleanupInterval         time.Duration
 }
 
 type Cache[T EvictableEntry] struct {
+	cacheName       string
 	ctx             context.Context
 	maxEntries      int
 	ttl             time.Duration
 	cleanupInterval time.Duration
 	mu              sync.RWMutex
 	cache           map[string]T
+	tracker         Tracker
 }
 
 func ParseCacheOptions(configMap map[string]interface{}) (*CacheOptions, error) {
@@ -72,21 +78,60 @@ func ParseCacheOptions(configMap map[string]interface{}) (*CacheOptions, error) 
 	} else if m, ok := maxCache.(int); ok {
 		maxCacheSize = m
 	}
+
+	isUsingDefaultCacheName := true
+	cacheNameStr := fmt.Sprintf("cache-%d", time.Now().UnixNano())
+	cacheName, ok := configMap["cache-name"]
+	if ok {
+		if m, ok := cacheName.(string); ok {
+			cacheTtlStr = m
+			isUsingDefaultCacheName = false
+		}
+	}
+	trackRateBool := false
+	trackRate, ok := configMap["track-rate"]
+	if !ok {
+		zap.S().Warnf("'track-rate' option not specified, defaulting to false")
+	} else if m, ok := trackRate.(bool); ok {
+		trackRateBool = m
+	}
+
+	var mgrManagerCasted *CacheInsightManager
+	mgr, ok := configMap[CacheInsightKey]
+	if ok {
+		if m, ok := mgr.(*CacheInsightManager); ok {
+			mgrManagerCasted = m
+		}
+	}
+
 	return &CacheOptions{
-		MaxEntries:      maxCacheSize,
-		TTL:             ttl,
-		CleanupInterval: cleanupInterval,
+		manager:                 mgrManagerCasted,
+		IsUsingDefaultCacheName: isUsingDefaultCacheName,
+		TrackRate:               trackRateBool,
+		CacheName:               cacheNameStr,
+		MaxEntries:              maxCacheSize,
+		TTL:                     ttl,
+		CleanupInterval:         cleanupInterval,
 	}, nil
 }
 
 func NewCache[T EvictableEntry](options *CacheOptions) (*Cache[T], error) {
+	rateTracker := NewNopRateTracker()
+	if options.TrackRate {
+		rateTracker = NewRateTracker()
+	}
 	c := &Cache[T]{
+		cacheName:       options.CacheName,
 		ctx:             context.Background(),
 		cleanupInterval: options.CleanupInterval,
 		maxEntries:      options.MaxEntries,
 		mu:              sync.RWMutex{},
 		ttl:             options.TTL,
 		cache:           make(map[string]T),
+		tracker:         rateTracker,
+	}
+	if options.manager != nil {
+		options.manager.RegisterCache(c)
 	}
 	c.startCleanup()
 	return c, nil
@@ -100,6 +145,7 @@ func (c *Cache[T]) CacheValue(ip string, value T) {
 	}
 	value.Touch()
 	c.cache[ip] = value
+	c.tracker.Mark(1)
 }
 
 func (c *Cache[T]) GetValue(ip string) (T, error) {
@@ -107,13 +153,16 @@ func (c *Cache[T]) GetValue(ip string) (T, error) {
 	defer c.mu.RUnlock()
 	entry, ok := c.cache[ip]
 	if !ok {
+		c.tracker.MarkMiss()
 		var zero T
 		return zero, ErrCacheMiss
 	}
 	if time.Since(entry.GetLastReadAt()) > c.ttl {
+		c.tracker.MarkMiss()
 		var zero T
 		return zero, ErrCacheMiss
 	}
+	c.tracker.MarkHit()
 	entry.Touch()
 	return entry, nil
 }
@@ -169,4 +218,50 @@ func (c *Cache[T]) sweep() {
 			delete(c.cache, ip)
 		}
 	}
+}
+
+func (c *Cache[T]) CacheName() string {
+	return c.cacheName
+}
+
+func (c *Cache[T]) GetMaxLen() int {
+	return c.maxEntries
+}
+
+func (c *Cache[T]) GetCurrentNumberOfElements() int {
+	return len(c.cache)
+}
+
+func (c *Cache[T]) GetAllKeys() []string {
+	c.mu.RLock()
+	defer c.mu.RUnlock()
+	keys := make([]string, 0, len(c.cache))
+	for k := range c.cache {
+		keys = append(keys, k)
+	}
+	return keys
+}
+
+func (c *Cache[T]) CacheInsertionM1Rate() float64 {
+	return c.tracker.M1Rate()
+}
+
+func (c *Cache[T]) CacheInsertionM5Rate() float64 {
+	return c.tracker.M5Rate()
+}
+
+func (c *Cache[T]) CacheInsertionM15Rate() float64 {
+	return c.tracker.M15Rate()
+}
+
+func (c *Cache[T]) CacheInsertionTotal() int64 {
+	return c.tracker.Total()
+}
+
+func (c *Cache[T]) CacheHits() int64 {
+	return c.tracker.Hits()
+}
+
+func (c *Cache[T]) CacheMisses() int64 {
+	return c.tracker.Misses()
 }

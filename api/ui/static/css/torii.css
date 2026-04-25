@@ -1367,3 +1367,35 @@
     background: var(--torii-review-tab-hover-bg);
 }
 
+/* ---------- Cache Insights ---------- */
+.cache-capacity-bar {
+    height: 6px;
+    border-radius: 3px;
+    background: var(--torii-gauge-bar-bg, rgba(255,255,255,0.06));
+    overflow: hidden;
+}
+.cache-capacity-fill {
+    height: 100%;
+    border-radius: 3px;
+    background: var(--torii-accent, #7c6ef0);
+    transition: width 0.4s ease;
+}
+.cache-keys-list {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.35rem;
+    margin-top: 0.5rem;
+    max-height: 200px;
+    overflow-y: auto;
+    padding: 0.25rem 0;
+}
+.cache-key-tag {
+    display: inline-block;
+    padding: 0.15rem 0.5rem;
+    font-size: 0.75rem;
+    border-radius: 0.25rem;
+    background: var(--pico-code-background-color);
+    color: var(--pico-code-color);
+    border: 1px solid var(--pico-muted-border-color);
+    word-break: break-all;
+}

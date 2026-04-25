@@ -12,6 +12,7 @@ import (
 	"github.com/nunoOliveiraqwe/torii/internal/ctxkeys"
 	"github.com/nunoOliveiraqwe/torii/internal/sqlite"
 	"github.com/nunoOliveiraqwe/torii/internal/store"
+	"github.com/nunoOliveiraqwe/torii/internal/util"
 	"github.com/nunoOliveiraqwe/torii/metrics"
 	"github.com/nunoOliveiraqwe/torii/proxy"
 	"github.com/nunoOliveiraqwe/torii/proxy/acme"
@@ -45,6 +46,7 @@ type SystemService interface {
 	GetServiceStore() *ServiceStore
 	GetConfiguredProxyServers() []*proxy.ProxySnapshot
 	GetGlobalMetricsManager() *metrics.ConnectionMetricsManager
+	GetCacheInsightManager() *util.CacheInsightManager
 	GetSSEBroker() *SSEBroker
 	StartProxy(port int) error
 	StopProxy(port int) error
@@ -62,6 +64,7 @@ type SystemService interface {
 
 type systemService struct {
 	micro                *proxy.Torii
+	cacheInsightsManager *util.CacheInsightManager
 	db                   *sqlite.DB
 	sessions             *session.Registry
 	serviceStore         *ServiceStore
@@ -77,6 +80,7 @@ type systemService struct {
 func NewSystemService(conf config.AppConfig, configPath string, readOnly bool) (SystemService, error) {
 	zap.S().Info("Initializing system service")
 	mgr := metrics.NewGlobalMetricsHandler(2, context.Background())
+	cInMgr := util.NewCacheInsightManager()
 
 	db := sqlite.NewDB("torii.db")
 	if err := db.Open(); err != nil {
@@ -96,7 +100,7 @@ func NewSystemService(conf config.AppConfig, configPath string, readOnly bool) (
 		}
 	}
 
-	m, err := proxy.NewTorii(conf.NetConfig, mgr, acmeMgr)
+	m, err := proxy.NewTorii(conf.NetConfig, mgr, cInMgr, acmeMgr)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create micro proxy: %w", err)
 	}
@@ -105,6 +109,7 @@ func NewSystemService(conf config.AppConfig, configPath string, readOnly bool) (
 	svc := &systemService{
 		micro:                m,
 		db:                   db,
+		cacheInsightsManager: cInMgr,
 		sessions:             sessions,
 		acmeStore:            acmeStore,
 		globalMetricsManager: mgr,
@@ -262,13 +267,15 @@ func (sm *systemService) DeleteProxy(port int) error {
 	if err != nil {
 		return fmt.Errorf("failed to stop proxy server on port %d: %w", port, err)
 	}
-	zap.S().Infof("Proxy server stopped successfully on port %d", port)
+	sm.globalMetricsManager.RemoveMetricsForServer(fmt.Sprintf("http-%d", port))
+	zap.S().Infof("Proxy server deleted successfully on port %d", port)
 	return nil
 }
 
 func (sm *systemService) AddHttpListener(conf config.HTTPListener) error {
 	zap.S().Infof("Adding HTTP listener on port %d", conf.Port)
 	ctx := context.WithValue(context.Background(), ctxkeys.MetricsMgr, sm.globalMetricsManager)
+	ctx = context.WithValue(ctx, ctxkeys.CacheInsightMgr, sm.cacheInsightsManager)
 	if err := sm.micro.AddHttpServer(ctx, conf, nil); err != nil {
 		return fmt.Errorf("failed to add HTTP listener on port %d: %w", conf.Port, err)
 	}
@@ -288,6 +295,7 @@ func (sm *systemService) GetProxyConfig(port int) *config.HTTPListener {
 func (sm *systemService) EditProxy(port int, conf config.HTTPListener) error {
 	zap.S().Infof("Editing proxy on port %d", port)
 	ctx := context.WithValue(context.Background(), ctxkeys.MetricsMgr, sm.globalMetricsManager)
+	ctx = context.WithValue(ctx, ctxkeys.CacheInsightMgr, sm.cacheInsightsManager)
 
 	requiresRestart, err := sm.micro.DoesConfigRequireServerRestart(port, conf)
 	zap.S().Debugf("Config change for port %d requires server restart: %v", port, requiresRestart)
@@ -345,4 +353,8 @@ func (sm *systemService) PersistConfig() error {
 	}
 	zap.S().Info("Configuration persisted to disk")
 	return nil
+}
+
+func (sm *systemService) GetCacheInsightManager() *util.CacheInsightManager {
+	return sm.cacheInsightsManager
 }

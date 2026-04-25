@@ -15,6 +15,7 @@ import (
 	"github.com/nunoOliveiraqwe/torii/internal/domain"
 	"github.com/nunoOliveiraqwe/torii/internal/sqlite"
 	"github.com/nunoOliveiraqwe/torii/internal/store"
+	"github.com/nunoOliveiraqwe/torii/internal/util"
 	"github.com/nunoOliveiraqwe/torii/metrics"
 	"github.com/nunoOliveiraqwe/torii/proxy"
 	"github.com/stretchr/testify/mock"
@@ -169,8 +170,9 @@ func (t *testSystemService) GetRecentRequests(n int) []metrics.RequestLogEntry {
 func (t *testSystemService) GetRecentBlockedEntries(n int) []metrics.BlockLogEntry {
 	return []metrics.BlockLogEntry{}
 }
-func (t *testSystemService) PersistConfig() error { return nil }
-func (t *testSystemService) IsReadOnly() bool     { return false }
+func (t *testSystemService) PersistConfig() error                              { return nil }
+func (t *testSystemService) IsReadOnly() bool                                  { return false }
+func (t *testSystemService) GetCacheInsightManager() *util.CacheInsightManager { return nil }
 
 // ---------------------------------------------------------------------------
 // Test fixture builder

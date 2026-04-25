@@ -9,6 +9,7 @@ import (
 
 	"github.com/nunoOliveiraqwe/torii/config"
 	"github.com/nunoOliveiraqwe/torii/internal/ctxkeys"
+	"github.com/nunoOliveiraqwe/torii/internal/util"
 	"github.com/nunoOliveiraqwe/torii/metrics"
 	"github.com/nunoOliveiraqwe/torii/proxy/acme"
 	"go.uber.org/zap"
@@ -33,9 +34,12 @@ type Torii struct {
 	lock               sync.Mutex
 	acmeManager        *acme.LegoAcmeManager
 	metricsManager     *metrics.ConnectionMetricsManager
+	cacheManager       *util.CacheInsightManager
 }
 
-func NewTorii(conf config.NetworkConfig, mgr *metrics.ConnectionMetricsManager, acmeMgr *acme.LegoAcmeManager) (*Torii, error) {
+func NewTorii(conf config.NetworkConfig, mgr *metrics.ConnectionMetricsManager,
+	cacheMgr *util.CacheInsightManager,
+	acmeMgr *acme.LegoAcmeManager) (*Torii, error) {
 	zap.S().Info("Initializing torii with configuration: ", conf)
 	m := Torii{
 		stoppedHttpServers: make(map[int]MicroHttpServer),
@@ -43,8 +47,10 @@ func NewTorii(conf config.NetworkConfig, mgr *metrics.ConnectionMetricsManager, 
 		lock:               sync.Mutex{},
 		metricsManager:     mgr,
 		acmeManager:        acmeMgr,
+		cacheManager:       cacheMgr,
 	}
 	ctx := context.WithValue(context.Background(), ctxkeys.MetricsMgr, mgr)
+	ctx = context.WithValue(ctx, ctxkeys.CacheInsightMgr, cacheMgr)
 	err := m.initializeHttpNetworkStackFromConf(ctx, conf)
 	if err != nil {
 		return nil, err
@@ -222,6 +228,7 @@ func (m *Torii) HotSwapHandler(ctx context.Context, port int, conf config.HTTPLi
 	}
 
 	ctx = context.WithValue(ctx, ctxkeys.MetricsMgr, m.metricsManager)
+	ctx = context.WithValue(ctx, ctxkeys.CacheInsightMgr, m.cacheManager)
 
 	//TODO -> optimize by only rebuilding the affected route's handler's instead of the whole handler chain.
 	//only swap what's changed

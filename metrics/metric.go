@@ -184,31 +184,3 @@ func (m *Metric) String() string {
 		m.CacheMisses,
 	)
 }
-
-func ProxyPathMetricsName(port, path string) string {
-	if path == "" {
-		return ProxyMetricsName(port)
-	}
-	return fmt.Sprintf("metric-port-%s-path-%s", port, path)
-}
-
-func ProxyHostPathMetricsName(port, host, path string) string {
-	if host == "" {
-		return ProxyPathMetricsName(port, path)
-	}
-	if path == "" {
-		return ProxyHostMetricsName(port, host)
-	}
-	return fmt.Sprintf("metric-port-%s-host-%s-path-%s", port, host, path)
-}
-
-func ProxyHostMetricsName(port, host string) string {
-	if host == "" {
-		return ProxyMetricsName(port)
-	}
-	return fmt.Sprintf("metric-port-%s-host-%s", port, host)
-}
-
-func ProxyMetricsName(port string) string {
-	return fmt.Sprintf("metric-port-%s", port)
-}

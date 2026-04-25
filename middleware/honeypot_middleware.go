@@ -6,6 +6,7 @@ import (
 	"net/http"
 	"net/netip"
 
+	"github.com/nunoOliveiraqwe/torii/internal/ctxkeys"
 	"github.com/nunoOliveiraqwe/torii/internal/netutil"
 	"github.com/nunoOliveiraqwe/torii/internal/util"
 	"github.com/nunoOliveiraqwe/torii/metrics"
@@ -103,8 +104,8 @@ var honeypotDefaults = map[string][]string{
 	},
 }
 
-func HoneyPotMiddleware(_ context.Context, next http.HandlerFunc, conf Config) http.HandlerFunc {
-	h, err := parseHoneyPotConfig(conf)
+func HoneyPotMiddleware(ctx context.Context, next http.HandlerFunc, conf Config) http.HandlerFunc {
+	h, err := parseHoneyPotConfig(ctx, conf)
 	if err != nil {
 		zap.S().Errorf("HoneyPotMiddleware failed to parse configuration: %v. Failing closed.", err)
 		return func(writer http.ResponseWriter, request *http.Request) {
@@ -164,15 +165,30 @@ func HoneyPotMiddleware(_ context.Context, next http.HandlerFunc, conf Config) h
 	}
 }
 
-func parseHoneyPotConfig(conf Config) (*honeypot.HoneyPotConfig, error) {
+func parseHoneyPotConfig(ctx context.Context, conf Config) (*honeypot.HoneyPotConfig, error) {
 	zap.S().Info("HoneyPotMiddleware: parsing configuration")
 	if conf.Options == nil {
 		return nil, fmt.Errorf("HoneyPotMiddleware: missing required options")
 	}
+	//i want to register this cache
+	conf.Options[util.CacheInsightKey] = ctx.Value(ctxkeys.CacheInsightMgr)
 	cacheOpts, err := util.ParseCacheOptions(conf.Options)
 	if err != nil {
 		return nil, err
 	}
+
+	cacheOpts.TrackRate = true
+
+	if cacheOpts.IsUsingDefaultCacheName {
+		cacheName, err2 := buildNameForConnection(ctx, "honeypot")
+		if err2 != nil {
+			zap.S().Warnf("HoneyPotMiddleware: failed to build connection name for cache options: %v. Using default cache name.", err2)
+		} else {
+			cacheOpts.CacheName = cacheName
+		}
+	}
+
+	zap.S().Debug("HoneyPotMiddleware: parsed cache options", zap.Any("cacheOpts", cacheOpts))
 
 	var paths []string
 

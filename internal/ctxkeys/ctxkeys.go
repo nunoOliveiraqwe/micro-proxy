@@ -13,4 +13,5 @@ const (
 	CountryCode
 	ContinentCode
 	BlockInfo
+	CacheInsightMgr
 )

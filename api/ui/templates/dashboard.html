@@ -186,10 +186,19 @@
             <div style="display:flex;justify-content:space-between;align-items:flex-start;flex-wrap:wrap;gap:1rem;margin-bottom:1.5rem;">
                 <hgroup style="margin:0;">
                     <h2>HTTP Routes</h2>
-                    <p>Configured proxy server routes</p>
+                    <p>Configured proxy server routes and cache insights</p>
                 </hgroup>
-                <button type="button" class="create-proxy-toggle" id="toggle-create-proxy">+ Create Proxy</button>
+                <button type="button" class="create-proxy-toggle" id="toggle-create-proxy" style="display:none;">+ Create Proxy</button>
             </div>
+
+            <!-- Inner tab bar -->
+            <div class="inner-tabs" id="proxy-tabs">
+                <button class="inner-tab active" data-proxy-tab="proxy-tab-routes">Routes</button>
+                <button class="inner-tab" data-proxy-tab="proxy-tab-cache">Cache</button>
+            </div>
+
+            <!-- Tab: Routes -->
+            <div class="inner-tab-panel" id="proxy-tab-routes">
 
             <!-- Inline Create Proxy Wizard (collapsed by default) -->
             <div id="create-proxy-panel" style="display:none;margin-bottom:2rem;">
@@ -381,6 +390,15 @@
             <div id="proxy-routes">
                 <p aria-busy="true">Loading HTTP routes…</p>
             </div>
+            </div><!-- /proxy-tab-routes -->
+
+            <!-- Tab: Cache -->
+            <div class="inner-tab-panel" id="proxy-tab-cache" style="display:none;">
+                <div id="cache-insights-container">
+                    <p aria-busy="true">Loading cache data…</p>
+                </div>
+            </div>
+
         </section>
 
         <!-- PAGE: System -->
@@ -664,6 +682,7 @@
 <script src="/static/js/account.js"></script>
 <script src="/static/js/acme.js"></script>
 <script src="/static/js/api-keys.js"></script>
+<script src="/static/js/cache-insights.js"></script>
 <script src="/static/js/wizard.js"></script>
 <script src="/static/js/bootstrap.js"></script>
 {{ end }}

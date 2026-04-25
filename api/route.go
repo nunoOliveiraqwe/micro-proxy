@@ -263,6 +263,16 @@ var routes = []ApplicationRoute{
 		HandlerFunc:        handleGetRecentBlocked,
 	},
 	{
+		Name:               "Cache Insights",
+		Description:        "Returns insights about the cache performance, including hit/miss ratio and cached keys(Ips). ",
+		Method:             "GET",
+		Pattern:            "/cache/insights",
+		IsAllowedBeforeFts: false,
+		IsAllowedAfterFts:  true,
+		IsSecure:           true,
+		HandlerFunc:        handleGetCacheInsights,
+	},
+	{
 		Name:               "Get ACME Configuration",
 		Description:        "Returns the current ACME / TLS configuration",
 		Method:             "GET",

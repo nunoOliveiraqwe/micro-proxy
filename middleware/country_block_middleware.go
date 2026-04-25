@@ -8,6 +8,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/nunoOliveiraqwe/torii/internal/ctxkeys"
 	"github.com/nunoOliveiraqwe/torii/internal/netutil"
 	"github.com/nunoOliveiraqwe/torii/internal/util"
 	"github.com/nunoOliveiraqwe/torii/middleware/country"
@@ -15,7 +16,7 @@ import (
 )
 
 func CountryBlockMiddleware(ctx context.Context, next http.HandlerFunc, middlewareConf Config) http.HandlerFunc {
-	filter, err := initCountryFilter(middlewareConf)
+	filter, err := initCountryFilter(ctx, middlewareConf)
 	if err != nil {
 		zap.S().Errorf("CountryBlockMiddleware: failed to initialize country filter: %v. Failing closed.", err)
 		return func(w http.ResponseWriter, r *http.Request) {
@@ -49,12 +50,24 @@ func CountryBlockMiddleware(ctx context.Context, next http.HandlerFunc, middlewa
 	}
 }
 
-func initCountryFilter(middlewareConf Config) (*country.Filter, error) {
+func initCountryFilter(ctx context.Context, middlewareConf Config) (*country.Filter, error) {
+	//i want to register this cache
+	middlewareConf.Options[util.CacheInsightKey] = ctx.Value(ctxkeys.CacheInsightMgr)
 	cacheOpts, err := util.ParseCacheOptions(middlewareConf.Options)
 	if err != nil {
 		zap.S().Errorf("Failed to parse cache options: %v", err)
 		return nil, err
 	}
+
+	if cacheOpts.IsUsingDefaultCacheName {
+		cacheName, err2 := buildNameForConnection(ctx, "country-block")
+		if err2 != nil {
+			zap.S().Warnf("UserAgentBlockMiddleware: failed to build connection name for cache options: %v. Using default cache name.", err2)
+		} else {
+			cacheOpts.CacheName = cacheName
+		}
+	}
+	cacheOpts.TrackRate = true
 
 	// Parse source options
 	sourceRaw, ok := middlewareConf.Options["source"]

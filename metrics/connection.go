@@ -230,6 +230,29 @@ func (h *ConnectionMetricsManager) AddWildcardListener(fn MetricListenerFunc) in
 	return h.AddListener("", fn)
 }
 
+func (h *ConnectionMetricsManager) RemoveMetricsForServer(serverId string) {
+	zap.S().Infof("Removing all connection metrics for server %s", serverId)
+
+	removedNames := make(map[string]struct{})
+	for name, cm := range h.connectionMetricsMap {
+		if cm.serverId == serverId && name != globalMetricsConName {
+			delete(h.connectionMetricsMap, name)
+			removedNames[name] = struct{}{}
+			zap.S().Debugf("Removed connection metric %s for server %s", name, serverId)
+		}
+	}
+
+	// clean up listeners that were bound to the removed connections.
+	h.listenersMu.Lock()
+	for id, l := range h.listeners {
+		if _, gone := removedNames[l.connectionName]; gone {
+			delete(h.listeners, id)
+			zap.S().Debugf("Removed orphaned listener %d for deleted connection %s", id, l.connectionName)
+		}
+	}
+	h.listenersMu.Unlock()
+}
+
 func (h *ConnectionMetricsManager) GetRegisteredConnectionNames() []string {
 	names := make([]string, 0, len(h.connectionMetricsMap))
 	for name := range h.connectionMetricsMap {

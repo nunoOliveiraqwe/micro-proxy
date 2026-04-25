@@ -42,6 +42,7 @@ func buildMux(port int, logPath string, svc app.SystemService) *http.ServeMux {
 	ctx := context.WithValue(context.Background(), ctxkeys.Port, strconv.Itoa(port))
 	ctx = context.WithValue(ctx, ctxkeys.MetricsMgr, svc.GetGlobalMetricsManager())
 	ctx = context.WithValue(ctx, ctxkeys.ServerID, fmt.Sprintf("http-%d", port))
+	ctx = context.WithValue(ctx, ctxkeys.CacheInsightMgr, svc.GetCacheInsightManager())
 
 	globalHandler := mux.ServeHTTP
 
