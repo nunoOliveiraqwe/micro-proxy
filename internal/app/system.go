@@ -31,6 +31,10 @@ type SystemHealth struct {
 	SysMemUsedPct    float64 `json:"sys_mem_used_percent"`
 	HeapAllocBytes   uint64  `json:"heap_alloc_bytes"`
 	GCPauseTotalNs   uint64  `json:"gc_pause_total_ns"`
+
+	ErrorLogCapacity   int `json:"error_log_capacity"`
+	RequestLogCapacity int `json:"request_log_capacity"`
+	BlockedLogCapacity int `json:"blocked_log_capacity"`
 }
 
 type SystemService interface {
@@ -161,6 +165,11 @@ func (sm *systemService) GetSystemHealth() *SystemHealth {
 	runtime.ReadMemStats(&ms)
 	h.HeapAllocBytes = ms.HeapAlloc
 	h.GCPauseTotalNs = ms.PauseTotalNs
+
+	errCap, reqCap, blkCap := sm.globalMetricsManager.GetLogCapacities()
+	h.ErrorLogCapacity = errCap
+	h.RequestLogCapacity = reqCap
+	h.BlockedLogCapacity = blkCap
 
 	return h
 }
@@ -337,4 +346,3 @@ func (sm *systemService) PersistConfig() error {
 	zap.S().Info("Configuration persisted to disk")
 	return nil
 }
-

@@ -8,6 +8,8 @@ function fetchSystemHealth() {
         .then(function (h) {
             if (!h) return;
 
+            applyLogCapacities(h);
+
             var secs = Math.floor(h.uptime_seconds);
             var days = Math.floor(secs / 86400);
             secs %= 86400;
@@ -51,6 +53,17 @@ function fetchSystemHealth() {
 
 // ---------- Error Log Feed ----------
 var MAX_ERROR_ENTRIES = 20;
+var MAX_REQUEST_ENTRIES = 100;
+var MAX_BLOCK_ENTRIES = 50;
+var MAX_ACTIVITY_ENTRIES = 200;
+
+function applyLogCapacities(health) {
+    if (health.error_log_capacity)   MAX_ERROR_ENTRIES   = health.error_log_capacity;
+    if (health.request_log_capacity) MAX_REQUEST_ENTRIES  = health.request_log_capacity;
+    if (health.blocked_log_capacity) MAX_BLOCK_ENTRIES    = health.blocked_log_capacity;
+    MAX_ACTIVITY_ENTRIES = MAX_ERROR_ENTRIES + MAX_REQUEST_ENTRIES + MAX_BLOCK_ENTRIES;
+}
+
 var errorEntries = [];
 var errorLogFilter = '';
 
@@ -134,7 +147,6 @@ function loadRecentErrors() {
 }
 
 // ---------- Request Log Feed ----------
-var MAX_REQUEST_ENTRIES = 100;
 var requestEntries = [];
 var requestLogFilter = '';
 
@@ -234,7 +246,6 @@ function loadRecentRequests() {
 }
 
 // ---------- Block Log Feed ----------
-var MAX_BLOCK_ENTRIES = 50;
 var blockEntries = [];
 var blockLogFilter = '';
 
@@ -319,7 +330,6 @@ function loadRecentBlocked() {
 }
 
 // ---------- Unified Activity Feed ----------
-var MAX_ACTIVITY_ENTRIES = 200;
 var activityEntries = [];
 var feedShowRequests = true;
 var feedShowErrors = true;

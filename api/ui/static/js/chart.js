@@ -304,5 +304,9 @@ function resetChartHistory() {
 document.getElementById('connection-selector').addEventListener('change', function () {
     selectedConnection = this.value;
     resetChartHistory();
+    var cached = perConnectionSnapshots[selectedConnection];
+    if (cached) {
+        applySnapshot(cached);
+    }
 });
 

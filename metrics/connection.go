@@ -143,6 +143,10 @@ func (h *ConnectionMetricsManager) GetBlockedLog() *util.RingBuffer[BlockLogEntr
 	return h.blockedLog
 }
 
+func (h *ConnectionMetricsManager) GetLogCapacities() (errorCap, requestCap, blockedCap int) {
+	return h.errorLog.Capacity(), h.requestLog.Capacity(), h.blockedLog.Capacity()
+}
+
 func (h *ConnectionMetricsManager) GetMetricForConnection(connectionName string) *Metric {
 	zap.S().Debugf("Getting connection metrics for connection %s", connectionName)
 	conMetrics, ok := h.connectionMetricsMap[connectionName]

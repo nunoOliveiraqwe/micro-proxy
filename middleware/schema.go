@@ -232,8 +232,8 @@ func GetMiddlewareSchemas() []MiddlewareSchema {
 			Description: "Detects and traps bots by monitoring access to honeypot paths. Caches and blocks offending IPs.",
 			Fields: append([]OptionField{
 				{Key: "defaults", Label: "Default Path Groups", Type: FieldTypeMultiSelect,
-					Choices:  []string{"php", "git", "infra", "backups", "cgi"},
-					HelpText: "Predefined groups of common attack paths. php: .env, wp-login.php, wp-admin, etc. git: .git/config, .svn. infra: /actuator, /.aws/credentials. backups: .zip, .sql dumps. cgi: /cgi-bin/."},
+					Choices:  []string{"php", "git", "infra", "secrets", "iot", "backups", "cgi"},
+					HelpText: "Predefined groups of common attack paths. php: .env, wp-login.php, wp-admin, etc. git: .git/config, .svn. infra: /actuator, /.aws/credentials. secrets: SSH keys, .htpasswd, private keys. iot: router exploits, DVR/camera panels. backups: .zip, .sql dumps. cgi: /cgi-bin/."},
 				{Key: "paths", Label: "Custom Paths", Type: FieldTypeStringList,
 					Placeholder: "e.g. /my-custom-trap",
 					HelpText:    "Additional custom paths to treat as honeypots. Any request matching these paths triggers the trap."},

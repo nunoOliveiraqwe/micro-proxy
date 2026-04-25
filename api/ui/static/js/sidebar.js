@@ -123,6 +123,18 @@ function showPage(pageId) {
         }
     }
 
+    if (pageId === 'dashboard' || pageId === 'proxy-routes') {
+        if (!routeInterval) {
+            loadProxyRoutes();
+            routeInterval = setInterval(loadProxyRoutes, 10000);
+        }
+    } else {
+        if (routeInterval) {
+            clearInterval(routeInterval);
+            routeInterval = null;
+        }
+    }
+
     if (pageId === 'acme') {
         loadAcmeProviders().then(function () {
             loadAcmeConfig();
@@ -132,7 +144,6 @@ function showPage(pageId) {
     if (pageId === 'proxy-routes') {
         initListenerWizard();
         lastRouteFingerprint = '';
-        loadProxyRoutes();
     }
 
     if (pageId === 'api-keys') {

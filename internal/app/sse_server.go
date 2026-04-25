@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"sync"
+	"sync/atomic"
 
 	"github.com/nunoOliveiraqwe/torii/metrics"
 	"go.uber.org/zap"
@@ -20,9 +21,10 @@ type SSEClient struct {
 }
 
 type SSEBroker struct {
-	mu      sync.RWMutex
-	clients map[string]*SSEClient
-	nextID  int
+	mu          sync.RWMutex
+	clients     map[string]*SSEClient
+	nextID      int
+	clientCount atomic.Int64
 
 	mgr *metrics.ConnectionMetricsManager
 
@@ -42,36 +44,16 @@ func NewSSEBroker(mgr *metrics.ConnectionMetricsManager) *SSEBroker {
 	}
 	// Wildcard metric listener — fires for every connection's metric updates.
 	b.metricsListenerID = mgr.AddWildcardListener(func(_ string, snapshot *metrics.Metric) {
-		data, err := json.Marshal(snapshot)
-		if err != nil {
-			zap.S().Errorf("SSEBroker: failed to marshal metric snapshot: %v", err)
-			return
-		}
-		b.broadcastAll(SSEEvent{Type: "metrics", Data: data})
+		b.broadcastJSON("metrics", snapshot)
 	})
 	b.errorListenerID = mgr.GetErrorLog().AddListener(func(entry *metrics.ErrorLogEntry) {
-		data, err := json.Marshal(entry)
-		if err != nil {
-			zap.S().Errorf("SSEBroker: failed to marshal error entry: %v", err)
-			return
-		}
-		b.broadcastAll(SSEEvent{Type: "proxy_error", Data: data})
+		b.broadcastJSON("proxy_error", entry)
 	})
 	b.requestListenerID = mgr.GetRequestLog().AddListener(func(entry *metrics.RequestLogEntry) {
-		data, err := json.Marshal(entry)
-		if err != nil {
-			zap.S().Errorf("SSEBroker: failed to marshal request log entry: %v", err)
-			return
-		}
-		b.broadcastAll(SSEEvent{Type: "proxy_request", Data: data})
+		b.broadcastJSON("proxy_request", entry)
 	})
 	b.blockedListenerID = mgr.GetBlockedLog().AddListener(func(entry *metrics.BlockLogEntry) {
-		data, err := json.Marshal(entry)
-		if err != nil {
-			zap.S().Errorf("SSEBroker: failed to marshal blocked log entry: %v", err)
-			return
-		}
-		b.broadcastAll(SSEEvent{Type: "proxy_blocked", Data: data})
+		b.broadcastJSON("proxy_blocked", entry)
 	})
 	return b
 }
@@ -85,6 +67,7 @@ func (b *SSEBroker) Subscribe() *SSEClient {
 		Events: make(chan SSEEvent, 64),
 	}
 	b.clients[id] = client
+	b.clientCount.Add(1)
 	b.mu.Unlock()
 
 	allMetrics := b.mgr.GetAllMetrics()
@@ -108,8 +91,21 @@ func (b *SSEBroker) Unsubscribe(client *SSEClient) {
 	if _, ok := b.clients[client.ID]; ok {
 		close(client.Events)
 		delete(b.clients, client.ID)
+		b.clientCount.Add(-1)
 		zap.S().Debugf("SSEBroker: client %s unsubscribed", client.ID)
 	}
+}
+
+func (b *SSEBroker) broadcastJSON(eventType string, v any) {
+	if b.clientCount.Load() == 0 {
+		return
+	}
+	data, err := json.Marshal(v)
+	if err != nil {
+		zap.S().Errorf("SSEBroker: failed to marshal %s event: %v", eventType, err)
+		return
+	}
+	b.broadcastAll(SSEEvent{Type: eventType, Data: data})
 }
 
 func (b *SSEBroker) broadcastAll(event SSEEvent) {
@@ -135,6 +131,7 @@ func (b *SSEBroker) Stop() {
 		close(c.Events)
 	}
 	b.clients = make(map[string]*SSEClient)
+	b.clientCount.Store(0)
 	b.mu.Unlock()
 
 	zap.S().Info("SSEBroker stopped")

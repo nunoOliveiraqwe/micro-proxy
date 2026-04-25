@@ -54,6 +54,10 @@ func (l *RingBuffer[T]) Recent(n int) []T {
 	return result
 }
 
+func (l *RingBuffer[T]) Capacity() int {
+	return l.capacity
+}
+
 func (l *RingBuffer[T]) AddListener(fn BufferListenerFunc[T]) int {
 	l.listenersMu.Lock()
 	defer l.listenersMu.Unlock()
