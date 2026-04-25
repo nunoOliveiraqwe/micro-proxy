@@ -64,7 +64,7 @@ func (b *SSEBroker) Subscribe() *SSEClient {
 	b.nextID++
 	client := &SSEClient{
 		ID:     id,
-		Events: make(chan SSEEvent, 64),
+		Events: make(chan SSEEvent, 512),
 	}
 	b.clients[id] = client
 	b.clientCount.Add(1)
