@@ -39,6 +39,33 @@ session:
   cookie-same-site: lax            # SameSite policy: strict, lax, none
 
 # ─────────────────────────────────────────────────────────────────
+# ACME (Automatic Certificate Management)
+# ─────────────────────────────────────────────────────────────────
+# Seeds the ACME configuration into the database on first startup.
+# Once stored in the DB, this section is ignored — the DB copy
+# becomes the source of truth (editable via the dashboard).
+#
+# Credential values support resolver syntax:
+#   $env:VAR_NAME          — read from environment variable
+#   $file:/path/to/secret  — read from file (e.g. Docker secret)
+#   plain-text-value       — used as-is
+# ─────────────────────────────────────────────────────────────────
+# acme:
+#   email: admin@example.com
+#   dns-provider: cloudflare           # Currently supported: cloudflare
+#   credentials:
+#     api_token: "$env:CF_API_TOKEN"   # Cloudflare API token with Zone:Read + DNS:Edit
+#   ca-url: ""                         # Empty = Let's Encrypt production
+#   renewal-check-interval: 12h        # How often to check/renew certs (min 1h)
+#   enabled: true                      # Set false to configure without activating
+#   domains:                           # Explicit cert domains (optional, recommended)
+#     - "*.example.com"               # One wildcard cert covers all subdomains
+#     - "example.com"                 # Bare domain is NOT covered by the wildcard
+#   # When domains is omitted, a separate cert is requested for each route host.
+#   # Use domains with a wildcard when you have multiple subdomains — one cert
+#   # covers them all, and adding new routes doesn't trigger new cert requests.
+
+# ─────────────────────────────────────────────────────────────────
 # Network Configuration
 # ─────────────────────────────────────────────────────────────────
 net-config:

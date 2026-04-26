@@ -10,6 +10,7 @@ import (
 	"encoding/json"
 	"encoding/pem"
 	"fmt"
+	"strings"
 	"sync"
 	"time"
 
@@ -39,7 +40,7 @@ type LegoAcmeManager struct {
 	user            *acmeUser
 	certCache       map[string]*tls.Certificate
 	conf            *domain.AcmeConfiguration
-	domains         []string
+	domainSupplier  func() []string // callback to discover route domains from the proxy
 	renewalInterval time.Duration
 	stopCh          chan struct{}
 }
@@ -244,9 +245,18 @@ func (m *LegoAcmeManager) ObtainCertificate(domains []string) error {
 }
 
 func (m *LegoAcmeManager) GetCertificate(hello *tls.ClientHelloInfo) (*tls.Certificate, error) {
+	name := hello.ServerName
+
 	m.mu.RLock()
-	cert, ok := m.certCache[hello.ServerName]
+	cert, ok := m.certCache[name]
+	if !ok {
+		// Wildcard fallback: "app.example.com" → "*.example.com"
+		if idx := strings.Index(name, "."); idx > 0 {
+			cert, ok = m.certCache["*."+name[idx+1:]]
+		}
+	}
 	m.mu.RUnlock()
+
 	if ok {
 		return cert, nil
 	}
@@ -262,21 +272,73 @@ func (m *LegoAcmeManager) GetTLSConfig() *tls.Config {
 	}
 }
 
-func (m *LegoAcmeManager) SetDomains(domains []string) {
+func (m *LegoAcmeManager) SetDomainSupplier(fn func() []string) {
 	m.mu.Lock()
 	defer m.mu.Unlock()
-	m.domains = domains
-	zap.S().Infof("acme: tracking %d domain(s): %v", len(domains), domains)
+	m.domainSupplier = fn
+}
+
+func (m *LegoAcmeManager) resolveDomains() []string {
+
+	var all []string
+	all = append(all, m.conf.Domains...)
+
+	m.mu.RLock()
+	supplier := m.domainSupplier
+	m.mu.RUnlock()
+	if supplier != nil {
+		all = append(all, supplier()...)
+	}
+
+	if len(all) == 0 {
+		return nil
+	}
+
+	seen := make(map[string]struct{}, len(all))
+	unique := make([]string, 0, len(all))
+	for _, d := range all {
+		dl := strings.ToLower(d)
+		if _, ok := seen[dl]; !ok {
+			seen[dl] = struct{}{}
+			unique = append(unique, dl)
+		}
+	}
+
+	wildcardParents := make(map[string]struct{})
+	for _, d := range unique {
+		if strings.HasPrefix(d, "*.") {
+			wildcardParents[d[2:]] = struct{}{}
+		}
+	}
+
+	if len(wildcardParents) == 0 {
+		zap.S().Debugf("acme: resolved %d domain(s): %v", len(unique), unique)
+		return unique
+	}
+	result := make([]string, 0, len(unique))
+	for _, d := range unique {
+		if strings.HasPrefix(d, "*.") {
+			result = append(result, d)
+			continue
+		}
+		if idx := strings.Index(d, "."); idx > 0 {
+			parent := d[idx+1:]
+			if _, covered := wildcardParents[parent]; covered {
+				zap.S().Debugf("acme: skipping %s (covered by *.%s)", d, parent)
+				continue
+			}
+		}
+		result = append(result, d)
+	}
+	zap.S().Debugf("acme: resolved %d domain(s): %v", len(result), result)
+	return result
 }
 
 func (m *LegoAcmeManager) EnsureCertificates() error {
-	m.mu.RLock()
-	snapshot := make([]string, len(m.domains))
-	copy(snapshot, m.domains)
-	m.mu.RUnlock()
+	domains := m.resolveDomains()
 
 	var need []string
-	for _, d := range snapshot {
+	for _, d := range domains {
 		m.mu.RLock()
 		cert := m.certCache[d]
 		m.mu.RUnlock()
@@ -285,7 +347,7 @@ func (m *LegoAcmeManager) EnsureCertificates() error {
 		}
 	}
 	if len(need) == 0 {
-		zap.S().Debugf("acme: all domains have valid certificates")
+		zap.S().Debugf("acme: all %d domain(s) have valid certificates", len(domains))
 		return nil
 	}
 
@@ -305,7 +367,6 @@ func (m *LegoAcmeManager) EnsureCertificates() error {
 
 func (m *LegoAcmeManager) StartRenewalLoop() {
 	go func() {
-		// Immediate first pass.
 		if err := m.EnsureCertificates(); err != nil {
 			zap.S().Errorf("acme: initial cert check: %v", err)
 		}

@@ -4,6 +4,7 @@ import (
 	"context"
 	"database/sql"
 	"fmt"
+	"strings"
 	"time"
 
 	"github.com/nunoOliveiraqwe/torii/internal/domain"
@@ -30,8 +31,9 @@ func (s *AcmeStore) GetConfiguration() (*domain.AcmeConfiguration, error) {
 
 	var conf domain.AcmeConfiguration
 	var intervalStr string
+	var domainsStr string
 	err = tx.QueryRowContext(ctx, `
-		SELECT ID, EMAIL, DNS_PROVIDER, CA_DIR_URL, RENEWAL_CHECK_INTERVAL, ENABLED, DNS_PROVIDER_SERIALIZED_FIELDS, CREATED_AT, UPDATED_AT
+		SELECT ID, EMAIL, DNS_PROVIDER, CA_DIR_URL, RENEWAL_CHECK_INTERVAL, ENABLED, DNS_PROVIDER_SERIALIZED_FIELDS, ACME_DOMAINS, CREATED_AT, UPDATED_AT
 		FROM acme_configuration
 		WHERE id = 1`,
 	).Scan(
@@ -42,6 +44,7 @@ func (s *AcmeStore) GetConfiguration() (*domain.AcmeConfiguration, error) {
 		&intervalStr,
 		&conf.Enabled,
 		&conf.SerializedFields,
+		&domainsStr,
 		(*NullTime)(&conf.CreatedAt),
 		(*NullTime)(&conf.UpdatedAt),
 	)
@@ -56,6 +59,9 @@ func (s *AcmeStore) GetConfiguration() (*domain.AcmeConfiguration, error) {
 		dur = 12 * time.Hour
 	}
 	conf.RenewalCheckInterval = dur
+	if domainsStr != "" {
+		conf.Domains = strings.Split(domainsStr, ",")
+	}
 	return &conf, nil
 }
 
@@ -68,8 +74,8 @@ func (s *AcmeStore) SaveConfiguration(conf *domain.AcmeConfiguration) error {
 	defer tx.Rollback()
 
 	_, err = tx.ExecContext(ctx, `
-		INSERT INTO acme_configuration (ID, EMAIL, DNS_PROVIDER, CA_DIR_URL, RENEWAL_CHECK_INTERVAL, ENABLED, DNS_PROVIDER_SERIALIZED_FIELDS, UPDATED_AT)
-		VALUES (1, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP)
+		INSERT INTO acme_configuration (ID, EMAIL, DNS_PROVIDER, CA_DIR_URL, RENEWAL_CHECK_INTERVAL, ENABLED, DNS_PROVIDER_SERIALIZED_FIELDS, ACME_DOMAINS, UPDATED_AT)
+		VALUES (1, ?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP)
 		ON CONFLICT(id) DO UPDATE SET
 			email                  = excluded.email,
 			dns_provider           = excluded.dns_provider,
@@ -77,6 +83,7 @@ func (s *AcmeStore) SaveConfiguration(conf *domain.AcmeConfiguration) error {
 			renewal_check_interval = excluded.renewal_check_interval,
 			enabled                = excluded.enabled,
 			dns_provider_serialized_fields            = excluded.dns_provider_serialized_fields,
+			acme_domains           = excluded.acme_domains,
 			updated_at             = CURRENT_TIMESTAMP`,
 		conf.Email,
 		conf.DNSProvider,
@@ -84,6 +91,7 @@ func (s *AcmeStore) SaveConfiguration(conf *domain.AcmeConfiguration) error {
 		conf.RenewalCheckInterval.String(),
 		conf.Enabled,
 		conf.SerializedFields,
+		strings.Join(conf.Domains, ","),
 	)
 	if err != nil {
 		return err

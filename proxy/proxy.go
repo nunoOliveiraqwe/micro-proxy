@@ -56,8 +56,7 @@ func NewTorii(conf config.NetworkConfig, mgr *metrics.ConnectionMetricsManager,
 		return nil, err
 	}
 	if acmeMgr != nil {
-		domains := m.collectWorkingDomains()
-		acmeMgr.SetDomains(domains)
+		acmeMgr.SetDomainSupplier(m.collectRouteDomains)
 		acmeMgr.StartRenewalLoop()
 	}
 	return &m, nil
@@ -189,8 +188,7 @@ func (m *Torii) SwapAcmeManager(newMgr *acme.LegoAcmeManager) {
 	}
 	m.acmeManager = newMgr
 	if newMgr != nil {
-		domains := m.collectWorkingDomains()
-		newMgr.SetDomains(domains)
+		newMgr.SetDomainSupplier(m.collectRouteDomains)
 		newMgr.StartRenewalLoop()
 	}
 }
@@ -335,8 +333,9 @@ func (m *Torii) initializeHttpNetworkStackFromConf(ctx context.Context, conf con
 	return nil
 }
 
-func (m *Torii) collectWorkingDomains() []string {
-	zap.S().Debugf("Collecting working domains from HTTP servers")
+func (m *Torii) collectRouteDomains() []string {
+	m.lock.Lock()
+	defer m.lock.Unlock()
 	domains := make([]string, 0)
 	domains = appendDomainsFromServers(m.stoppedHttpServers, domains)
 	domains = appendDomainsFromServers(m.startedHttpServers, domains)

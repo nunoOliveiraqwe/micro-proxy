@@ -229,11 +229,13 @@ Keeping track of what's done and what's next. This is not a roadmap, just my per
 - [x] Coraza WAF integration: [Coraza](https://coraza.io/) is a full-featured open-source WAF (OWASP CRS compatible). Add it as a middleware so routes can opt into proper WAF rules alongside the existing bot defense. There's overlap with what the honeypot and UA blocker already do, but Coraza covers a much wider surface (SQLi, XSS, protocol violations, etc.).
 - [x] AbuseIPDB middleware: check client IPs against [AbuseIPDB](https://www.abuseipdb.com/) and block or flag IPs with a high abuse confidence score. Optionally report blocked IPs back (honeypot hits, rate-limit violations, etc.) so the community benefits too.
 - [ ] ForwardAuth middleware: delegate auth decisions to an external service (like Traefik's ForwardAuth / nginx auth_request)
+- [ ] When initializng with a complete config, the UI still needs FTS to be done. It should be possible to completly disable the UI and run the proxy in raw mode
 
 
 ### Known Bugs
 - [x] **ACME port leak on startup:** if a route has `use-acme: true` but ACME is not configured, the server fails to start. Starting the proxy manually afterwards returns an ACME error, but the port is already bound from the first attempt. A second manual start then fails with a "bind: address already in use" error. The listener from the failed first start is never closed.
-- [ ] **ACME config not loadable from config file:** there is no way to specify ACME configuration (provider, credentials, etc.) in the YAML config file. On first start with `use-acme: true`, it should be possible to seed the ACME configuration from the config file instead of requiring it to be set up through the UI first.
+- [x] **ACME config not loadable from config file:** there is no way to specify ACME configuration (provider, credentials, etc.) in the YAML config file. On first start with `use-acme: true`, it should be possible to seed the ACME configuration from the config file instead of requiring it to be set up through the UI first.
+- [x] **When using wildcards, the ACME cert will show as orphanated in the UI 
 
 ### Maybe
 - [ ] Proxy-level authentication: login pages so the proxy handles auth before forwarding to backends

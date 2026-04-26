@@ -15,6 +15,17 @@ type AppConfig struct {
 	APIServer APIServerConfig `yaml:"api-server" json:"api-server"`
 	NetConfig NetworkConfig   `yaml:"net-config" json:"net-config"`
 	Session   SessionConfig   `yaml:"session" json:"session"`
+	Acme      *AcmeConfig     `yaml:"acme" json:"acme,omitempty"`
+}
+
+type AcmeConfig struct {
+	Email                string            `yaml:"email" json:"email"`
+	DNSProvider          string            `yaml:"dns-provider" json:"dns-provider"`
+	Credentials          map[string]string `yaml:"credentials" json:"credentials"`
+	CADirURL             string            `yaml:"ca-url" json:"ca-url,omitempty"`
+	RenewalCheckInterval string            `yaml:"renewal-check-interval" json:"renewal-check-interval,omitempty"`
+	Enabled              bool              `yaml:"enabled" json:"enabled"`
+	Domains              []string          `yaml:"domains" json:"domains,omitempty"`
 }
 
 type SessionConfig struct {

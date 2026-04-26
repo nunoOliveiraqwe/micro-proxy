@@ -44,3 +44,19 @@ func (e *EnvResolver) Resolve(key string) (string, error) {
 func (e *EnvResolver) getResolverKey() string {
 	return "env"
 }
+
+func ResolveValue(raw string) (string, error) {
+	for prefix, key := range map[string]string{
+		"$env:":  "env",
+		"$file:": "file",
+	} {
+		if strings.HasPrefix(raw, prefix) {
+			r := GetResolver(key)
+			if r == nil {
+				return "", fmt.Errorf("no resolver registered for %q", key)
+			}
+			return r.Resolve(strings.TrimPrefix(raw, prefix))
+		}
+	}
+	return raw, nil
+}

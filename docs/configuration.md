@@ -48,6 +48,46 @@
 | `api-server.read-timeout` | `int` | `60` | Read timeout in seconds. |
 | `api-server.write-timeout` | `int` | `60` | Write timeout in seconds. |
 
+## ACME (`acme`)
+
+Seeds ACME (Let's Encrypt) configuration into the database on first startup. Once stored in the DB, this section is ignored — the DB becomes the source of truth (editable via the dashboard).
+
+| Key | Type | Default | Description |
+|---|---|---|---|
+| `acme.email` | `string` | | Contact email for the ACME account. **Required.** |
+| `acme.dns-provider` | `string` | | DNS provider for DNS-01 challenges. Currently supported: `cloudflare`. **Required.** |
+| `acme.credentials` | `map[string]string` | | Provider-specific credential key-value pairs. Supports `$env:VAR` and `$file:/path` syntax. |
+| `acme.ca-url` | `string` | *(Let's Encrypt production)* | Custom ACME CA directory URL (e.g. staging). |
+| `acme.renewal-check-interval` | `duration` | `12h` | How often to check/renew certificates. Minimum `1h`. |
+| `acme.enabled` | `bool` | `false` | Whether ACME is active. Set `false` to seed config without activating. |
+| `acme.domains` | `[]string` | | Explicit list of domains to obtain certificates for. Supports wildcards (e.g. `*.example.com`). When set, only these domains get certs. When empty, a cert is requested for each route host individually. |
+
+**Example — wildcard cert for all subdomains:**
+```yaml
+acme:
+  email: admin@example.com
+  dns-provider: cloudflare
+  credentials:
+    api_token: "$env:CF_API_TOKEN"
+  renewal-check-interval: 12h
+  enabled: true
+  domains:
+    - "*.example.com"       # one cert covers app.example.com, api.example.com, etc.
+    - "example.com"         # bare domain is NOT covered by the wildcard
+```
+
+### Wildcard Certificates
+
+To use a wildcard certificate, list it in `acme.domains`. A single `*.example.com` cert covers all single-level subdomains (`app.example.com`, `api.example.com`, etc.) — no matter how many routes you add. During TLS handshake, Torii automatically falls back to a matching wildcard cert when no exact cert exists for the requested server name.
+
+> **Note:** The bare domain (`example.com`) is **not** covered by `*.example.com` and must be listed separately if needed.
+
+### Auto-discovery (no `acme.domains`)
+
+When `acme.domains` is omitted, Torii collects domains from the route hosts on ACME-enabled listeners and requests a separate cert for each one. This is simpler for small setups but means every new route triggers a new certificate request.
+
+**Use `acme.domains` with a wildcard when** you have multiple subdomains under the same parent — one cert covers them all, and adding new routes doesn't require new certs.
+
 ## HTTP Listener (`net-config.http[]`)
 
 | Key | Type | Description |

@@ -12,6 +12,7 @@ type AcmeConfiguration struct {
 	CADirURL             string
 	RenewalCheckInterval time.Duration // how often the renewal loop ticks
 	Enabled              bool
+	Domains              []string
 	CreatedAt            time.Time
 	UpdatedAt            time.Time
 }

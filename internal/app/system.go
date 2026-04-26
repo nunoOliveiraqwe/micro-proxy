@@ -88,16 +88,9 @@ func NewSystemService(conf config.AppConfig, configPath string, readOnly bool) (
 	}
 
 	acmeStore := sqlite.NewAcmeStore(db)
-	var acmeMgr *acme.LegoAcmeManager
-	acmeConf, err := acmeStore.GetConfiguration()
+	acmeMgr, err := acme.Bootstrap(acmeStore, conf.Acme)
 	if err != nil {
-		zap.S().Warnf("Failed to read ACME configuration from DB: %v", err)
-	}
-	if acmeConf != nil && acmeConf.Enabled {
-		acmeMgr, err = acme.NewLegoAcmeManager(acmeConf, acmeStore)
-		if err != nil {
-			return nil, fmt.Errorf("failed to create ACME manager: %w", err)
-		}
+		return nil, fmt.Errorf("failed to bootstrap ACME: %w", err)
 	}
 
 	m, err := proxy.NewTorii(conf.NetConfig, mgr, cInMgr, acmeMgr)
