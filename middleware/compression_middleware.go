@@ -116,7 +116,7 @@ func (lw *lazyCompressionWriter) Unwrap() http.ResponseWriter {
 }
 
 func CompressionMiddleware(_ context.Context, next http.HandlerFunc, conf Config) http.HandlerFunc {
-	initFunc, err := parseCompressionsOptions(conf)
+	cType, initFunc, err := parseCompressionsOptions(conf)
 	if err != nil {
 		zap.S().Errorf("CompressionMiddleware failed to parse configuration: %v. Failing closed.", err)
 		return func(writer http.ResponseWriter, request *http.Request) {
@@ -135,7 +135,7 @@ func CompressionMiddleware(_ context.Context, next http.HandlerFunc, conf Config
 		lw := &lazyCompressionWriter{
 			w:        w,
 			initFunc: initFunc,
-			confType: conf.Type,
+			confType: cType,
 			logger:   logger,
 		}
 		defer func() {
@@ -150,32 +150,32 @@ func CompressionMiddleware(_ context.Context, next http.HandlerFunc, conf Config
 	}
 }
 
-func parseCompressionsOptions(conf Config) (compressInitFunc, error) {
+func parseCompressionsOptions(conf Config) (string, compressInitFunc, error) {
 	zap.S().Debugf("Parsing compression options: %v", conf)
 
 	compressionLevel := ParseIntOpt(conf.Options, "level", gzip.BestCompression)
 
 	typeComp, err := ParseStringRequired(conf.Options, "type")
 	if err != nil {
-		return nil, err
+		return "", nil, err
 	}
 
 	typeComp = strings.ToLower(typeComp)
 
 	if typeComp != "gzip" && typeComp != "zlib" {
-		return nil, fmt.Errorf("invalid compression type: %s", typeComp)
+		return "", nil, fmt.Errorf("invalid compression type: %s", typeComp)
 	}
 
 	if typeComp == "gzip" {
 		gzTest, err := gzip.NewWriterLevel(io.Discard, compressionLevel)
 		if err != nil {
-			return nil, fmt.Errorf("invalid gzip compression level %d: %w", compressionLevel, err)
+			return "", nil, fmt.Errorf("invalid gzip compression level %d: %w", compressionLevel, err)
 		}
 		err = gzTest.Close()
 		if err != nil {
 			zap.S().Warnf("Failed to close gzip test writer: %v", err)
 		}
-		return func(w http.ResponseWriter) *CompressionResponseWriter {
+		return typeComp, func(w http.ResponseWriter) *CompressionResponseWriter {
 			gz, _ := gzip.NewWriterLevel(w, compressionLevel)
 			return &CompressionResponseWriter{w: w, compressorWriter: gz}
 		}, nil
@@ -183,13 +183,13 @@ func parseCompressionsOptions(conf Config) (compressInitFunc, error) {
 
 	zw, err := zlib.NewWriterLevel(io.Discard, compressionLevel)
 	if err != nil {
-		return nil, fmt.Errorf("invalid zlib compression level %d: %w", compressionLevel, err)
+		return "", nil, fmt.Errorf("invalid zlib compression level %d: %w", compressionLevel, err)
 	}
 	err = zw.Close()
 	if err != nil {
 		zap.S().Warnf("Failed to close zlib test writer: %v", err)
 	}
-	return func(w http.ResponseWriter) *CompressionResponseWriter {
+	return typeComp, func(w http.ResponseWriter) *CompressionResponseWriter {
 		zw, _ := zlib.NewWriterLevel(w, compressionLevel)
 		return &CompressionResponseWriter{w: w, compressorWriter: zw}
 	}, nil
