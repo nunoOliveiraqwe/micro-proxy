@@ -18,9 +18,11 @@ import (
 )
 
 type ToriiHttpServer struct {
-	httpServer        *http.Server
-	serverId          string
-	handler           *SwappableHandler
+	httpServer *http.Server
+	serverId   string
+	handler    *SwappableHandler
+
+	cancelChain       context.CancelFunc
 	readTimeout       time.Duration
 	readHeaderTimeout time.Duration
 	writeTimeout      time.Duration
@@ -147,6 +149,9 @@ func (m *ToriiHttpServer) start(_ *acme.LegoAcmeManager) error {
 
 func (m *ToriiHttpServer) stop() error {
 	zap.S().Infof("Stopping HTTP server")
+	if m.cancelChain != nil {
+		m.cancelChain()
+	}
 	if m.httpServer == nil {
 		return nil
 	}
@@ -161,7 +166,11 @@ func (m *ToriiHttpServer) getHandler() http.Handler {
 	return m.handler.Load()
 }
 
-func (m *ToriiHttpServer) updateHandler(handler http.Handler) error {
+func (m *ToriiHttpServer) updateHandler(handler http.Handler, cancel context.CancelFunc) error {
+	if m.cancelChain != nil {
+		m.cancelChain()
+	}
+	m.cancelChain = cancel
 	old := m.handler.Swap(handler)
 	if m.isStarted.Load() {
 		zap.S().Infof("Hot-swapped HTTP handler on port %d (was %T, now %T)", m.bindPort, old, handler)

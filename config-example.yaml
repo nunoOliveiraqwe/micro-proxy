@@ -49,6 +49,50 @@ net-config:
   # ───────────────────────────────────────────────────────────────
   global:
     disable-default-middlewares: false  # If true, RequestId/RequestLog/Metrics are NOT auto-prepended
+
+    # ─────────────────────────────────────────────────────────────
+    # Trusted Proxies
+    # ─────────────────────────────────────────────────────────────
+    # When your server sits behind a reverse proxy (Cloudflare, nginx, AWS ALB, etc.),
+    # the real client IP is hidden behind the proxy's IP.  Trusted proxies rewrites
+    # r.RemoteAddr from the forwarding header so that rate limiters, IP filters,
+    # country blocking, WAF, honeypots, and logs all see the real client IP.
+    #
+    # Can be set at three levels (inner overrides outer):
+    #   global  → applies to every request
+    #   route   → per-host override  (in target.trusted-proxies)
+    #   path    → per-path override  (in paths[].trusted-proxies)
+    #
+    # Options:
+    #   preset           — Built-in provider whose CIDRs are fetched live.
+    #                       Supported: "cloudflare"
+    #                       Cloudflare fetches from https://www.cloudflare.com/ips-v4/
+    #                       and ips-v6/, defaults header to CF-Connecting-IP, refresh 24h.
+    #   ranges           — Additional static IP/CIDR entries (merged with preset if set).
+    #   header           — HTTP header to read client IP from.
+    #                       Default: "X-Forwarded-For" (or preset default, e.g. "CF-Connecting-IP").
+    #   refresh-interval — How often to re-fetch preset CIDRs (ignored for static ranges).
+    #                       Default: preset's own default (24h for Cloudflare).
+    # ─────────────────────────────────────────────────────────────
+
+    # Example: Cloudflare (simplest — everything auto-configured)
+    # trusted-proxies:
+    #   preset: cloudflare
+
+    # Example: Cloudflare + internal load balancer
+    # trusted-proxies:
+    #   preset: cloudflare
+    #   ranges:
+    #     - 10.0.0.0/8
+    #   refresh-interval: 12h
+
+    # Example: Manual setup (no remote fetch, custom header)
+    # trusted-proxies:
+    #   ranges:
+    #     - 172.16.0.0/12
+    #     - 192.168.1.1
+    #   header: X-Real-IP
+
     middlewares:
       - type: "CorazaWaf"
         options:
@@ -431,6 +475,11 @@ net-config:
             # backend:
             #   address: http://192.168.1.27:2283
             #   replace-host-header: true        # Replace Host header with backend's host
+
+            # Route-level trusted proxies (overrides global for this host)
+            trusted-proxies:
+               preset: cloudflare
+
             middlewares:
               - type: "RequestId"
               - type: "RequestLog"
@@ -470,6 +519,11 @@ net-config:
                 backend: http://192.168.1.100:8096  # Override backend for this path
                 strip-prefix: true                  # Strip the matched path prefix (/jellyfin/foo → /foo)
                 drop-query: false                   # Preserve query parameters (default: false)
+                # Path-level trusted proxies (overrides route-level for this path)
+                trusted-proxies:
+                  ranges:
+                    - 10.0.0.0/8
+                  header: X-Real-IP
                 middlewares:
                   - type: "Metrics"
                   - type: "RequestId"

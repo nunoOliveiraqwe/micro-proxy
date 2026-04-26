@@ -3,6 +3,7 @@
 var lfSchemas = [];
 var lfInterfaces = [];
 var lfDefaultMwChain = null;
+var lfDefaultTpSection = null;
 var lfHostRoutes = [];  // [{id, el, mwChain, paths:[{id, el, mwChain}]}]
 var lfDefaultPaths = []; // [{id, el, mwChain}]
 var lfIdCounter = 0;
@@ -133,6 +134,9 @@ function lfLoadSchemas() {
             // Initialize default route middleware chain
             if (!lfDefaultMwChain) {
                 lfDefaultMwChain = new MwChainBuilder(document.getElementById('lf-default-mw'), lfSchemas);
+            }
+            if (!lfDefaultTpSection) {
+                lfDefaultTpSection = lfCreateTrustedProxiesSection(document.getElementById('lf-default-tp'));
             }
         });
 }
@@ -728,6 +732,13 @@ function lfCreatePathCard(pathsContainer, pathsList) {
     var mwContainer = card.querySelector('.lf-path-mw-container');
     var mwChain = new MwChainBuilder(mwContainer, lfSchemas);
 
+    // Trusted proxies section for this path
+    var tpContainer = document.createElement('div');
+    tpContainer.className = 'lf-path-tp-container';
+    var pathMwDetails = card.querySelector('.lf-mw-section');
+    pathMwDetails.parentNode.insertBefore(tpContainer, pathMwDetails);
+    var tpSection = lfCreateTrustedProxiesSection(tpContainer);
+
     card.querySelector('.lf-remove-btn').addEventListener('click', function() {
         for (var i = 0; i < pathsList.length; i++) {
             if (pathsList[i].id === pathId) { pathsList.splice(i, 1); break; }
@@ -737,7 +748,7 @@ function lfCreatePathCard(pathsContainer, pathsList) {
     });
 
     pathsContainer.appendChild(card);
-    var pathObj = { id: pathId, el: card, mwChain: mwChain };
+    var pathObj = { id: pathId, el: card, mwChain: mwChain, tpSection: tpSection };
     pathsList.push(pathObj);
     lfUpdatePathBadge(pathsContainer);
     return pathObj;
@@ -796,7 +807,15 @@ function lfCreateHostRouteCard() {
     var mwContainer = card.querySelector('.lf-route-mw-container');
     var mwChain = new MwChainBuilder(mwContainer, lfSchemas);
 
-    var routeObj = { id: routeId, el: card, mwChain: mwChain, paths: [] };
+    // Trusted proxies section for this route
+    var tpContainer = document.createElement('div');
+    tpContainer.className = 'lf-route-tp-container';
+    // Insert before the middleware details
+    var mwDetails = card.querySelector('.lf-mw-section');
+    mwDetails.parentNode.insertBefore(tpContainer, mwDetails);
+    var tpSection = lfCreateTrustedProxiesSection(tpContainer);
+
+    var routeObj = { id: routeId, el: card, mwChain: mwChain, tpSection: tpSection, paths: [] };
 
     card.querySelector('.lf-remove-btn').addEventListener('click', function() {
         for (var i = 0; i < lfHostRoutes.length; i++) {
@@ -823,6 +842,88 @@ function lfRenumberRoutes() {
     });
 }
 
+// ========== Trusted Proxies UI ==========
+
+function lfCreateTrustedProxiesSection(parentEl) {
+    var details = document.createElement('details');
+    details.className = 'lf-mw-section';
+    details.style.marginTop = '0.5rem';
+    details.innerHTML =
+        '<summary>Trusted Proxies <span class="lf-mw-badge lf-tp-badge"></span></summary>' +
+        '<div class="lf-tp-fields" style="margin-top:0.5rem;">' +
+        '<label style="font-size:0.8rem;margin-bottom:0.25rem;">Preset' +
+        '<select class="lf-tp-preset" style="margin-bottom:0.4rem;font-size:0.8rem;padding:0.3rem 0.5rem;">' +
+        '<option value="">None (manual ranges only)</option>' +
+        '<option value="cloudflare">Cloudflare</option>' +
+        '</select></label>' +
+        '<p class="mw-help" style="margin-top:-0.2rem;">Built-in provider whose IP ranges are fetched live and refreshed automatically.</p>' +
+        '<label style="font-size:0.8rem;margin-bottom:0.25rem;">Header <small>(optional)</small>' +
+        '<input type="text" class="lf-tp-header" placeholder="e.g. CF-Connecting-IP, X-Real-IP" ' +
+        'style="margin-bottom:0.4rem;font-size:0.8rem;padding:0.3rem 0.5rem;"></label>' +
+        '<p class="mw-help" style="margin-top:-0.2rem;">HTTP header to read client IP from. Leave empty for default (X-Forwarded-For, or preset default).</p>' +
+        '<label style="font-size:0.8rem;margin-bottom:0.25rem;">Refresh Interval <small>(optional)</small>' +
+        '<input type="text" class="lf-tp-refresh" placeholder="e.g. 24h, 12h" ' +
+        'style="margin-bottom:0.4rem;font-size:0.8rem;padding:0.3rem 0.5rem;"></label>' +
+        '<p class="mw-help" style="margin-top:-0.2rem;">How often to re-fetch preset CIDRs. Ignored for static ranges.</p>' +
+        '<label style="font-size:0.8rem;margin-bottom:0.25rem;">Additional Ranges <small>(IP/CIDR, optional)</small></label>' +
+        '<div class="lf-tp-ranges"></div>' +
+        '<p class="mw-help">Static IP addresses or CIDR blocks to trust, merged with preset if set.</p>' +
+        '</div>';
+
+    var rangesEl = details.querySelector('.lf-tp-ranges');
+    rangesEl.setAttribute('data-option-key', '__tp_ranges');
+    rangesEl.setAttribute('data-option-type', 'stringlist');
+    lfInitTagInput(rangesEl, []);
+
+    // Update badge when preset changes
+    var presetSel = details.querySelector('.lf-tp-preset');
+    var badge = details.querySelector('.lf-tp-badge');
+    presetSel.addEventListener('change', function() {
+        lfUpdateTpBadge(details);
+    });
+
+    parentEl.appendChild(details);
+    return details;
+}
+
+function lfUpdateTpBadge(tpSection) {
+    var badge = tpSection.querySelector('.lf-tp-badge');
+    if (!badge) return;
+    var preset = tpSection.querySelector('.lf-tp-preset').value;
+    var ranges = lfCollectStringListValues(tpSection.querySelector('.lf-tp-ranges'));
+    if (preset || ranges.length > 0) {
+        badge.textContent = preset ? preset : ranges.length + ' range(s)';
+    } else {
+        badge.textContent = '';
+    }
+}
+
+function lfCollectTrustedProxies(tpSection) {
+    if (!tpSection) return undefined;
+    var preset = tpSection.querySelector('.lf-tp-preset').value;
+    var header = tpSection.querySelector('.lf-tp-header').value.trim();
+    var refresh = tpSection.querySelector('.lf-tp-refresh').value.trim();
+    var ranges = lfCollectStringListValues(tpSection.querySelector('.lf-tp-ranges'));
+    if (!preset && ranges.length === 0) return undefined;
+    var tp = {};
+    if (preset) tp.preset = preset;
+    if (ranges.length > 0) tp.ranges = ranges;
+    if (header) tp.header = header;
+    if (refresh) tp.refresh_interval = refresh;
+    return tp;
+}
+
+function lfPopulateTrustedProxies(tpSection, data) {
+    if (!tpSection || !data) return;
+    if (data.preset) tpSection.querySelector('.lf-tp-preset').value = data.preset;
+    if (data.header) tpSection.querySelector('.lf-tp-header').value = data.header;
+    if (data.refresh_interval) tpSection.querySelector('.lf-tp-refresh').value = data.refresh_interval;
+    if (data.ranges && data.ranges.length > 0) {
+        data.ranges.forEach(function(r) { lfAddTag(tpSection.querySelector('.lf-tp-ranges'), r); });
+    }
+    lfUpdateTpBadge(tpSection);
+}
+
 // ========== Collect paths from a path list ==========
 function lfCollectPaths(pathsList) {
     var result = [];
@@ -842,6 +943,8 @@ function lfCollectPaths(pathsList) {
         }
         var mws = p.mwChain.collect();
         if (mws.length > 0) entry.middlewares = mws;
+        var tp = lfCollectTrustedProxies(p.tpSection);
+        if (tp) entry.trusted_proxies = tp;
         result.push(entry);
     });
     return result;
@@ -892,6 +995,8 @@ function lfCollectPayload() {
         }
         var defMws = lfDefaultMwChain ? lfDefaultMwChain.collect() : [];
         if (defMws.length > 0) defTarget.middlewares = defMws;
+        var defTp = lfCollectTrustedProxies(lfDefaultTpSection);
+        if (defTp) defTarget.trusted_proxies = defTp;
         var defPaths = lfCollectPaths(lfDefaultPaths);
         if (defPaths.length > 0) defTarget.paths = defPaths;
         payload.default = defTarget;
@@ -912,6 +1017,8 @@ function lfCollectPayload() {
             }
             var mws = r.mwChain.collect();
             if (mws.length > 0) target.middlewares = mws;
+            var routeTp = lfCollectTrustedProxies(r.tpSection);
+            if (routeTp) target.trusted_proxies = routeTp;
             var paths = lfCollectPaths(r.paths);
             if (paths.length > 0) target.paths = paths;
             payload.routes.push({
@@ -941,7 +1048,9 @@ var lfYamlKeyMap = {
     'strip_prefix': 'strip-prefix',
     'disable_http2': 'disable-http2',
     'disable_default_middlewares': 'disable-default-middlewares',
-    'replace_host_header': 'replace-host-header'
+    'replace_host_header': 'replace-host-header',
+    'trusted_proxies': 'trusted-proxies',
+    'refresh_interval': 'refresh-interval'
 };
 var lfJsonKeyMap = {};
 Object.keys(lfYamlKeyMap).forEach(function(k) { lfJsonKeyMap[lfYamlKeyMap[k]] = k; });
@@ -1201,6 +1310,13 @@ function lfResetForm() {
     document.getElementById('lf-default-replace-host').checked = false;
     document.getElementById('lf-default-disable-defaults').checked = false;
     if (lfDefaultMwChain) lfDefaultMwChain.clear();
+    if (lfDefaultTpSection) {
+        lfDefaultTpSection.querySelector('.lf-tp-preset').value = '';
+        lfDefaultTpSection.querySelector('.lf-tp-header').value = '';
+        lfDefaultTpSection.querySelector('.lf-tp-refresh').value = '';
+        lfDefaultTpSection.querySelector('.lf-tp-ranges .mw-tag-list').innerHTML = '';
+        lfUpdateTpBadge(lfDefaultTpSection);
+    }
     lfDefaultPaths.forEach(function(p) { p.el.remove(); });
     lfDefaultPaths = [];
     lfHostRoutes.forEach(function(r) { r.el.remove(); });

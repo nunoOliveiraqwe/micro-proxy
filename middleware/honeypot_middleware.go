@@ -178,6 +178,7 @@ func parseHoneyPotConfig(ctx context.Context, conf Config) (*honeypot.HoneyPotCo
 	}
 
 	cacheOpts.TrackRate = true
+	cacheOpts.Ctx = ctx
 
 	if cacheOpts.IsUsingDefaultCacheName {
 		cacheName, err2 := buildNameForConnection(ctx, "honeypot")

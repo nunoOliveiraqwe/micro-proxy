@@ -35,21 +35,24 @@ func applyDefaultTimeouts(conf *config.HTTPListener) {
 	}
 }
 
-func buildHandlerChain(ctx context.Context, serverId string, conf config.HTTPListener, global *config.GlobalConfig) (http.Handler, []string, []RouteSnapshot, error) {
+func buildHandlerChain(ctx context.Context, serverId string, conf config.HTTPListener, global *config.GlobalConfig) (http.Handler, context.CancelFunc, []string, []RouteSnapshot, error) {
+	ctx, cancel := context.WithCancel(ctx)
 	ctx = context.WithValue(ctx, ctxkeys.Port, conf.Port)
 	ctx = context.WithValue(ctx, ctxkeys.ServerID, serverId)
 
 	hostHandler, backends, routeSnapshots, err := buildHostDispatcher(ctx, conf.Default, conf.Routes)
 	if err != nil {
-		return nil, nil, nil, fmt.Errorf("failed to build host dispatcher: %w", err)
+		cancel()
+		return nil, nil, nil, nil, fmt.Errorf("failed to build host dispatcher: %w", err)
 	}
 
 	//global mw → route mw → path mw → proxy
 	handler, err := buildGlobalDispatcher(ctx, global, hostHandler)
 	if err != nil {
-		return nil, nil, nil, fmt.Errorf("failed to build global dispatcher: %w", err)
+		cancel()
+		return nil, nil, nil, nil, fmt.Errorf("failed to build global dispatcher: %w", err)
 	}
-	return handler, backends, routeSnapshots, nil
+	return handler, cancel, backends, routeSnapshots, nil
 }
 
 func buildHttpServer(ctx context.Context, conf config.HTTPListener, global *config.GlobalConfig) (MicroHttpServer, error) {
@@ -77,7 +80,7 @@ func buildHttpServer(ctx context.Context, conf config.HTTPListener, global *conf
 	}
 	serverId := fmt.Sprintf("http-%d", conf.Port)
 
-	handler, backends, routeSnapshots, err := buildHandlerChain(ctx, serverId, conf, global)
+	handler, cancelChain, backends, routeSnapshots, err := buildHandlerChain(ctx, serverId, conf, global)
 	if err != nil {
 		return nil, err
 	}
@@ -89,6 +92,7 @@ func buildHttpServer(ctx context.Context, conf config.HTTPListener, global *conf
 	if conf.TLS != nil {
 		return &ToriiHttpsServer{
 			handler:           NewSwappableHandler(handler),
+			cancelChain:       cancelChain,
 			serverId:          serverId,
 			readTimeout:       conf.ReadTimeout,
 			readHeaderTimeout: conf.ReadHeaderTimeout,
@@ -111,6 +115,7 @@ func buildHttpServer(ctx context.Context, conf config.HTTPListener, global *conf
 
 	return &ToriiHttpServer{
 		handler:           NewSwappableHandler(handler),
+		cancelChain:       cancelChain,
 		serverId:          serverId,
 		readTimeout:       conf.ReadTimeout,
 		readHeaderTimeout: conf.ReadHeaderTimeout,

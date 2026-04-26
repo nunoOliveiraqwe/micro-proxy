@@ -1,13 +1,15 @@
 package ip_filter
 
 import (
+	"context"
 	"sync/atomic"
 
+	"github.com/nunoOliveiraqwe/torii/internal/netutil"
 	"go.uber.org/zap"
 )
 
 type IpList struct {
-	trie *SubnetTrie
+	trie *netutil.SubnetTrie
 }
 
 type IpFilter struct {
@@ -20,7 +22,7 @@ type IpFilter struct {
 //
 // Logic: if IP is in the allow list → always allowed (whitelist override).
 // If IP is in the block list → blocked. Otherwise → allowed.
-func NewIpFilter(loader IpLoader) (*IpFilter, error) {
+func NewIpFilter(ctx context.Context, loader IpLoader) (*IpFilter, error) {
 	allowIps, err := loader.LoadAllowedIps()
 	if err != nil {
 		return nil, err
@@ -37,7 +39,7 @@ func NewIpFilter(loader IpLoader) (*IpFilter, error) {
 
 	if loader.IsRefreshable() {
 		// StartRefreshTimer does the initial fetch and starts the ticker
-		initialIps, err := loader.StartRefreshTimer(func(ips []string) {
+		initialIps, err := loader.StartRefreshTimer(ctx, func(ips []string) {
 			if err := filter.ReplaceBlockList(ips); err != nil {
 				zap.S().Errorf("IpFilter: failed to replace block list on refresh: %v", err)
 			}
@@ -95,7 +97,7 @@ func (f *IpFilter) IsBlocked(ip string) (bool, error) {
 }
 
 func buildIpList(entries []string) (*IpList, error) {
-	trie := NewSubnetTrie()
+	trie := netutil.NewSubnetTrie()
 	zap.S().Debugf("Parsing %d ip/subnets", len(entries))
 	for _, entry := range entries {
 		if err := trie.InsertFromString(entry); err != nil {

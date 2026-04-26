@@ -68,6 +68,7 @@ func initCountryFilter(ctx context.Context, middlewareConf Config) (*country.Fil
 		}
 	}
 	cacheOpts.TrackRate = true
+	cacheOpts.Ctx = ctx
 
 	// Parse source options
 	sourceRaw, ok := middlewareConf.Options["source"]
@@ -173,7 +174,7 @@ func initCountryFilter(ctx context.Context, middlewareConf Config) (*country.Fil
 		}
 	}
 
-	return country.NewFilter(cacheOpts, loader, countryListMode, countryCodes, continentListMode, continentCodes, refreshInterval, countryField, continentField, onUnknown)
+	return country.NewFilter(ctx, cacheOpts, loader, countryListMode, countryCodes, continentListMode, continentCodes, refreshInterval, countryField, continentField, onUnknown)
 }
 
 func parseListMode(options map[string]interface{}, key string) (country.ListMode, error) {

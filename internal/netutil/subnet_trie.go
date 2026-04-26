@@ -1,4 +1,4 @@
-package ip_filter
+package netutil
 
 import (
 	"fmt"
@@ -141,4 +141,11 @@ func (t *SubnetTrie) ContainsFromString(ipStr string) (bool, error) {
 		return false, err
 	}
 	return t.Contains(addr), nil
+}
+
+func (t *SubnetTrie) IsEmpty() bool {
+	t.mu.RLock()
+	defer t.mu.RUnlock()
+	return t.v4.children[0] == nil && t.v4.children[1] == nil &&
+		t.v6.children[0] == nil && t.v6.children[1] == nil
 }

@@ -24,7 +24,7 @@ type MicroHttpServer interface {
 	DoesConfigChangeRequireServerRestart(newConf config.HTTPListener) bool
 	start(acmeManager *acme.LegoAcmeManager) error
 	getHandler() http.Handler
-	updateHandler(handler http.Handler) error
+	updateHandler(handler http.Handler, cancel context.CancelFunc) error
 	stop() error
 }
 
@@ -232,12 +232,13 @@ func (m *Torii) HotSwapHandler(ctx context.Context, port int, conf config.HTTPLi
 
 	//TODO -> optimize by only rebuilding the affected route's handler's instead of the whole handler chain.
 	//only swap what's changed
-	handler, backends, routeSnapshots, err := buildHandlerChain(ctx, server.GetServerId(), conf, globalConf)
+	handler, cancel, backends, routeSnapshots, err := buildHandlerChain(ctx, server.GetServerId(), conf, globalConf)
 	if err != nil {
 		return fmt.Errorf("failed to build handler chain: %w", err)
 	}
 
-	if err := server.updateHandler(handler); err != nil {
+	if err := server.updateHandler(handler, cancel); err != nil {
+		cancel()
 		return fmt.Errorf("failed to swap handler: %w", err)
 	}
 

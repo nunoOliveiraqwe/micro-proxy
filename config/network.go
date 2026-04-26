@@ -35,8 +35,9 @@ type HTTPListener struct {
 }
 
 type GlobalConfig struct {
-	Middlewares     []middleware.Config `yaml:"middlewares" json:"middlewares,omitempty"`
-	DisableDefaults bool                `yaml:"disable-default-middlewares" json:"disable-default-middlewares,omitempty"`
+	Middlewares     []middleware.Config   `yaml:"middlewares" json:"middlewares,omitempty"`
+	DisableDefaults bool                  `yaml:"disable-default-middlewares" json:"disable-default-middlewares,omitempty"`
+	TrustedProxies  *TrustedProxiesConfig `yaml:"trusted-proxies" json:"trusted-proxies,omitempty"`
 }
 
 type TCPListener struct {
@@ -54,19 +55,28 @@ type Route struct {
 }
 
 type PathRule struct {
-	Pattern         string              `yaml:"pattern" json:"pattern"`
-	Backend         *BackendConfig      `yaml:"backend" json:"backend,omitempty"`
-	DropQuery       *bool               `yaml:"drop-query" json:"drop-query,omitempty"`
-	StripPrefix     *bool               `yaml:"strip-prefix" json:"strip-prefix,omitempty"`
-	Middlewares     []middleware.Config `yaml:"middlewares" json:"middlewares,omitempty"`
-	DisableDefaults bool                `yaml:"disable-default-middlewares" json:"disable-default-middlewares,omitempty"`
+	Pattern         string                `yaml:"pattern" json:"pattern"`
+	Backend         *BackendConfig        `yaml:"backend" json:"backend,omitempty"`
+	DropQuery       *bool                 `yaml:"drop-query" json:"drop-query,omitempty"`
+	StripPrefix     *bool                 `yaml:"strip-prefix" json:"strip-prefix,omitempty"`
+	Middlewares     []middleware.Config   `yaml:"middlewares" json:"middlewares,omitempty"`
+	DisableDefaults bool                  `yaml:"disable-default-middlewares" json:"disable-default-middlewares,omitempty"`
+	TrustedProxies  *TrustedProxiesConfig `yaml:"trusted-proxies" json:"trusted-proxies,omitempty"`
 }
 
 type RouteTarget struct {
-	Backend         BackendConfig       `yaml:"backend" json:"backend"`
-	Middlewares     []middleware.Config `yaml:"middlewares" json:"middlewares,omitempty"`
-	Paths           []PathRule          `yaml:"paths" json:"paths,omitempty"`
-	DisableDefaults bool                `yaml:"disable-default-middlewares" json:"disable-default-middlewares,omitempty"`
+	Backend         BackendConfig         `yaml:"backend" json:"backend"`
+	Middlewares     []middleware.Config   `yaml:"middlewares" json:"middlewares,omitempty"`
+	Paths           []PathRule            `yaml:"paths" json:"paths,omitempty"`
+	DisableDefaults bool                  `yaml:"disable-default-middlewares" json:"disable-default-middlewares,omitempty"`
+	TrustedProxies  *TrustedProxiesConfig `yaml:"trusted-proxies" json:"trusted-proxies,omitempty"`
+}
+
+type TrustedProxiesConfig struct {
+	Preset          string        `yaml:"preset" json:"preset,omitempty"`
+	Ranges          []string      `yaml:"ranges" json:"ranges,omitempty"`
+	Header          string        `yaml:"header" json:"header,omitempty"`
+	RefreshInterval time.Duration `yaml:"refresh-interval" json:"refresh-interval,omitempty"`
 }
 
 type TLSConfig struct {

@@ -36,13 +36,21 @@ func buildGlobalDispatcher(ctx context.Context, global *config.GlobalConfig, nex
 		next:             next,
 	}
 
-	if len(global.Middlewares) == 0 {
+	if len(global.Middlewares) == 0 && global.TrustedProxies == nil {
 		return d, nil
 	}
 
-	wrapped, _, err := buildMiddlewareChain(ctx, d.ServeHTTP, global.Middlewares, global.DisableDefaults)
-	if err != nil {
-		return nil, err
+	var handler http.HandlerFunc = d.ServeHTTP
+
+	if len(global.Middlewares) > 0 {
+		wrapped, _, err := buildMiddlewareChain(ctx, handler, global.Middlewares, global.DisableDefaults)
+		if err != nil {
+			return nil, err
+		}
+		handler = wrapped
 	}
-	return wrapped, nil
+
+	handler = wrapTrustedProxies(ctx, handler, global.TrustedProxies)
+
+	return handler, nil
 }

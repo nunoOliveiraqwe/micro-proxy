@@ -12,7 +12,7 @@ import (
 )
 
 func IpFilterMiddleware(ctx context.Context, next http.HandlerFunc, conf Config) http.HandlerFunc {
-	filter, err := initIpFilter(conf)
+	filter, err := initIpFilter(ctx, conf)
 	if err != nil {
 		zap.S().Errorf("IpFilterMiddleware: failed to initialize: %v. Failing closed.", err)
 		return func(w http.ResponseWriter, r *http.Request) {
@@ -50,7 +50,7 @@ func IpFilterMiddleware(ctx context.Context, next http.HandlerFunc, conf Config)
 	}
 }
 
-func initIpFilter(conf Config) (*ip_filter.IpFilter, error) {
+func initIpFilter(ctx context.Context, conf Config) (*ip_filter.IpFilter, error) {
 	opts := conf.Options
 
 	allowList, err := ParseStringSliceOpt(opts, "allow", nil)
@@ -76,9 +76,9 @@ func initIpFilter(conf Config) (*ip_filter.IpFilter, error) {
 		if err != nil {
 			return nil, err
 		}
-		return ip_filter.NewIpFilter(loader)
+		return ip_filter.NewIpFilter(ctx, loader)
 	}
 
 	loader := ip_filter.NewStaticLoader(allowList, blockList)
-	return ip_filter.NewIpFilter(loader)
+	return ip_filter.NewIpFilter(ctx, loader)
 }

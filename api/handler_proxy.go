@@ -274,6 +274,7 @@ func convertRouteTarget(dto RouteTargetDTO) config.RouteTarget {
 	target := config.RouteTarget{
 		Backend:         config.BackendConfig{Address: dto.Backend.Address, ReplaceHostHeader: dto.Backend.ReplaceHostHeader},
 		DisableDefaults: dto.DisableDefaults,
+		TrustedProxies:  convertTrustedProxies(dto.TrustedProxies),
 	}
 	for _, m := range dto.Middlewares {
 		target.Middlewares = append(target.Middlewares, mw.Config{
@@ -287,6 +288,7 @@ func convertRouteTarget(dto RouteTargetDTO) config.RouteTarget {
 			DropQuery:       p.DropQuery,
 			StripPrefix:     p.StripPrefix,
 			DisableDefaults: p.DisableDefaults,
+			TrustedProxies:  convertTrustedProxies(p.TrustedProxies),
 		}
 		if p.Backend != nil {
 			pr.Backend = &config.BackendConfig{Address: p.Backend.Address, ReplaceHostHeader: p.Backend.ReplaceHostHeader}
@@ -382,6 +384,7 @@ func routeTargetToDTO(t config.RouteTarget) RouteTargetDTO {
 	dto := RouteTargetDTO{
 		Backend:         BackendConfigDTO{Address: t.Backend.Address, ReplaceHostHeader: t.Backend.ReplaceHostHeader},
 		DisableDefaults: t.DisableDefaults,
+		TrustedProxies:  trustedProxiesToDTO(t.TrustedProxies),
 	}
 	for _, m := range t.Middlewares {
 		mDTO := MiddlewareConfigDTO{Type: m.Type, Options: m.Options}
@@ -393,6 +396,7 @@ func routeTargetToDTO(t config.RouteTarget) RouteTargetDTO {
 			DropQuery:       p.DropQuery,
 			StripPrefix:     p.StripPrefix,
 			DisableDefaults: p.DisableDefaults,
+			TrustedProxies:  trustedProxiesToDTO(p.TrustedProxies),
 		}
 		if p.Backend != nil {
 			pDTO.Backend = &BackendConfigDTO{Address: p.Backend.Address, ReplaceHostHeader: p.Backend.ReplaceHostHeader}
@@ -455,4 +459,42 @@ func handleEditProxy(svc app.SystemService) http.HandlerFunc {
 			"port":   conf.Port,
 		}, w)
 	}
+}
+
+func convertTrustedProxies(dto *TrustedProxiesDTO) *config.TrustedProxiesConfig {
+	if dto == nil {
+		return nil
+	}
+	if dto.Preset == "" && len(dto.Ranges) == 0 {
+		return nil
+	}
+	tp := &config.TrustedProxiesConfig{
+		Preset: dto.Preset,
+		Ranges: dto.Ranges,
+		Header: dto.Header,
+	}
+	if dto.RefreshInterval != "" {
+		if d, err := time.ParseDuration(dto.RefreshInterval); err == nil {
+			tp.RefreshInterval = d
+		}
+	}
+	return tp
+}
+
+func trustedProxiesToDTO(tp *config.TrustedProxiesConfig) *TrustedProxiesDTO {
+	if tp == nil {
+		return nil
+	}
+	if tp.Preset == "" && len(tp.Ranges) == 0 {
+		return nil
+	}
+	dto := &TrustedProxiesDTO{
+		Preset: tp.Preset,
+		Ranges: tp.Ranges,
+		Header: tp.Header,
+	}
+	if tp.RefreshInterval > 0 {
+		dto.RefreshInterval = tp.RefreshInterval.String()
+	}
+	return dto
 }

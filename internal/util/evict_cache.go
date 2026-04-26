@@ -23,6 +23,7 @@ type EvictableEntry interface {
 }
 
 type CacheOptions struct {
+	Ctx                     context.Context
 	manager                 *CacheInsightManager //if defined cache is registered with manager
 	IsUsingDefaultCacheName bool
 	TrackRate               bool
@@ -120,9 +121,13 @@ func NewCache[T EvictableEntry](options *CacheOptions) (*Cache[T], error) {
 	if options.TrackRate {
 		rateTracker = NewRateTracker()
 	}
+	cacheCtx := options.Ctx
+	if cacheCtx == nil {
+		cacheCtx = context.Background()
+	}
 	c := &Cache[T]{
 		cacheName:       options.CacheName,
-		ctx:             context.Background(),
+		ctx:             cacheCtx,
 		cleanupInterval: options.CleanupInterval,
 		maxEntries:      options.MaxEntries,
 		mu:              sync.RWMutex{},
@@ -196,13 +201,12 @@ func (c *Cache[T]) startCleanup() {
 	ticker := time.NewTicker(c.cleanupInterval)
 	go func() {
 		defer ticker.Stop()
-		for range ticker.C {
+		for {
 			select {
 			case <-c.ctx.Done():
 				zap.S().Info("Cache cleanup goroutine exiting due to context cancellation")
 				return
-			default:
-				// continue with cleanup
+			case <-ticker.C:
 				c.sweep()
 			}
 		}

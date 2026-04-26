@@ -1,4 +1,4 @@
-package ip_filter
+package netutil
 
 import (
 	"fmt"

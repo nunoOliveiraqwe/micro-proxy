@@ -26,41 +26,41 @@ func compressedHandler(t *testing.T) http.HandlerFunc {
 
 func TestParseCompressionsOptions_MissingType(t *testing.T) {
 	conf := Config{Type: "Compression", Options: map[string]interface{}{}}
-	_, err := parseCompressionsOptions(conf)
+	_, _, err := parseCompressionsOptions(conf)
 	assert.Error(t, err)
 }
 
 func TestParseCompressionsOptions_InvalidType(t *testing.T) {
 	conf := Config{Type: "Compression", Options: map[string]interface{}{"type": "brotli"}}
-	_, err := parseCompressionsOptions(conf)
+	_, _, err := parseCompressionsOptions(conf)
 	assert.Error(t, err)
 	assert.Contains(t, err.Error(), "invalid compression type")
 }
 
 func TestParseCompressionsOptions_Gzip(t *testing.T) {
 	conf := Config{Type: "Compression", Options: map[string]interface{}{"type": "gzip"}}
-	fn, err := parseCompressionsOptions(conf)
+	_, fn, err := parseCompressionsOptions(conf)
 	require.NoError(t, err)
 	assert.NotNil(t, fn)
 }
 
 func TestParseCompressionsOptions_Zlib(t *testing.T) {
 	conf := Config{Type: "Compression", Options: map[string]interface{}{"type": "zlib"}}
-	fn, err := parseCompressionsOptions(conf)
+	_, fn, err := parseCompressionsOptions(conf)
 	require.NoError(t, err)
 	assert.NotNil(t, fn)
 }
 
 func TestParseCompressionsOptions_InvalidLevel(t *testing.T) {
 	conf := Config{Type: "Compression", Options: map[string]interface{}{"type": "gzip", "level": float64(999)}}
-	_, err := parseCompressionsOptions(conf)
+	_, _, err := parseCompressionsOptions(conf)
 	assert.Error(t, err)
 	assert.Contains(t, err.Error(), "invalid gzip compression level")
 }
 
 func TestParseCompressionsOptions_InvalidLevelZlib(t *testing.T) {
 	conf := Config{Type: "Compression", Options: map[string]interface{}{"type": "zlib", "level": float64(999)}}
-	_, err := parseCompressionsOptions(conf)
+	_, _, err := parseCompressionsOptions(conf)
 	assert.Error(t, err)
 	assert.Contains(t, err.Error(), "invalid zlib compression level")
 }

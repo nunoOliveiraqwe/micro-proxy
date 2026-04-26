@@ -116,6 +116,7 @@ type RouteTargetDTO struct {
 	Middlewares     []MiddlewareConfigDTO `json:"middlewares,omitempty"`
 	Paths           []PathRuleDTO         `json:"paths,omitempty"`
 	DisableDefaults bool                  `json:"disable_default_middlewares,omitempty"`
+	TrustedProxies  *TrustedProxiesDTO    `json:"trusted_proxies,omitempty"`
 }
 
 // PathRuleDTO mirrors config.PathRule.
@@ -126,6 +127,7 @@ type PathRuleDTO struct {
 	StripPrefix     *bool                 `json:"strip_prefix,omitempty"`
 	Middlewares     []MiddlewareConfigDTO `json:"middlewares,omitempty"`
 	DisableDefaults bool                  `json:"disable_default_middlewares,omitempty"`
+	TrustedProxies  *TrustedProxiesDTO    `json:"trusted_proxies,omitempty"`
 }
 
 // BackendConfigDTO mirrors config.BackendConfig.
@@ -137,4 +139,12 @@ type BackendConfigDTO struct {
 type MiddlewareConfigDTO struct {
 	Type    string                 `json:"type"`
 	Options map[string]interface{} `json:"options,omitempty"`
+}
+
+// TrustedProxiesDTO mirrors config.TrustedProxiesConfig.
+type TrustedProxiesDTO struct {
+	Preset          string   `json:"preset,omitempty"`
+	Ranges          []string `json:"ranges,omitempty"`
+	Header          string   `json:"header,omitempty"`
+	RefreshInterval string   `json:"refresh_interval,omitempty"`
 }

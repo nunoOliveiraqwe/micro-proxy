@@ -55,10 +55,13 @@ func buildPathDispatcher(ctx context.Context, defaultHandler http.HandlerFunc, p
 		}
 
 		ctx2 := context.WithValue(ctx, ctxkeys.Path, rule.Pattern)
+
 		handler, appliedMw, err := buildMiddlewareChain(ctx2, pathBaseHandler, rule.Middlewares, rule.DisableDefaults)
 		if err != nil {
 			return nil, nil, nil, err
 		}
+
+		handler = wrapTrustedProxies(ctx, handler, rule.TrustedProxies)
 
 		// When the rule has its own backend, ensure the pattern covers
 		// sub-paths too (e.g. "/jellyfino" → "/jellyfino/{path...}").
@@ -68,7 +71,6 @@ func buildPathDispatcher(ctx context.Context, defaultHandler http.HandlerFunc, p
 
 		mux.HandleFunc(pattern, handler)
 		registeredPatternMap[pattern] = struct{}{}
-
 
 		backend := ""
 		if rule.Backend != nil {

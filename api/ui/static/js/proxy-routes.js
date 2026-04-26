@@ -461,6 +461,9 @@ function lfPopulateForm(data) {
         if (data.default.middlewares && data.default.middlewares.length > 0 && lfDefaultMwChain) {
             data.default.middlewares.forEach(function(m) { lfDefaultMwChain.add(m.type, m.options || {}); });
         }
+        if (data.default.trusted_proxies && lfDefaultTpSection) {
+            lfPopulateTrustedProxies(lfDefaultTpSection, data.default.trusted_proxies);
+        }
         if (data.default.paths && data.default.paths.length > 0) {
             data.default.paths.forEach(function(p) {
                 var pathObj = lfCreatePathCard(document.getElementById('lf-default-paths'), lfDefaultPaths);
@@ -475,6 +478,9 @@ function lfPopulateForm(data) {
                 }
                 if (p.middlewares && p.middlewares.length > 0) {
                     p.middlewares.forEach(function(m) { pathObj.mwChain.add(m.type, m.options || {}); });
+                }
+                if (p.trusted_proxies && pathObj.tpSection) {
+                    lfPopulateTrustedProxies(pathObj.tpSection, p.trusted_proxies);
                 }
             });
         }
@@ -497,6 +503,9 @@ function lfPopulateForm(data) {
             if (target.middlewares && target.middlewares.length > 0) {
                 target.middlewares.forEach(function(m) { routeObj.mwChain.add(m.type, m.options || {}); });
             }
+            if (target.trusted_proxies && routeObj.tpSection) {
+                lfPopulateTrustedProxies(routeObj.tpSection, target.trusted_proxies);
+            }
             if (target.paths && target.paths.length > 0) {
                 var pathsContainer = routeObj.el.querySelector('.lf-route-paths-container');
                 target.paths.forEach(function(p) {
@@ -512,6 +521,9 @@ function lfPopulateForm(data) {
                     }
                     if (p.middlewares && p.middlewares.length > 0) {
                         p.middlewares.forEach(function(m) { pathObj.mwChain.add(m.type, m.options || {}); });
+                    }
+                    if (p.trusted_proxies && pathObj.tpSection) {
+                        lfPopulateTrustedProxies(pathObj.tpSection, p.trusted_proxies);
                     }
                 });
             }

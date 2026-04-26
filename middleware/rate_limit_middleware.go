@@ -196,6 +196,7 @@ func parseRateLimitConfig(ctx context.Context, conf Config) (*rateLimitConf, err
 			zap.S().Errorf("Failed to parse cache options for per-client rate limiter: %v. Failing closed.", err)
 			return nil, fmt.Errorf("failed to parse cache options: %w", err)
 		}
+		cacheOpts.Ctx = ctx
 	}
 	return &rateLimitConf{
 		CacheOpt:      cacheOpts,

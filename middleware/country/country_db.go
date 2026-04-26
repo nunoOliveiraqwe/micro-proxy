@@ -72,7 +72,7 @@ func splitFieldPath(field string) []string {
 	return strings.Split(field, ".")
 }
 
-func NewFilter(cacheOpts *util.CacheOptions, loader DbLoader, countryMode ListMode, countryCodes []string, continentMode ListMode, continentCodes []string, refreshInterval time.Duration, countryField string, continentField string, onUnknown bool) (*Filter, error) {
+func NewFilter(ctx context.Context, cacheOpts *util.CacheOptions, loader DbLoader, countryMode ListMode, countryCodes []string, continentMode ListMode, continentCodes []string, refreshInterval time.Duration, countryField string, continentField string, onUnknown bool) (*Filter, error) {
 	hasCountryList := len(countryCodes) > 0
 	hasContinentList := len(continentCodes) > 0
 
@@ -126,7 +126,7 @@ func NewFilter(cacheOpts *util.CacheOptions, loader DbLoader, countryMode ListMo
 	}
 
 	if refreshInterval > 0 && loader.isRefreshable() {
-		f.startRefresh()
+		f.startRefresh(ctx)
 	}
 
 	return f, nil
@@ -143,13 +143,19 @@ func modeString(m ListMode) string {
 	}
 }
 
-func (c *Filter) startRefresh() {
+func (c *Filter) startRefresh(ctx context.Context) {
 	zap.S().Infof("Starting country DB refresh goroutine with interval %s", c.refreshInterval)
 	ticker := time.NewTicker(c.refreshInterval)
 	go func() {
 		defer ticker.Stop()
-		for range ticker.C {
-			c.reloadDB()
+		for {
+			select {
+			case <-ctx.Done():
+				zap.S().Infof("Country DB refresh goroutine stopped")
+				return
+			case <-ticker.C:
+				c.reloadDB()
+			}
 		}
 	}()
 }

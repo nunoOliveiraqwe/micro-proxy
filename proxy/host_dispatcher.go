@@ -117,11 +117,14 @@ func buildRouteHandler(ctx context.Context, target config.RouteTarget) (http.Han
 		pathSnapshots = pSnaps
 		baseHandler = pathHandler.ServeHTTP
 	}
+
 	//global mw → route mw → path mw → proxy
 	defaultHandler, appliedMw, err := buildMiddlewareChain(ctx, baseHandler, target.Middlewares, target.DisableDefaults)
 	if err != nil {
 		return nil, nil, RouteSnapshot{}, fmt.Errorf("failed to build middleware chain for backend %s: %w", target.Backend.Address, err)
 	}
+
+	defaultHandler = wrapTrustedProxies(ctx, defaultHandler, target.TrustedProxies)
 
 	snapshot := RouteSnapshot{
 		Backend:     target.Backend.Address,

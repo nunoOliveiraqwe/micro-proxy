@@ -2,6 +2,7 @@ package ip_filter
 
 import (
 	"bufio"
+	"context"
 	"fmt"
 	"strings"
 	"time"
@@ -13,7 +14,7 @@ import (
 )
 
 type IpLoader interface {
-	StartRefreshTimer(func([]string)) ([]string, error)
+	StartRefreshTimer(ctx context.Context, callback func([]string)) ([]string, error)
 	IsRefreshable() bool
 	LoadAllowedIps() ([]string, error)
 	LoadBlockedIps() ([]string, error)
@@ -24,7 +25,7 @@ type StaticLoader struct {
 	blockedIps []string
 }
 
-func (s *StaticLoader) StartRefreshTimer(_ func([]string)) ([]string, error) {
+func (s *StaticLoader) StartRefreshTimer(_ context.Context, _ func([]string)) ([]string, error) {
 	zap.S().Debugf("StaticLoader does not support refresh timer")
 	return []string{}, nil
 }
@@ -93,7 +94,7 @@ func resolveValue(value string) (string, error) {
 	return resolver.Resolve(value[idx+1:])
 }
 
-func (s *AbuseIpDbBlockListLoader) StartRefreshTimer(callback func([]string)) ([]string, error) {
+func (s *AbuseIpDbBlockListLoader) StartRefreshTimer(ctx context.Context, callback func([]string)) ([]string, error) {
 	ips, err := s.fetchBlockList()
 	if err != nil {
 		zap.S().Warnf("AbuseIPDB initial fetch failed, starting with empty block list: %v", err)
@@ -102,14 +103,21 @@ func (s *AbuseIpDbBlockListLoader) StartRefreshTimer(callback func([]string)) ([
 
 	ticker := time.NewTicker(s.refreshInterval)
 	go func() {
-		for range ticker.C {
-			zap.S().Infof("AbuseIPDB refresh tick, fetching block list")
-			refreshed, err := s.fetchBlockList()
-			if err != nil {
-				zap.S().Errorf("AbuseIPDB refresh failed: %v", err)
-				continue
+		defer ticker.Stop()
+		for {
+			select {
+			case <-ctx.Done():
+				zap.S().Infof("AbuseIPDB refresh goroutine stopped")
+				return
+			case <-ticker.C:
+				zap.S().Infof("AbuseIPDB refresh tick, fetching block list")
+				refreshed, err := s.fetchBlockList()
+				if err != nil {
+					zap.S().Errorf("AbuseIPDB refresh failed: %v", err)
+					continue
+				}
+				callback(refreshed)
 			}
-			callback(refreshed)
 		}
 	}()
 

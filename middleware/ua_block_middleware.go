@@ -91,6 +91,7 @@ func parseUaConfig(ctx context.Context, conf Config) (*ua.UaBlockerConfig, error
 		}
 	}
 	cacheOpts.TrackRate = true
+	cacheOpts.Ctx = ctx
 
 	zap.S().Debug("UserAgentBlockMiddleware: parsed cache options", zap.Any("cacheOpts", cacheOpts))
 
