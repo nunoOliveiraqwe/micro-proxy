@@ -6,6 +6,7 @@ import (
 	"sync"
 
 	"github.com/nunoOliveiraqwe/torii/internal/app"
+	"github.com/nunoOliveiraqwe/torii/internal/service"
 	"github.com/nunoOliveiraqwe/torii/middleware"
 	"go.uber.org/zap"
 )
@@ -55,7 +56,7 @@ func handleCompleteFts(systemService app.SystemService) http.HandlerFunc {
 		err = systemService.GetServiceStore().GetUserService().
 			SetPasswordForUser(f.Password, "admin")
 		if err != nil {
-			var pve *app.PasswordValidationError
+			var pve *service.PasswordValidationError
 			if errors.As(err, &pve) {
 				logger.Error("Invalid password provided for FTS completion", zap.Error(err))
 				http.Error(w, "Invalid password: "+pve.Error(), http.StatusBadRequest)

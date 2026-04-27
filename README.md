@@ -235,7 +235,7 @@ Keeping track of what's done and what's next. This is not a roadmap, just my per
 ### Known Bugs
 - [x] **ACME port leak on startup:** if a route has `use-acme: true` but ACME is not configured, the server fails to start. Starting the proxy manually afterwards returns an ACME error, but the port is already bound from the first attempt. A second manual start then fails with a "bind: address already in use" error. The listener from the failed first start is never closed.
 - [x] **ACME config not loadable from config file:** there is no way to specify ACME configuration (provider, credentials, etc.) in the YAML config file. On first start with `use-acme: true`, it should be possible to seed the ACME configuration from the config file instead of requiring it to be set up through the UI first.
-- [x] **When using wildcards, the ACME cert will show as orphanated in the UI 
+- [x] **When using wildcards, the ACME cert will show as orphaned in the UI:** fixed by normalizing domains to lowercase and adding wildcard-aware matching when determining cert active status.
 
 ### Maybe
 - [ ] Proxy-level authentication: login pages so the proxy handles auth before forwarding to backends

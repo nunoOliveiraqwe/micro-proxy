@@ -1,6 +1,7 @@
 // ---------- ACME / TLS ----------
 var acmeProviders = [];
 var acmeConfigExists = false;
+var acmeDomainsInitialized = false;
 
 function lockAcmeForm(locked) {
     var fields = ['acme-email', 'acme-dns-provider', 'acme-ca-dir-url', 'acme-renewal-interval'];
@@ -89,6 +90,58 @@ function loadAcmeConfig() {
         });
 }
 
+// ---------- ACME Domains Tab ----------
+
+function loadAcmeDomains() {
+    fetch('/api/v1/acme/config', {credentials: 'same-origin'})
+        .then(function (resp) {
+            if (resp.status === 401) { window.location.href = '/ui/login'; return null; }
+            if (!resp.ok) throw new Error(resp.statusText);
+            return resp.json();
+        })
+        .then(function (conf) {
+            if (!conf) return;
+            var container = document.getElementById('acme-domains-input');
+            var domains = conf.domains || [];
+
+            // Re-initialize the tag input each time we load
+            container.innerHTML = '';
+            container.classList.remove('mw-tag-input');
+            acmeDomainsInitialized = false;
+
+            lfInitTagInput(container, domains);
+            acmeDomainsInitialized = true;
+        })
+        .catch(function (err) {
+            console.error('Failed to load ACME domains', err);
+        });
+}
+
+document.getElementById('acme-save-domains-btn').addEventListener('click', function () {
+    var container = document.getElementById('acme-domains-input');
+    var domains = lfCollectStringListValues(container);
+    var resultEl = document.getElementById('acme-domains-result');
+    resultEl.innerHTML = '';
+
+    fetch('/api/v1/acme/domains', {
+        method: 'PUT', credentials: 'same-origin',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({domains: domains})
+    })
+        .then(function (resp) {
+            if (resp.status === 401) { window.location.href = '/ui/login'; return; }
+            if (!resp.ok) return resp.text().then(function (t) {
+                resultEl.innerHTML = '<div class="error-alert">' + (t || 'Failed to update domains.') + '</div>';
+            });
+            showToast('ACME domains updated.', 'success');
+        })
+        .catch(function () {
+            resultEl.innerHTML = '<div class="error-alert">An error occurred. Please try again.</div>';
+        });
+});
+
+// ---------- Certificates Tab ----------
+
 function loadAcmeCertificates() {
     fetch('/api/v1/acme/certificates', {credentials: 'same-origin'})
         .then(function (resp) {
@@ -130,11 +183,12 @@ function loadAcmeCertificates() {
         });
 }
 
-// Enabled toggle — uses PATCH endpoint (only mutation allowed post-setup)
+// ---------- Toggle ----------
+
 document.getElementById('acme-enabled').addEventListener('change', function () {
     var enabled = this.checked;
     document.getElementById('acme-enabled-label').textContent = enabled ? 'Enabled' : 'Disabled';
-    if (!acmeConfigExists) return; // toggle is part of the form for first-time setup
+    if (!acmeConfigExists) return;
     fetch('/api/v1/acme/config', {
         method: 'PATCH', credentials: 'same-origin',
         headers: {'Content-Type': 'application/json'},
@@ -151,6 +205,8 @@ document.getElementById('acme-enabled').addEventListener('change', function () {
         });
 });
 
+// ---------- Save Config (first-time setup) ----------
+
 document.getElementById('acme-config-form').addEventListener('submit', function (e) {
     e.preventDefault();
     var resultEl = document.getElementById('acme-config-result');
@@ -158,7 +214,6 @@ document.getElementById('acme-config-form').addEventListener('submit', function 
 
     var providerName = document.getElementById('acme-dns-provider').value;
 
-    // Collect dynamic credential fields into configurationMap.
     var configMap = {};
     document.querySelectorAll('#acme-credential-fields [data-cred-key]').forEach(function (inp) {
         configMap[inp.getAttribute('data-cred-key')] = inp.value;
@@ -169,6 +224,7 @@ document.getElementById('acme-config-form').addEventListener('submit', function 
         caDirUrl: document.getElementById('acme-ca-dir-url').value,
         renewalCheckInterval: document.getElementById('acme-renewal-interval').value || '12h',
         enabled: document.getElementById('acme-enabled').checked,
+        domains: [],
         dns_provider_config_request: {
             provider: providerName,
             configurationMap: configMap
@@ -195,6 +251,8 @@ document.getElementById('acme-config-form').addEventListener('submit', function 
         });
 });
 
+// ---------- Reset ----------
+
 document.getElementById('acme-reset-btn').addEventListener('click', function () {
     if (!confirm('This will permanently delete ALL ACME data:\n\n• Configuration\n• Account keys\n• Certificates\n\nThis cannot be undone. Continue?')) return;
     fetch('/api/v1/acme', {method: 'DELETE', credentials: 'same-origin'})
@@ -216,6 +274,13 @@ document.getElementById('acme-reset-btn').addEventListener('click', function () 
             document.getElementById('acme-renewal-interval').value = '';
             document.getElementById('acme-credential-fields').innerHTML = '';
             document.getElementById('acme-config-result').innerHTML = '';
+
+            // Reset the domains tab
+            var dc = document.getElementById('acme-domains-input');
+            dc.innerHTML = '';
+            dc.classList.remove('mw-tag-input');
+            acmeDomainsInitialized = false;
+
             lockAcmeForm(false);
         })
         .catch(function () {

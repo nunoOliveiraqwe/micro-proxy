@@ -8,8 +8,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/nunoOliveiraqwe/torii/internal/app"
 	"github.com/nunoOliveiraqwe/torii/internal/domain"
+	"github.com/nunoOliveiraqwe/torii/internal/service"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
@@ -21,7 +21,7 @@ import (
 
 func createTestApiKey(t *testing.T, f *testFixture, alias string, scopes []string, expiry time.Time) *domain.ApiKey {
 	t.Helper()
-	req := &app.CreateApiKeyRequest{
+	req := &service.CreateApiKeyRequest{
 		Alias:      alias,
 		Scopes:     scopes,
 		ExpiryDate: expiry,
@@ -188,7 +188,7 @@ func TestApiKeyGuard_MultipleRequiredScopes_NoneMatch_Returns403(t *testing.T) {
 func TestHandleCreateApiKey_Success(t *testing.T) {
 	f := newTestFixture(t)
 
-	body := app.CreateApiKeyRequest{
+	body := service.CreateApiKeyRequest{
 		Alias:  "new-api-key",
 		Scopes: []string{"read_stats"},
 	}
@@ -211,7 +211,7 @@ func TestHandleCreateApiKey_DuplicateAlias_Returns409(t *testing.T) {
 	createTestApiKey(t, f, "dup-alias", []string{"read_stats"}, time.Time{})
 
 	// Try creating again with same alias
-	body := app.CreateApiKeyRequest{
+	body := service.CreateApiKeyRequest{
 		Alias:  "dup-alias",
 		Scopes: []string{"read_stats"},
 	}
@@ -224,7 +224,7 @@ func TestHandleCreateApiKey_DuplicateAlias_Returns409(t *testing.T) {
 func TestHandleCreateApiKey_EmptyAlias_Returns400(t *testing.T) {
 	f := newTestFixture(t)
 
-	body := app.CreateApiKeyRequest{
+	body := service.CreateApiKeyRequest{
 		Alias:  "",
 		Scopes: []string{"read_stats"},
 	}
@@ -237,7 +237,7 @@ func TestHandleCreateApiKey_EmptyAlias_Returns400(t *testing.T) {
 func TestHandleCreateApiKey_InvalidScopes_Returns400(t *testing.T) {
 	f := newTestFixture(t)
 
-	body := app.CreateApiKeyRequest{
+	body := service.CreateApiKeyRequest{
 		Alias:  "bad-scopes",
 		Scopes: []string{"root_access"},
 	}

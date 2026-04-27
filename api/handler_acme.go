@@ -6,8 +6,9 @@ import (
 	"time"
 
 	"github.com/nunoOliveiraqwe/torii/internal/app"
+	"github.com/nunoOliveiraqwe/torii/internal/service"
+	"github.com/nunoOliveiraqwe/torii/internal/service/acme"
 	"github.com/nunoOliveiraqwe/torii/middleware"
-	"github.com/nunoOliveiraqwe/torii/proxy/acme"
 	"go.uber.org/zap"
 )
 
@@ -49,13 +50,24 @@ func handleGetAcmeConfig(svc app.SystemService) http.HandlerFunc {
 			return
 		}
 
+		if result == nil {
+			logger.Info("No ACME configuration found")
+			WriteResponseAsJSON(&AcmeConfigResponse{Configured: false}, w)
+			return
+		}
+
+		domains := result.Domains
+		if domains == nil {
+			domains = []string{}
+		}
 		WriteResponseAsJSON(AcmeConfigResponse{
 			Email:                result.Email,
 			DNSProvider:          result.DNSProvider,
 			CADirURL:             result.CADirURL,
-			RenewalCheckInterval: result.RenewalCheckInterval,
+			RenewalCheckInterval: result.RenewalCheckInterval.String(),
 			Enabled:              result.Enabled,
-			Configured:           result.Configured,
+			Configured:           true,
+			Domains:              domains,
 		}, w)
 	}
 }
@@ -79,24 +91,25 @@ func handleSaveAcmeConfig(svc app.SystemService) http.HandlerFunc {
 			credMap = req.DnsProviderConfigRequest.ConfigMap
 		}
 
-		err = svc.GetServiceStore().GetAcmeService().SaveConfiguration(&app.SaveAcmeConfigRequest{
+		err = svc.GetServiceStore().GetAcmeService().SaveConfiguration(&service.SaveAcmeConfigRequest{
 			Email:                req.Email,
 			CADirURL:             req.CADirURL,
 			RenewalCheckInterval: req.RenewalCheckInterval,
 			Enabled:              req.Enabled,
 			DNSProvider:          dnsProvider,
 			CredentialMap:        credMap,
+			Domains:              req.Domains,
 		})
 		if err != nil {
 			status := http.StatusInternalServerError
-			if errors.Is(err, app.ErrAcmeAlreadyConfigured) {
+			if errors.Is(err, service.ErrAcmeAlreadyConfigured) {
 				status = http.StatusConflict
-			} else if errors.Is(err, app.ErrEmailRequired) ||
-				errors.Is(err, app.ErrDNSProviderRequired) ||
-				errors.Is(err, app.ErrInvalidDNSProvider) ||
-				errors.Is(err, app.ErrInvalidDNSProviderCfg) ||
-				errors.Is(err, app.ErrInvalidRenewalFmt) ||
-				errors.Is(err, app.ErrRenewalTooShort) {
+			} else if errors.Is(err, service.ErrEmailRequired) ||
+				errors.Is(err, service.ErrDNSProviderRequired) ||
+				errors.Is(err, service.ErrInvalidDNSProvider) ||
+				errors.Is(err, service.ErrInvalidDNSProviderCfg) ||
+				errors.Is(err, service.ErrInvalidRenewalFmt) ||
+				errors.Is(err, service.ErrRenewalTooShort) {
 				status = http.StatusBadRequest
 			}
 			logger.Error("Failed to save ACME configuration", zap.Error(err))
@@ -143,7 +156,7 @@ func handleToggleAcmeEnabled(svc app.SystemService) http.HandlerFunc {
 
 		if err := svc.GetServiceStore().GetAcmeService().ToggleEnabled(req.Enabled); err != nil {
 			status := http.StatusInternalServerError
-			if errors.Is(err, app.ErrAcmeNotConfigured) {
+			if errors.Is(err, service.ErrAcmeNotConfigured) {
 				status = http.StatusNotFound
 			}
 			logger.Error("Failed to toggle ACME enabled state", zap.Error(err))
@@ -157,6 +170,31 @@ func handleToggleAcmeEnabled(svc app.SystemService) http.HandlerFunc {
 		}
 		logger.Info("ACME " + state)
 		WriteResponseAsJSON(map[string]string{"status": "ACME " + state + " successfully."}, w)
+	}
+}
+
+func handleUpdateAcmeDomains(svc app.SystemService) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		logger := middleware.GetRequestLoggerFromContext(r)
+
+		req, err := DecodeJSONBody[AcmeDomainsRequest](r)
+		if err != nil {
+			http.Error(w, "Invalid request body", http.StatusBadRequest)
+			return
+		}
+
+		if err := svc.GetServiceStore().GetAcmeService().UpdateDomains(req.Domains); err != nil {
+			status := http.StatusInternalServerError
+			if errors.Is(err, service.ErrAcmeNotConfigured) {
+				status = http.StatusNotFound
+			}
+			logger.Error("Failed to update ACME domains", zap.Error(err))
+			http.Error(w, err.Error(), status)
+			return
+		}
+
+		logger.Info("ACME domains updated")
+		WriteResponseAsJSON(map[string]string{"status": "ACME domains updated successfully."}, w)
 	}
 }
 

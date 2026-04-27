@@ -6,8 +6,8 @@ import (
 	"time"
 
 	"github.com/nunoOliveiraqwe/torii/internal/domain"
+	"github.com/nunoOliveiraqwe/torii/internal/service/acme"
 	"github.com/nunoOliveiraqwe/torii/internal/sqlite"
-	"github.com/nunoOliveiraqwe/torii/proxy/acme"
 )
 
 func openTestDB(t *testing.T) *sqlite.DB {

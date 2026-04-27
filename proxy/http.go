@@ -2,6 +2,7 @@ package proxy
 
 import (
 	"context"
+	"crypto/tls"
 	"errors"
 	"fmt"
 	"net"
@@ -11,7 +12,6 @@ import (
 
 	"github.com/nunoOliveiraqwe/torii/config"
 	"github.com/nunoOliveiraqwe/torii/metrics"
-	"github.com/nunoOliveiraqwe/torii/proxy/acme"
 	"go.uber.org/zap"
 	"golang.org/x/net/http2"
 	"golang.org/x/net/http2/h2c"
@@ -91,7 +91,7 @@ func (m *ToriiHttpServer) DoesConfigChangeRequireServerRestart(newConf config.HT
 	return false
 }
 
-func (m *ToriiHttpServer) start(_ *acme.LegoAcmeManager) error {
+func (m *ToriiHttpServer) start(_ *tls.Config) error {
 	zap.S().Infof("Starting HTTP server on %d, ipv4 = %s, ipv6 = %s", m.bindPort, m.iPV4BindInterface, m.iPV6BindInterface)
 	listeners := buildNetListeners(m.iPV4BindInterface, m.iPV6BindInterface, m.bindPort)
 	closeListeners := func() {

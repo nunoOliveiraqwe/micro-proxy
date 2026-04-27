@@ -27,12 +27,13 @@ type UserIdentityResponse struct {
 }
 
 type AcmeConfigResponse struct {
-	Email                string `json:"email"`
-	DNSProvider          string `json:"dnsProvider"`
-	CADirURL             string `json:"caDirUrl"`
-	RenewalCheckInterval string `json:"renewalCheckInterval"`
-	Enabled              bool   `json:"enabled"`
-	Configured           bool   `json:"configured"`
+	Email                string   `json:"email"`
+	DNSProvider          string   `json:"dnsProvider"`
+	CADirURL             string   `json:"caDirUrl"`
+	RenewalCheckInterval string   `json:"renewalCheckInterval"`
+	Enabled              bool     `json:"enabled"`
+	Configured           bool     `json:"configured"`
+	Domains              []string `json:"domains"`
 }
 
 type AcmeConfigRequest struct {
@@ -40,6 +41,7 @@ type AcmeConfigRequest struct {
 	CADirURL                 string                    `json:"caDirUrl"`
 	RenewalCheckInterval     string                    `json:"renewalCheckInterval"`
 	Enabled                  bool                      `json:"enabled"`
+	Domains                  []string                  `json:"domains"`
 	DnsProviderConfigRequest *DnsProviderConfigRequest `json:"dns_provider_config_request"`
 }
 
@@ -50,6 +52,10 @@ type DnsProviderConfigRequest struct {
 
 type AcmeToggleRequest struct {
 	Enabled bool `json:"enabled"`
+}
+
+type AcmeDomainsRequest struct {
+	Domains []string `json:"domains"`
 }
 
 type AcmeCertificateResponse struct {

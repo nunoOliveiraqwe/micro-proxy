@@ -1,8 +1,9 @@
-package app
+package service
 
 import (
-	"github.com/stretchr/testify/assert"
 	"testing"
+
+	"github.com/stretchr/testify/assert"
 )
 
 func TestDefaultPasswordValidator_IsValidPassword(t *testing.T) {

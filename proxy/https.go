@@ -13,7 +13,6 @@ import (
 	"github.com/nunoOliveiraqwe/torii/config"
 	"github.com/nunoOliveiraqwe/torii/internal/fsutil"
 	"github.com/nunoOliveiraqwe/torii/metrics"
-	"github.com/nunoOliveiraqwe/torii/proxy/acme"
 	"go.uber.org/zap"
 	"golang.org/x/net/http2"
 )
@@ -98,7 +97,7 @@ func (m *ToriiHttpsServer) DoesConfigChangeRequireServerRestart(newConf config.H
 	return false
 }
 
-func (m *ToriiHttpsServer) start(acmeManager *acme.LegoAcmeManager) error {
+func (m *ToriiHttpsServer) start(tlsConf *tls.Config) error {
 	zap.S().Infof("Starting HTTPS server on %d, ipv4 = %s, ipv6 = %s", m.bindPort, m.iPV4BindInterface, m.iPV6BindInterface)
 	listeners := buildNetListeners(m.iPV4BindInterface, m.iPV6BindInterface, m.bindPort)
 	closeListeners := func() {
@@ -141,12 +140,12 @@ func (m *ToriiHttpsServer) start(acmeManager *acme.LegoAcmeManager) error {
 	}
 	if m.useAcme {
 		zap.S().Infof("Starting ACME HTTPS server")
-		if acmeManager == nil {
+		if tlsConf == nil {
 			m.errorMessage = fmt.Sprintf("ACME is enabled but no ACME manager is configured for port %d", m.bindPort)
 			return fmt.Errorf("ACME is enabled but no ACME manager is configured")
 
 		}
-		m.httpServer.TLSConfig = acmeManager.GetTLSConfig()
+		m.httpServer.TLSConfig = tlsConf
 		if !m.disableHTTP2 {
 			if err := http2.ConfigureServer(m.httpServer, nil); err != nil {
 				m.errorMessage = fmt.Sprintf("failed to configure HTTP/2 for ACME server: %v", err)

@@ -1,8 +1,7 @@
-package app
+package service
 
 import (
-	"github.com/nunoOliveiraqwe/torii/internal/store"
-	"github.com/nunoOliveiraqwe/torii/proxy"
+	"github.com/nunoOliveiraqwe/torii/config"
 	"go.uber.org/zap"
 )
 
@@ -11,10 +10,9 @@ type ServiceStore struct {
 	userService                *UserService
 	systemConfigurationService *SystemConfigurationService
 	acmeService                *AcmeService
-	acmeStore                  store.AcmeStore
 }
 
-func NewServiceStore(ds *DataStore, reloadAcme func() error, getProxies func() []*proxy.ProxySnapshot) *ServiceStore {
+func NewServiceStore(ds *DataStore, acmeConf *config.AcmeConfig) *ServiceStore {
 	conf, err := ds.SystemConfigStore.GetSystemConfiguration()
 	if err != nil {
 		zap.S().Errorf("Failed to get system configuration: %v", err)
@@ -24,8 +22,7 @@ func NewServiceStore(ds *DataStore, reloadAcme func() error, getProxies func() [
 		apiKeyService:              NewApiKeyService(ds.ApiKeyStore, conf.ApiKeyHmacSecret),
 		userService:                NewUserService(ds),
 		systemConfigurationService: NewSystemConfigurationService(ds),
-		acmeService:                NewAcmeService(ds.AcmeStore, reloadAcme, getProxies),
-		acmeStore:                  ds.AcmeStore,
+		acmeService:                NewAcmeService(ds.AcmeStore, acmeConf),
 	}
 }
 
@@ -35,10 +32,6 @@ func (s *ServiceStore) GetUserService() *UserService {
 
 func (s *ServiceStore) GetSystemConfigurationService() *SystemConfigurationService {
 	return s.systemConfigurationService
-}
-
-func (s *ServiceStore) GetAcmeStore() store.AcmeStore {
-	return s.acmeStore
 }
 
 func (s *ServiceStore) GetApiKeyService() *ApiKeyService {

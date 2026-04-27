@@ -323,6 +323,16 @@ var routes = []ApplicationRoute{
 		HandlerFunc:        handleToggleAcmeEnabled,
 	},
 	{
+		Name:               "Update ACME Domains",
+		Description:        "Updates the list of extra ACME domains to issue certificates for",
+		Method:             "PUT",
+		Pattern:            "/acme/domains",
+		IsAllowedBeforeFts: false,
+		IsAllowedAfterFts:  true,
+		IsSecure:           true,
+		HandlerFunc:        handleUpdateAcmeDomains,
+	},
+	{
 		Name:               "Reset ACME",
 		Description:        "Deletes all ACME data (configuration, accounts, certificates)",
 		Method:             "DELETE",

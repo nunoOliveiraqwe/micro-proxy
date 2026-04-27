@@ -5,6 +5,7 @@ import (
 	"net/http"
 
 	"github.com/nunoOliveiraqwe/torii/internal/app"
+	"github.com/nunoOliveiraqwe/torii/internal/service"
 	"github.com/nunoOliveiraqwe/torii/middleware"
 	"go.uber.org/zap"
 )
@@ -13,7 +14,7 @@ func handleCreateNewApiKey(systemService app.SystemService) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		logger := middleware.GetRequestLoggerFromContext(r)
 		logger.Info("Handling create new API key request")
-		apiKeyRequest, err := DecodeJSONBody[app.CreateApiKeyRequest](r)
+		apiKeyRequest, err := DecodeJSONBody[service.CreateApiKeyRequest](r)
 		if err != nil {
 			logger.Warn("Failed to decode create API key request", zap.Error(err))
 			http.Error(w, "Bad request", http.StatusBadRequest)
@@ -22,23 +23,23 @@ func handleCreateNewApiKey(systemService app.SystemService) http.HandlerFunc {
 		apiKey, err := systemService.GetServiceStore().
 			GetApiKeyService().CreateApiKey(r.Context(), apiKeyRequest)
 		if err != nil {
-			if errors.Is(err, app.ErrorInvalidApiKeyRequest) {
+			if errors.Is(err, service.ErrorInvalidApiKeyRequest) {
 				logger.Warn("Invalid API key request", zap.Error(err))
 				http.Error(w, "Bad request: "+err.Error(), http.StatusBadRequest)
 				return
-			} else if errors.Is(err, app.ErrorDuplicatedAliasApiKeyRequest) {
+			} else if errors.Is(err, service.ErrorDuplicatedAliasApiKeyRequest) {
 				logger.Warn("API key already exists", zap.Error(err))
 				http.Error(w, "Conflict: "+err.Error(), http.StatusConflict)
 				return
-			} else if errors.Is(err, app.ErrorInvalidScopesApiKeyRequest) {
+			} else if errors.Is(err, service.ErrorInvalidScopesApiKeyRequest) {
 				logger.Warn("Invalid API key scopes", zap.Error(err))
 				http.Error(w, "Bad request: "+err.Error(), http.StatusBadRequest)
 				return
-			} else if errors.Is(err, app.ErrorInvalidAliasApiKeyRequest) {
+			} else if errors.Is(err, service.ErrorInvalidAliasApiKeyRequest) {
 				logger.Warn("Invalid API key expiration", zap.Error(err))
 				http.Error(w, "Bad request: "+err.Error(), http.StatusBadRequest)
 				return
-			} else if errors.Is(err, app.ErrorInvalidExpiryDateApiKeyRequest) {
+			} else if errors.Is(err, service.ErrorInvalidExpiryDateApiKeyRequest) {
 				logger.Warn("Invalid API key expiration", zap.Error(err))
 				http.Error(w, "Bad request: "+err.Error(), http.StatusBadRequest)
 				return

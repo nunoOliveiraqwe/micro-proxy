@@ -74,10 +74,6 @@ func (a *Application) Start() error {
 	}
 	a.service = svc
 
-	if err := a.service.Start(); err != nil {
-		return fmt.Errorf("failed to start system service: %w", err)
-	}
-
 	a.apiServer = api.StartServer(a.appConfig.APIServer, a.service)
 
 	ln, err := net.Listen("tcp", a.apiServer.Addr)
@@ -91,6 +87,11 @@ func (a *Application) Start() error {
 			zap.S().Fatalf("API server failed: %v", err)
 		}
 	}()
+
+	if err := a.service.Start(); err != nil {
+		return fmt.Errorf("failed to start system service: %w", err)
+	}
+
 	a.RunDebugMode()
 	zap.S().Info("Application started successfully")
 	return nil

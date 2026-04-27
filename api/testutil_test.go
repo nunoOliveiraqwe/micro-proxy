@@ -13,6 +13,7 @@ import (
 	"github.com/nunoOliveiraqwe/torii/config"
 	"github.com/nunoOliveiraqwe/torii/internal/app"
 	"github.com/nunoOliveiraqwe/torii/internal/domain"
+	"github.com/nunoOliveiraqwe/torii/internal/service"
 	"github.com/nunoOliveiraqwe/torii/internal/sqlite"
 	"github.com/nunoOliveiraqwe/torii/internal/store"
 	"github.com/nunoOliveiraqwe/torii/internal/util"
@@ -136,7 +137,7 @@ func (m *mockProxyMetricsStore) UpdateGlobalProxyMetrics(ctx context.Context, me
 // ---------------------------------------------------------------------------
 
 type testSystemService struct {
-	serviceStore   *app.ServiceStore
+	serviceStore   *service.ServiceStore
 	sessions       *session.Registry
 	proxies        []*proxy.ProxySnapshot
 	metricsManager *metrics.ConnectionMetricsManager
@@ -146,7 +147,7 @@ func (t *testSystemService) Start() error                                      {
 func (t *testSystemService) Stop() error                                       { return nil }
 func (t *testSystemService) StartStopAcme() error                              { return nil }
 func (t *testSystemService) SessionRegistry() *session.Registry                { return t.sessions }
-func (t *testSystemService) GetServiceStore() *app.ServiceStore                { return t.serviceStore }
+func (t *testSystemService) GetServiceStore() *service.ServiceStore            { return t.serviceStore }
 func (t *testSystemService) GetConfiguredProxyServers() []*proxy.ProxySnapshot { return t.proxies }
 func (t *testSystemService) GetGlobalMetricsManager() *metrics.ConnectionMetricsManager {
 	return t.metricsManager
@@ -219,7 +220,7 @@ func newTestFixture(t *testing.T) *testFixture {
 	mrs := new(mockRoleStore)
 	mpms := new(mockProxyMetricsStore)
 
-	dataStore := &app.DataStore{
+	dataStore := &service.DataStore{
 		UserStore:         store.UserStore(mus),
 		RoleStore:         store.RoleStore(mrs),
 		SystemConfigStore: store.SystemConfigStore(mscs),
@@ -227,7 +228,7 @@ func newTestFixture(t *testing.T) *testFixture {
 		AcmeStore:         sqlite.NewAcmeStore(db),
 		ApiKeyStore:       sqlite.NewApiKeyStore(db),
 	}
-	serviceStore := app.NewServiceStore(dataStore, func() error { return nil }, func() []*proxy.ProxySnapshot { return nil })
+	serviceStore := service.NewServiceStore(dataStore, nil)
 
 	ctx, cancel := context.WithCancel(context.Background())
 	t.Cleanup(cancel)

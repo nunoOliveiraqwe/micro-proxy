@@ -488,6 +488,7 @@
             <!-- Inner tab bar -->
             <div class="inner-tabs" id="acme-tabs">
                 <button class="inner-tab active" data-acme-tab="acme-tab-config">Configuration</button>
+                <button class="inner-tab" data-acme-tab="acme-tab-domains">Domains</button>
                 <button class="inner-tab" data-acme-tab="acme-tab-certs">Certificates</button>
             </div>
 
@@ -537,6 +538,23 @@
                         <button type="submit" id="acme-save-btn">Save Configuration</button>
                     </form>
                     <div id="acme-config-result"></div>
+                </div>
+            </div>
+
+            <!-- Tab: Domains -->
+            <div class="inner-tab-panel" id="acme-tab-domains" style="display:none;">
+                <div class="stat-card" style="text-align:left;">
+                    <p style="font-size:0.85rem;margin-bottom:0.5rem;color:var(--pico-muted-color);">
+                        Extra domains to issue ACME certificates for, beyond those auto-detected from proxy routes.
+                        Type a domain and press <kbd>Enter</kbd>, <kbd>Tab</kbd>, or <kbd>,</kbd> to add it.
+                    </p>
+                    <p style="font-size:0.8rem;margin-bottom:0.75rem;color:var(--pico-muted-color);">
+                        💡 If a wildcard certificate is present (e.g. <code>*.example.com</code>), domains from proxy routes
+                        under that parent are automatically covered. No need to list them individually.
+                    </p>
+                    <div id="acme-domains-input" class="acme-domains-input" style="margin-bottom:0.75rem;"></div>
+                    <button type="button" id="acme-save-domains-btn">Save Domains</button>
+                    <div id="acme-domains-result"></div>
                 </div>
             </div>
 

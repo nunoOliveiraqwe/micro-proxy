@@ -10,12 +10,11 @@ import (
 	"github.com/nunoOliveiraqwe/torii/api/session"
 	"github.com/nunoOliveiraqwe/torii/config"
 	"github.com/nunoOliveiraqwe/torii/internal/ctxkeys"
+	"github.com/nunoOliveiraqwe/torii/internal/service"
 	"github.com/nunoOliveiraqwe/torii/internal/sqlite"
-	"github.com/nunoOliveiraqwe/torii/internal/store"
 	"github.com/nunoOliveiraqwe/torii/internal/util"
 	"github.com/nunoOliveiraqwe/torii/metrics"
 	"github.com/nunoOliveiraqwe/torii/proxy"
-	"github.com/nunoOliveiraqwe/torii/proxy/acme"
 	"github.com/shirou/gopsutil/v4/cpu"
 	"github.com/shirou/gopsutil/v4/mem"
 	"github.com/shirou/gopsutil/v4/process"
@@ -41,9 +40,8 @@ type SystemHealth struct {
 type SystemService interface {
 	Start() error
 	Stop() error
-	StartStopAcme() error
 	SessionRegistry() *session.Registry
-	GetServiceStore() *ServiceStore
+	GetServiceStore() *service.ServiceStore
 	GetConfiguredProxyServers() []*proxy.ProxySnapshot
 	GetGlobalMetricsManager() *metrics.ConnectionMetricsManager
 	GetCacheInsightManager() *util.CacheInsightManager
@@ -67,8 +65,7 @@ type systemService struct {
 	cacheInsightsManager *util.CacheInsightManager
 	db                   *sqlite.DB
 	sessions             *session.Registry
-	serviceStore         *ServiceStore
-	acmeStore            store.AcmeStore
+	serviceStore         *service.ServiceStore
 	globalMetricsManager *metrics.ConnectionMetricsManager
 	sseBroker            *SSEBroker
 	startTime            time.Time
@@ -87,13 +84,9 @@ func NewSystemService(conf config.AppConfig, configPath string, readOnly bool) (
 		return nil, fmt.Errorf("failed to open database: %w", err)
 	}
 
-	acmeStore := sqlite.NewAcmeStore(db)
-	acmeMgr, err := acme.Bootstrap(acmeStore, conf.Acme)
-	if err != nil {
-		return nil, fmt.Errorf("failed to bootstrap ACME: %w", err)
-	}
+	serviceStore := service.NewServiceStore(service.NewDataStore(db), conf.Acme)
 
-	m, err := proxy.NewTorii(conf.NetConfig, mgr, cInMgr, acmeMgr)
+	m, err := proxy.NewTorii(conf.NetConfig, mgr, cInMgr, serviceStore.GetAcmeService())
 	if err != nil {
 		return nil, fmt.Errorf("failed to create micro proxy: %w", err)
 	}
@@ -104,19 +97,18 @@ func NewSystemService(conf config.AppConfig, configPath string, readOnly bool) (
 		db:                   db,
 		cacheInsightsManager: cInMgr,
 		sessions:             sessions,
-		acmeStore:            acmeStore,
 		globalMetricsManager: mgr,
 		sseBroker:            NewSSEBroker(mgr),
 		startTime:            time.Now(),
 		configPath:           configPath,
 		readOnly:             readOnly,
 		appConfig:            conf,
+		serviceStore:         serviceStore,
 	}
-	svc.serviceStore = NewServiceStore(NewDataStore(db), svc.StartStopAcme, svc.GetConfiguredProxyServers)
 	return svc, nil
 }
 
-func (sm *systemService) GetServiceStore() *ServiceStore {
+func (sm *systemService) GetServiceStore() *service.ServiceStore {
 	return sm.serviceStore
 }
 
@@ -190,6 +182,7 @@ func (sm *systemService) Start() error {
 		return fmt.Errorf("failed to start micro proxy: %w", err)
 	}
 	sm.globalMetricsManager.StartCollectingMetrics()
+	sm.serviceStore.GetAcmeService().Start()
 	zap.S().Info("System service started successfully")
 	return nil
 }
@@ -197,7 +190,7 @@ func (sm *systemService) Start() error {
 func (sm *systemService) Stop() error {
 	zap.S().Info("Stopping system service")
 	sm.sseBroker.Stop()
-	sm.micro.StopAcme()
+	sm.serviceStore.GetAcmeService().Stop()
 	if err := sm.micro.StopAll(); err != nil {
 		return fmt.Errorf("failed to stop micro proxy: %w", err)
 	}
@@ -211,26 +204,6 @@ func (sm *systemService) Stop() error {
 	}
 
 	zap.S().Info("System service stopped successfully")
-	return nil
-}
-
-func (sm *systemService) StartStopAcme() error {
-	zap.S().Info("Reloading ACME manager from DB configuration")
-	conf, err := sm.acmeStore.GetConfiguration()
-	if err != nil {
-		return fmt.Errorf("failed to read ACME configuration: %w", err)
-	}
-	if conf == nil || !conf.Enabled {
-		zap.S().Info("ACME disabled or not configured, stopping ACME manager")
-		sm.micro.SwapAcmeManager(nil)
-		return nil
-	}
-	mgr, err := acme.NewLegoAcmeManager(conf, sm.acmeStore)
-	if err != nil {
-		return fmt.Errorf("failed to create ACME manager: %w", err)
-	}
-	sm.micro.SwapAcmeManager(mgr)
-	zap.S().Info("ACME manager reloaded successfully")
 	return nil
 }
 
@@ -272,6 +245,7 @@ func (sm *systemService) AddHttpListener(conf config.HTTPListener) error {
 	if err := sm.micro.AddHttpServer(ctx, conf, nil); err != nil {
 		return fmt.Errorf("failed to add HTTP listener on port %d: %w", conf.Port, err)
 	}
+	sm.serviceStore.GetAcmeService().NotifyDomainsChanged()
 	zap.S().Infof("HTTP listener added successfully on port %d", conf.Port)
 	return nil
 }
@@ -327,6 +301,7 @@ func (sm *systemService) EditProxy(port int, conf config.HTTPListener) error {
 	if err := sm.micro.HotSwapHandler(ctx, port, conf, nil); err != nil {
 		return fmt.Errorf("failed to edit proxy on port %d: %w", port, err)
 	}
+	sm.serviceStore.GetAcmeService().NotifyDomainsChanged()
 	zap.S().Infof("Proxy on port %d edited successfully", port)
 	return nil
 }

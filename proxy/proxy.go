@@ -2,6 +2,7 @@ package proxy
 
 import (
 	"context"
+	"crypto/tls"
 	"fmt"
 	"net/http"
 	"reflect"
@@ -9,9 +10,9 @@ import (
 
 	"github.com/nunoOliveiraqwe/torii/config"
 	"github.com/nunoOliveiraqwe/torii/internal/ctxkeys"
+	"github.com/nunoOliveiraqwe/torii/internal/service"
 	"github.com/nunoOliveiraqwe/torii/internal/util"
 	"github.com/nunoOliveiraqwe/torii/metrics"
-	"github.com/nunoOliveiraqwe/torii/proxy/acme"
 	"go.uber.org/zap"
 )
 
@@ -22,7 +23,7 @@ type MicroHttpServer interface {
 	GetProxySnapshot(metric []*metrics.Metric) *ProxySnapshot
 	GetCurrentConfig() config.HTTPListener
 	DoesConfigChangeRequireServerRestart(newConf config.HTTPListener) bool
-	start(acmeManager *acme.LegoAcmeManager) error
+	start(tls *tls.Config) error
 	getHandler() http.Handler
 	updateHandler(handler http.Handler, cancel context.CancelFunc) error
 	stop() error
@@ -32,21 +33,20 @@ type Torii struct {
 	stoppedHttpServers map[int]MicroHttpServer
 	startedHttpServers map[int]MicroHttpServer
 	lock               sync.Mutex
-	acmeManager        *acme.LegoAcmeManager
+	acmeService        *service.AcmeService
 	metricsManager     *metrics.ConnectionMetricsManager
 	cacheManager       *util.CacheInsightManager
 }
 
 func NewTorii(conf config.NetworkConfig, mgr *metrics.ConnectionMetricsManager,
-	cacheMgr *util.CacheInsightManager,
-	acmeMgr *acme.LegoAcmeManager) (*Torii, error) {
+	cacheMgr *util.CacheInsightManager, acmeService *service.AcmeService) (*Torii, error) {
 	zap.S().Info("Initializing torii with configuration: ", conf)
 	m := Torii{
 		stoppedHttpServers: make(map[int]MicroHttpServer),
 		startedHttpServers: make(map[int]MicroHttpServer),
 		lock:               sync.Mutex{},
 		metricsManager:     mgr,
-		acmeManager:        acmeMgr,
+		acmeService:        acmeService,
 		cacheManager:       cacheMgr,
 	}
 	ctx := context.WithValue(context.Background(), ctxkeys.MetricsMgr, mgr)
@@ -55,10 +55,9 @@ func NewTorii(conf config.NetworkConfig, mgr *metrics.ConnectionMetricsManager,
 	if err != nil {
 		return nil, err
 	}
-	if acmeMgr != nil {
-		acmeMgr.SetDomainSupplier(m.collectRouteDomains)
-		acmeMgr.StartRenewalLoop()
-	}
+	acmeService.RegisterProxy(&service.AcmeRegisteredProxy{
+		DomainSupplier: m.collectRouteDomains,
+	})
 	return &m, nil
 }
 
@@ -102,7 +101,7 @@ func (m *Torii) StartHttpProxy(port int) error {
 		return fmt.Errorf("no stopped HTTP server found for port %d", port)
 	}
 
-	err := server.start(m.acmeManager)
+	err := server.start(m.acmeService.GetAcmeTLSConfig())
 	if err != nil {
 		zap.S().Errorf("Failed to start HTTP server on port %d: %v", port, err)
 		return err
@@ -172,25 +171,6 @@ func (m *Torii) DeleteHttpProxy(port int) error {
 	delete(m.startedHttpServers, port)
 	zap.S().Warnf("Deleted stopped proxy server on port %d", port)
 	return nil
-}
-
-func (m *Torii) StopAcme() {
-	if m.acmeManager != nil {
-		m.acmeManager.Stop()
-	}
-}
-
-func (m *Torii) SwapAcmeManager(newMgr *acme.LegoAcmeManager) {
-	m.lock.Lock()
-	defer m.lock.Unlock()
-	if m.acmeManager != nil {
-		m.acmeManager.Stop()
-	}
-	m.acmeManager = newMgr
-	if newMgr != nil {
-		newMgr.SetDomainSupplier(m.collectRouteDomains)
-		newMgr.StartRenewalLoop()
-	}
 }
 
 func (m *Torii) AddHttpServer(ctx context.Context, conf config.HTTPListener, globalConf *config.GlobalConfig) error {

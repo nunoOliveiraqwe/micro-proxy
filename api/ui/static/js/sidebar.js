@@ -72,6 +72,9 @@ document.querySelectorAll('#acme-tabs .inner-tab').forEach(function (tab) {
         if (targetId === 'acme-tab-certs') {
             loadAcmeCertificates();
         }
+        if (targetId === 'acme-tab-domains') {
+            loadAcmeDomains();
+        }
     });
 });
 

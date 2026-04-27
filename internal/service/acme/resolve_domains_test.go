@@ -97,3 +97,61 @@ func TestResolveDomains_SupplierReturnsEmpty(t *testing.T) {
 	got := mgr.resolveDomains()
 	assert.Nil(t, got)
 }
+
+func TestGroupDomainBatches_GroupsByParent(t *testing.T) {
+	batches := groupDomainBatches([]string{
+		"app.example.com",
+		"api.example.com",
+		"blog.example.com",
+	})
+	require.Len(t, batches, 1)
+	assert.ElementsMatch(t, []string{"app.example.com", "api.example.com", "blog.example.com"}, batches[0])
+}
+
+func TestGroupDomainBatches_WildcardsAreIndividual(t *testing.T) {
+	batches := groupDomainBatches([]string{
+		"*.example.com",
+		"*.other.com",
+	})
+	require.Len(t, batches, 2)
+	assert.Equal(t, []string{"*.example.com"}, batches[0])
+	assert.Equal(t, []string{"*.other.com"}, batches[1])
+}
+
+func TestGroupDomainBatches_MixedWildcardAndConcrete(t *testing.T) {
+	batches := groupDomainBatches([]string{
+		"*.example.com",
+		"app.other.com",
+		"api.other.com",
+		"single.net",
+	})
+	require.Len(t, batches, 3)
+	// wildcard first (encountered first)
+	assert.Equal(t, []string{"*.example.com"}, batches[0])
+	// other.com group
+	assert.ElementsMatch(t, []string{"app.other.com", "api.other.com"}, batches[1])
+	// single.net alone in its parent group
+	assert.Equal(t, []string{"single.net"}, batches[2])
+}
+
+func TestGroupDomainBatches_DifferentParents(t *testing.T) {
+	batches := groupDomainBatches([]string{
+		"app.example.com",
+		"app.other.com",
+		"api.example.com",
+	})
+	require.Len(t, batches, 2)
+	assert.ElementsMatch(t, []string{"app.example.com", "api.example.com"}, batches[0])
+	assert.Equal(t, []string{"app.other.com"}, batches[1])
+}
+
+func TestGroupDomainBatches_Empty(t *testing.T) {
+	batches := groupDomainBatches(nil)
+	assert.Empty(t, batches)
+}
+
+func TestGroupDomainBatches_BareDomain(t *testing.T) {
+	batches := groupDomainBatches([]string{"localhost"})
+	require.Len(t, batches, 1)
+	assert.Equal(t, []string{"localhost"}, batches[0])
+}

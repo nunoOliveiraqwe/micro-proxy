@@ -1068,6 +1068,9 @@
 .mw-tag{display:inline-flex;align-items:center;gap:0.25rem;background:rgba(124,110,240,0.2);color:#dcd7ff;border:1px solid rgba(124,110,240,0.4);padding:0.1rem 0.4rem;border-radius:0.25rem;font-size:0.72rem;}
 .mw-tag button{border:none;background:transparent;color:inherit;font-size:0.75rem;cursor:pointer;padding:0 0.15rem;}
 .mw-tag-editor{flex:1;min-width:120px;background:transparent;border:none;outline:none;font-size:0.78rem;padding:0.2rem;margin:0;}
+.acme-domains-input.mw-tag-input{align-items:center;}
+.acme-domains-input .mw-tag-list{align-items:center;}
+.acme-domains-input .mw-tag-editor{height:auto;min-height:0;padding:0.2rem 0.3rem;margin:0;line-height:1.4;}
 .lf-section{margin-bottom:1.5rem;}
 .lf-section h4{margin:0 0 0.75rem;padding-bottom:0.5rem;border-bottom:1px solid var(--pico-muted-border-color);}
 .lf-route-card{border:1px solid var(--pico-muted-border-color);border-radius:0.5rem;padding:1rem;margin-bottom:1rem;background:rgba(255,255,255,0.02);}
