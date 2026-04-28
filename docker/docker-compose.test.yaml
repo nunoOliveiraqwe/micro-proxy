@@ -1,0 +1,31 @@
+services:
+
+  torii:
+    build:
+      context: ..
+      dockerfile: docker/Multistage.Dockerfile
+    ports:
+      - "8080:8080"
+      - "27000:27000"
+    volumes:
+      - ./docker-test.config.yaml:/etc/torii/config.yaml:ro
+      - torii-data:/data
+    depends_on:
+      - app-one
+      - app-two
+
+  app-one:
+    image: hashicorp/http-echo
+    command: [ "-text=Hello from app-one 🟢", "-listen=:5000" ]
+    expose:
+      - "5000"
+
+  app-two:
+    image: hashicorp/http-echo
+    command: [ "-text=Hello from app-two 🔵", "-listen=:5000" ]
+    expose:
+      - "5000"
+
+volumes:
+  torii-data:
+

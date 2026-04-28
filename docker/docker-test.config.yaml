@@ -1,0 +1,68 @@
+log:
+  log-level: DEBUG
+  encoding: console
+  color: true
+
+api-server:
+  host: 0.0.0.0
+  port: 27000
+
+net-config:
+  http:
+    - port: 8080
+      read-timeout: 10s
+      read-header-timeout: 5s
+      write-timeout: 10s
+      idle-timeout: 30s
+
+      routes:
+        # curl -H "Host: one.local" http://localhost:8080
+        - host: one.local
+          target:
+            backend:
+              address: http://app-one:5000
+              replace-host-header: false
+            middlewares: []
+            paths: []
+            disable-default-middlewares: false
+
+
+        - host: two.local
+          target:
+            backend:
+              address: http://app-two:5000
+              replace-host-header: false
+            middlewares: []
+            paths: []
+            disable-default-middlewares: false
+
+      default:
+        backend:
+          address: ""
+        middlewares:
+          - type: StaticResponse
+            options:
+              status-code: 404
+              content-type: "text/plain; charset=utf-8"
+              response-body: "No route matched. Try: curl -H 'Host: one.local' http://localhost:8080"
+        paths: []
+        disable-default-middlewares: true
+
+  tcp: []
+  global:
+    trusted-proxies:
+      ranges:
+        - 172.16.0.0/12     # Docker bridge networks
+        - 192.168.0.0/16    # Docker custom networks
+      header: X-Forwarded-For
+    middlewares:
+      - type: RequestId
+        options: {}
+      - type: RequestLog
+        options: {}
+    disable-default-middlewares: true
+
+session:
+  cookie-secure: false
+
+
