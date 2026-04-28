@@ -55,9 +55,14 @@ func NewTorii(conf config.NetworkConfig, mgr *metrics.ConnectionMetricsManager,
 	if err != nil {
 		return nil, err
 	}
-	acmeService.RegisterProxy(&service.AcmeRegisteredProxy{
-		DomainSupplier: m.collectRouteDomains,
-	})
+	if acmeService != nil {
+		zap.S().Info("ACME service provided, registering ACME proxy")
+		acmeService.RegisterProxy(&service.AcmeRegisteredProxy{
+			DomainSupplier: m.collectRouteDomains,
+		})
+	} else {
+		zap.S().Info("No ACME service provided, skipping ACME proxy registration")
+	}
 	return &m, nil
 }
 
@@ -101,7 +106,11 @@ func (m *Torii) StartHttpProxy(port int) error {
 		return fmt.Errorf("no stopped HTTP server found for port %d", port)
 	}
 
-	err := server.start(m.acmeService.GetAcmeTLSConfig())
+	var tlsConf *tls.Config
+	if m.acmeService != nil {
+		tlsConf = m.acmeService.GetAcmeTLSConfig()
+	}
+	err := server.start(tlsConf)
 	if err != nil {
 		zap.S().Errorf("Failed to start HTTP server on port %d: %v", port, err)
 		return err

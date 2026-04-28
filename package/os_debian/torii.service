@@ -6,7 +6,7 @@ Wants=network-online.target
 [Service]
 Type=simple
 WorkingDirectory=/var/lib/torii
-ExecStart=/usr/bin/torii --config /etc/torii/config.yaml
+ExecStart=/usr/bin/torii --config /etc/torii/config.yaml --data-dir /var/lib/torii
 
 
 User=torii
@@ -38,7 +38,7 @@ ProtectClock=yes
 ProtectHostname=yes
 ProtectProc=invisible
 RestrictSUIDSGID=yes
-ReadWritePaths=/var/lib/torii /etc/torii
+ReadWritePaths=/var/lib/torii
 
 
 RestrictAddressFamilies=AF_INET AF_INET6 AF_UNIX AF_NETLINK

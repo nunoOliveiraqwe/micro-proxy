@@ -76,10 +76,6 @@ func handleStopProxy(systemService app.SystemService) http.HandlerFunc {
 func handleDeleteProxy(service app.SystemService) http.HandlerFunc {
 	return func(writer http.ResponseWriter, request *http.Request) {
 		logger := mw.GetRequestLoggerFromContext(request)
-		if service.IsReadOnly() {
-			http.Error(writer, "Server is in read-only mode", http.StatusForbidden)
-			return
-		}
 		port := request.PathValue("serverId")
 		logger.Info("Deleting proxy server", zap.String("port", port))
 		portInt, err := strconv.Atoi(port)
@@ -144,10 +140,6 @@ func handleGetNetworkInterfaces(_ app.SystemService) http.HandlerFunc {
 func handleCreateHttpProxyServer(svc app.SystemService) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		logger := mw.GetRequestLoggerFromContext(r)
-		if svc.IsReadOnly() {
-			http.Error(w, "Server is in read-only mode", http.StatusForbidden)
-			return
-		}
 		req, err := DecodeJSONBody[CreateProxyServerRequest](r)
 		if err != nil {
 			logger.Error("Failed to decode listener request", zap.Error(err))
@@ -412,10 +404,6 @@ func routeTargetToDTO(t config.RouteTarget) RouteTargetDTO {
 func handleEditProxy(svc app.SystemService) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		logger := mw.GetRequestLoggerFromContext(r)
-		if svc.IsReadOnly() {
-			http.Error(w, "Server is in read-only mode", http.StatusForbidden)
-			return
-		}
 		port := r.PathValue("serverId")
 		portInt, err := strconv.Atoi(port)
 		if err != nil {

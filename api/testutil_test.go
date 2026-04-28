@@ -172,7 +172,7 @@ func (t *testSystemService) GetRecentBlockedEntries(n int) []metrics.BlockLogEnt
 	return []metrics.BlockLogEntry{}
 }
 func (t *testSystemService) PersistConfig() error                              { return nil }
-func (t *testSystemService) IsReadOnly() bool                                  { return false }
+func (t *testSystemService) IsHeadless() bool                                  { return false }
 func (t *testSystemService) GetCacheInsightManager() *util.CacheInsightManager { return nil }
 
 // ---------------------------------------------------------------------------

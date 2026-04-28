@@ -10,7 +10,12 @@ RUN CGO_ENABLED=1 GOOS=linux go build -ldflags="-s -w -linkmode external -extldf
 FROM debian:stable-slim
 
 COPY --from=builder /app/torii /torii
+
+VOLUME /data
+
 WORKDIR /data
 
+EXPOSE 27000
+
 ENTRYPOINT ["/torii"]
-CMD ["-config", "/etc/torii/config.yaml"]
+CMD ["--config", "/etc/torii/config.yaml", "--data-dir", "/data"]
