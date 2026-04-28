@@ -245,7 +245,12 @@ func parseHoneyPotConfig(ctx context.Context, conf Config) (*honeypot.HoneyPotCo
 			if err != nil {
 				return nil, err
 			}
+			contentType, err := ParseStringOpt(respMap, "content-type", "text/plain")
+			if err != nil {
+				return nil, err
+			}
 			resp.Body = body
+			resp.ContentType = contentType
 		} else {
 			resp.MaxSlowTricks = ParseIntOpt(respMap, "max-slow-tricks", 10)
 		}

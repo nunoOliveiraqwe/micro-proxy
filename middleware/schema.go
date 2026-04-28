@@ -243,6 +243,8 @@ func GetMiddlewareSchemas() []MiddlewareSchema {
 					HelpText: "HTTP status code for honeypot responses (e.g., 403, 404). Ignored if trickster mode is enabled."},
 				{Key: "response.body", Label: "Response Body", Type: FieldTypeString, Default: "Forbidden", Group: "response",
 					HelpText: "Response body text for honeypot hits. Ignored if trickster mode is enabled."},
+				{Key: "response.content-type", Label: "Content-Type", Type: FieldTypeString, Default: "text/plain", Group: "response",
+					HelpText: "Content-Type header for honeypot responses. Ignored if trickster mode is enabled."},
 				{Key: "response.max-slow-tricks", Label: "Max Slow Tricks", Type: FieldTypeInt, Default: 10, Group: "response",
 					HelpText: "Maximum concurrent slow-trick responses. Careful: these tie up connections on both sides. Keep this low."},
 			}, cacheFields...),

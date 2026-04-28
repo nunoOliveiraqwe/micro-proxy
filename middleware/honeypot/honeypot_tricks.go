@@ -326,6 +326,7 @@ type HoneyPotResponseConfig struct {
 	MaxSlowTricks int    //Max number of slow tricks to use concurrently
 	StatusCode    int    // HTTP status code to return for honeypot hits
 	Body          string // Response body to return for honeypot hits
+	ContentType   string // Content-Type header for static responses; defaults to text/plain
 }
 
 type HoneyPotConfig struct {
@@ -361,10 +362,11 @@ type TricksterServer struct {
 }
 
 type StaticResponseServer struct {
-	cachedIps  *util.Cache[*honeyPotCacheEntry] //any cached entry means the IP is currently banned
-	statusCode int
-	body       string
-	paths      []string
+	cachedIps   *util.Cache[*honeyPotCacheEntry] //any cached entry means the IP is currently banned
+	statusCode  int
+	body        string
+	contentType string
+	paths       []string
 }
 
 func NewHoneyPotServer(honeyPotConf *HoneyPotConfig) (HoneyPotServer, error) {
@@ -380,10 +382,11 @@ func NewHoneyPotServer(honeyPotConf *HoneyPotConfig) (HoneyPotServer, error) {
 		}, nil
 	}
 	return &StaticResponseServer{
-		cachedIps:  cache,
-		statusCode: honeyPotConf.Response.StatusCode,
-		body:       honeyPotConf.Response.Body,
-		paths:      honeyPotConf.Paths,
+		cachedIps:   cache,
+		statusCode:  honeyPotConf.Response.StatusCode,
+		body:        honeyPotConf.Response.Body,
+		paths:       honeyPotConf.Paths,
+		contentType: honeyPotConf.Response.ContentType,
 	}, nil
 
 }
@@ -426,6 +429,7 @@ func (t *StaticResponseServer) Serve(w http.ResponseWriter, _ *http.Request, _ *
 	if t.body != "" {
 		_, _ = w.Write([]byte(t.body))
 	}
+	w.Header().Set("Content-Type", t.contentType)
 }
 
 func (h *StaticResponseServer) IsHoneyPotPath(path string) bool {
