@@ -229,7 +229,7 @@ Keeping track of what's done and what's next. This is not a roadmap, just my per
 - [x] Coraza WAF integration: [Coraza](https://coraza.io/) is a full-featured open-source WAF (OWASP CRS compatible). Add it as a middleware so routes can opt into proper WAF rules alongside the existing bot defense. There's overlap with what the honeypot and UA blocker already do, but Coraza covers a much wider surface (SQLi, XSS, protocol violations, etc.).
 - [x] AbuseIPDB middleware: check client IPs against [AbuseIPDB](https://www.abuseipdb.com/) and block or flag IPs with a high abuse confidence score. Optionally report blocked IPs back (honeypot hits, rate-limit violations, etc.) so the community benefits too.
 - [ ] ForwardAuth middleware: delegate auth decisions to an external service (like Traefik's ForwardAuth / nginx auth_request)
-- [ ] When initializng with a complete config, the UI still needs FTS to be done. It should be possible to completly disable the UI and run the proxy in raw mode
+- [x] When initializng with a complete config, the UI still needs FTS to be done. It should be possible to completly disable the UI and run the proxy in raw mode
 
 
 ### Known Bugs
