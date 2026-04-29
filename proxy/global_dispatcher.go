@@ -5,6 +5,7 @@ import (
 	"net/http"
 
 	"github.com/nunoOliveiraqwe/torii/config"
+	"github.com/nunoOliveiraqwe/torii/middleware"
 	"go.uber.org/zap"
 )
 
@@ -22,10 +23,10 @@ func (d *GlobalDispatcher) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	d.next.ServeHTTP(w, r)
 }
 
-func buildGlobalDispatcher(ctx context.Context, global *config.GlobalConfig, next http.Handler) (http.Handler, error) {
+func buildGlobalDispatcher(ctx context.Context, global *config.GlobalConfig, next http.Handler) (http.Handler, []string, error) {
 	if global == nil {
 		zap.S().Infof("No global dispatcher configuration provided. Skipping")
-		return next, nil
+		return next, nil, nil
 	}
 
 	zap.S().Infof("Building global dispatcher with %d middlewares",
@@ -37,20 +38,24 @@ func buildGlobalDispatcher(ctx context.Context, global *config.GlobalConfig, nex
 	}
 
 	if len(global.Middlewares) == 0 && global.TrustedProxies == nil {
-		return d, nil
+		return d, nil, nil
 	}
 
 	var handler http.HandlerFunc = d.ServeHTTP
 
+	var globalMwNames []middleware.Config
+
 	if len(global.Middlewares) > 0 {
-		wrapped, _, err := buildMiddlewareChain(ctx, handler, global.Middlewares, global.DisableDefaults)
+		wrapped, appliedMw, err := buildMiddlewareChain(ctx, handler, global.Middlewares, global.DisableDefaults)
 		if err != nil {
-			return nil, err
+			return nil, nil, err
 		}
 		handler = wrapped
+
+		globalMwNames = appliedMw
 	}
 
 	handler = wrapTrustedProxies(ctx, handler, global.TrustedProxies)
 
-	return handler, nil
+	return handler, middlewareNames(globalMwNames), nil
 }

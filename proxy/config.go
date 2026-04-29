@@ -47,10 +47,15 @@ func buildHandlerChain(ctx context.Context, serverId string, conf config.HTTPLis
 	}
 
 	//global mw → route mw → path mw → proxy
-	handler, err := buildGlobalDispatcher(ctx, global, hostHandler)
+	handler, globalMwNames, err := buildGlobalDispatcher(ctx, global, hostHandler)
 	if err != nil {
 		cancel()
 		return nil, nil, nil, nil, fmt.Errorf("failed to build global dispatcher: %w", err)
+	}
+	if globalMwNames != nil {
+		for i := range routeSnapshots {
+			routeSnapshots[i].GlobalMiddlewares = append([]string(nil), globalMwNames...)
+		}
 	}
 	return handler, cancel, backends, routeSnapshots, nil
 }

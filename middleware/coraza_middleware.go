@@ -58,6 +58,10 @@ func (rw *wafResponseWriter) Write(b []byte) (int, error) {
 	return n, err
 }
 
+func (rw *wafResponseWriter) Unwrap() http.ResponseWriter {
+	return rw.w
+}
+
 type corazaConfig struct {
 	waf            coraza.WAF
 	inspectReqBody bool

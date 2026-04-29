@@ -312,10 +312,15 @@ function renderRouteDetail(routes) {
     var h = '<table style="width:100%;margin:0;font-size:0.8rem;">' +
         '<thead><tr><th>Host</th><th>Backend</th><th>Middleware</th></tr></thead><tbody>';
     routes.forEach(function (r) {
+
+
         var host = r.host || '<em>default</em>';
+
+        var globalMw = (r.global_middlewares && r.global_middlewares.length) ? r.global_middlewares.join(', ') : '';
         var mw = (r.middlewares && r.middlewares.length) ? r.middlewares.join(', ') : '<em>none</em>';
+        var fullMw = globalMw ? (globalMw + ', ' + mw) : mw;
         var backendAddr = (typeof r.backend === 'object' && r.backend) ? r.backend.address : (r.backend || '');
-        h += '<tr><td>' + host + '</td><td><code>' + backendAddr + '</code></td><td>' + mw + '</td></tr>';
+        h += '<tr><td>' + host + '</td><td><code>' + backendAddr + '</code></td><td>' + fullMw + '</td></tr>';
         if (r.paths && r.paths.length > 0) {
             r.paths.forEach(function (p) {
                 var pmw = (p.middlewares && p.middlewares.length) ? p.middlewares.join(', ') : '<em>none</em>';

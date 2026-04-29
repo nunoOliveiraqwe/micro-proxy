@@ -12,7 +12,6 @@ import (
 	"github.com/nunoOliveiraqwe/torii/api"
 	"github.com/nunoOliveiraqwe/torii/config"
 	"github.com/nunoOliveiraqwe/torii/internal/app"
-	"github.com/nunoOliveiraqwe/torii/internal/fsutil"
 	"github.com/nunoOliveiraqwe/torii/logging"
 	"go.uber.org/zap"
 )
@@ -92,36 +91,38 @@ func (a *Application) loadManaged() error {
 
 	a.workingConfigPath = filepath.Join(a.dataDir, workingConfigName)
 
-	_, statErr := os.Stat(a.workingConfigPath)
-	workingExists := statErr == nil
+	var conf config.AppConfig
 
-	switch {
-	case a.flags.ConfigPath != "" && !workingExists:
-		// First run: seed the working config from --config
-		if err := fsutil.CopyFile(a.flags.ConfigPath, a.workingConfigPath); err != nil {
-			return fmt.Errorf("failed to seed working config from %q: %w", a.flags.ConfigPath, err)
+	if a.flags.ConfigPath == "" {
+		logBoot("No --config provided, looking for existing working config at %s", a.workingConfigPath)
+		_, statErr := os.Stat(a.workingConfigPath)
+		workingExists := statErr == nil
+
+		if !workingExists {
+			logBoot("No working config found at %s", a.workingConfigPath)
+			logBoot("Using default configuration")
+
+			conf = config.DefaultConfiguration()
+			if err := config.SaveConfiguration(a.workingConfigPath, conf); err != nil {
+				return fmt.Errorf("failed to save default configuration to %s: %w", a.workingConfigPath, err)
+			}
+			logBoot("Saved default configuration to %s", a.workingConfigPath)
+		} else {
+			logBoot("Found existing working config at %s", a.workingConfigPath)
+			conf, err = config.LoadConfiguration(a.workingConfigPath)
+			if err != nil {
+				return fmt.Errorf("failed to load existing working config from %s: %w", a.workingConfigPath, err)
+			}
+			logBoot("Loaded existing working config from %s", a.workingConfigPath)
 		}
-		logBoot("Seeded working config from %s → %s", a.flags.ConfigPath, a.workingConfigPath)
-
-	case a.flags.ConfigPath != "" && workingExists:
-		// Working config already exists — ignore --config, warn the user
-		logBoot("Working config %s already exists, ignoring --config %s (delete %s to re-seed)",
-			a.workingConfigPath, a.flags.ConfigPath, workingConfigName)
-
-	case a.flags.ConfigPath == "" && workingExists:
-		// Normal subsequent run
-		logBoot("Loading existing working config from %s", a.workingConfigPath)
-
-	default:
-		// No --config and no working config
-		return fmt.Errorf("no configuration found: provide --config to seed, or ensure %s exists in data-dir %s",
-			workingConfigName, a.dataDir)
+	} else {
+		logBoot("--config provided: %s", a.flags.ConfigPath)
+		conf, err = config.LoadConfiguration(a.workingConfigPath)
+		if err != nil {
+			return fmt.Errorf("failed to load working config from %q: %w", a.workingConfigPath, err)
+		}
 	}
 
-	conf, err := config.LoadConfiguration(a.workingConfigPath)
-	if err != nil {
-		return fmt.Errorf("failed to load working config from %q: %w", a.workingConfigPath, err)
-	}
 	a.appConfig = conf
 	a.applyFlagOverrides()
 	return nil

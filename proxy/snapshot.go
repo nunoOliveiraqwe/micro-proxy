@@ -9,10 +9,11 @@ type PathSnapshot struct {
 }
 
 type RouteSnapshot struct {
-	Host        string         `json:"host,omitempty"`
-	Backend     string         `json:"backend"`
-	Middlewares []string       `json:"middlewares"`
-	Paths       []PathSnapshot `json:"paths,omitempty"`
+	Host              string         `json:"host,omitempty"`
+	Backend           string         `json:"backend"`
+	Middlewares       []string       `json:"middlewares"`
+	GlobalMiddlewares []string       `json:"global_middlewares"`
+	Paths             []PathSnapshot `json:"paths,omitempty"`
 }
 
 type ProxySnapshot struct {
@@ -32,6 +33,12 @@ func collectMiddlewareNames(routes []RouteSnapshot) []string {
 	seen := make(map[string]struct{})
 	var names []string
 	for _, r := range routes {
+		for _, n := range r.GlobalMiddlewares {
+			if _, ok := seen[n]; !ok {
+				seen[n] = struct{}{}
+				names = append(names, n)
+			}
+		}
 		for _, n := range r.Middlewares {
 			if _, ok := seen[n]; !ok {
 				seen[n] = struct{}{}
@@ -46,6 +53,7 @@ func collectMiddlewareNames(routes []RouteSnapshot) []string {
 				}
 			}
 		}
+
 	}
 	return names
 }
