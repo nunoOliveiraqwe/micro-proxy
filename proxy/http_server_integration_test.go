@@ -126,7 +126,9 @@ func createTestContext() context.Context {
 func buildAndStart(t *testing.T, listener config.HTTPListener, global *config.GlobalConfig) string {
 	t.Helper()
 	ctx := createTestContext()
-	server, err := buildHttpServer(ctx, listener, global)
+	d, err := initGlobalDispatcher(ctx, global)
+	require.NoError(t, err, "initGlobalDispatcher must succeed")
+	server, err := buildHttpServer(ctx, listener, d)
 	require.NoError(t, err, "buildHttpServer must succeed")
 
 	err = server.start(nil)
@@ -2978,7 +2980,9 @@ func TestEveryMiddleware_CanBuildAndStart(t *testing.T) {
 			listener := simpleListener(port, backend.URL, []middleware.Config{tc.mw})
 			ctx := createTestContext()
 
-			server, err := buildHttpServer(ctx, listener, nil)
+			d, _ := initGlobalDispatcher(ctx, nil)
+
+			server, err := buildHttpServer(ctx, listener, d)
 			require.NoError(t, err, "buildHttpServer should succeed for %s", tc.name)
 
 			err = server.start(nil)
@@ -3137,7 +3141,7 @@ func TestPathPrefixStripping_DedicatedBackend(t *testing.T) {
 			Backend: config.BackendConfig{Address: mainBackend.URL},
 			Paths: []config.PathRule{{
 				Pattern:     "/api/*",
-				Backend: &config.BackendConfig{Address: apiBackend.URL},
+				Backend:     &config.BackendConfig{Address: apiBackend.URL},
 				StripPrefix: &stripPrefix,
 			}},
 		},
@@ -3164,7 +3168,7 @@ func TestPathPrefixStripping_NestedPrefix(t *testing.T) {
 			Backend: config.BackendConfig{Address: mainBackend.URL},
 			Paths: []config.PathRule{{
 				Pattern:     "/app/v1/*",
-				Backend: &config.BackendConfig{Address: apiBackend.URL},
+				Backend:     &config.BackendConfig{Address: apiBackend.URL},
 				StripPrefix: &stripPrefix,
 			}},
 		},
@@ -3194,7 +3198,7 @@ func TestPathRule_DropQuery_True(t *testing.T) {
 			Backend: config.BackendConfig{Address: backend.URL},
 			Paths: []config.PathRule{{
 				Pattern:   "/api/*",
-				Backend: &config.BackendConfig{Address: backend.URL},
+				Backend:   &config.BackendConfig{Address: backend.URL},
 				DropQuery: &dropQuery,
 			}},
 		},
@@ -3221,7 +3225,7 @@ func TestPathRule_DropQuery_False(t *testing.T) {
 			Backend: config.BackendConfig{Address: backend.URL},
 			Paths: []config.PathRule{{
 				Pattern:   "/api/*",
-				Backend: &config.BackendConfig{Address: backend.URL},
+				Backend:   &config.BackendConfig{Address: backend.URL},
 				DropQuery: &dropQuery,
 			}},
 		},
@@ -3475,7 +3479,9 @@ func TestLifecycle_StopAndRestart(t *testing.T) {
 	ctx := createTestContext()
 	listener := simpleListener(port, backend.URL, nil)
 
-	server, err := buildHttpServer(ctx, listener, nil)
+	d, _ := initGlobalDispatcher(ctx, nil)
+
+	server, err := buildHttpServer(ctx, listener, d)
 	require.NoError(t, err)
 
 	// First start
@@ -3781,7 +3787,9 @@ func TestEdge_NilGlobalConfig(t *testing.T) {
 	ctx := createTestContext()
 	listener := simpleListener(port, backend.URL, nil)
 
-	server, err := buildHttpServer(ctx, listener, nil)
+	d, _ := initGlobalDispatcher(ctx, nil)
+
+	server, err := buildHttpServer(ctx, listener, d)
 	require.NoError(t, err)
 	err = server.start(nil)
 	require.NoError(t, err)

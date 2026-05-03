@@ -33,6 +33,7 @@ type Torii struct {
 	stoppedHttpServers map[int]MicroHttpServer
 	startedHttpServers map[int]MicroHttpServer
 	lock               sync.Mutex
+	gDispatcher        *GlobalDispatcher
 	acmeService        *service.AcmeService
 	metricsManager     *metrics.ConnectionMetricsManager
 	cacheManager       *util.CacheInsightManager
@@ -182,11 +183,11 @@ func (m *Torii) DeleteHttpProxy(port int) error {
 	return nil
 }
 
-func (m *Torii) AddHttpServer(ctx context.Context, conf config.HTTPListener, globalConf *config.GlobalConfig) error {
+func (m *Torii) AddHttpServer(ctx context.Context, conf config.HTTPListener) error {
 	zap.S().Debugf("Adding HTTP server for listener configuration: %+v", conf)
 	m.lock.Lock()
 	defer m.lock.Unlock()
-	httpServer, err := buildHttpServer(ctx, conf, globalConf)
+	httpServer, err := buildHttpServer(ctx, conf, m.gDispatcher)
 	if err != nil {
 		zap.S().Errorf("Failed to build HTTP server: %v", err)
 		return fmt.Errorf("failed to build HTTP server: %w", err)
@@ -195,7 +196,7 @@ func (m *Torii) AddHttpServer(ctx context.Context, conf config.HTTPListener, glo
 	return nil
 }
 
-func (m *Torii) HotSwapHandler(ctx context.Context, port int, conf config.HTTPListener, globalConf *config.GlobalConfig) error {
+func (m *Torii) HotSwapHandler(ctx context.Context, port int, conf config.HTTPListener) error {
 	m.lock.Lock()
 	defer m.lock.Unlock()
 
@@ -219,7 +220,7 @@ func (m *Torii) HotSwapHandler(ctx context.Context, port int, conf config.HTTPLi
 
 	//TODO -> optimize by only rebuilding the affected route's handler's instead of the whole handler chain.
 	//only swap what's changed
-	handler, cancel, backends, routeSnapshots, err := buildHandlerChain(ctx, server.GetServerId(), conf, globalConf)
+	handler, cancel, backends, routeSnapshots, err := buildHandlerChain(ctx, server.GetServerId(), conf, m.gDispatcher)
 	if err != nil {
 		return fmt.Errorf("failed to build handler chain: %w", err)
 	}
@@ -308,6 +309,17 @@ func (m *Torii) DoesConfigRequireServerRestart(oldPort int, newConf config.HTTPL
 }
 
 func (m *Torii) initializeHttpNetworkStackFromConf(ctx context.Context, conf config.NetworkConfig) error {
+	zap.S().Debugf("Initializing HTTP network stack with configuration: %+v", conf)
+
+	if conf.Global != nil {
+		zap.S().Debugf("Initializing global dispatcher with configuration: %+v", conf.Global)
+		dGlobal, err := initGlobalDispatcher(ctx, conf.Global)
+		if err != nil {
+			return fmt.Errorf("failed to initialize global dispatcher: %w", err)
+		}
+		m.gDispatcher = dGlobal
+	}
+
 	zap.S().Infof("Initializing HTTP servers")
 	if (conf.HTTPListeners == nil || len(conf.HTTPListeners) == 0) &&
 		(len(conf.TCPListeners) == 0 || conf.TCPListeners == nil) &&
@@ -317,7 +329,7 @@ func (m *Torii) initializeHttpNetworkStackFromConf(ctx context.Context, conf con
 	}
 	for _, ln := range conf.HTTPListeners {
 		zap.S().Debugf("Initializing HTTP server with configuration: %+v", ln)
-		m.AddHttpServer(ctx, ln, conf.Global)
+		m.AddHttpServer(ctx, ln)
 	}
 	return nil
 }

@@ -35,7 +35,7 @@ func applyDefaultTimeouts(conf *config.HTTPListener) {
 	}
 }
 
-func buildHandlerChain(ctx context.Context, serverId string, conf config.HTTPListener, global *config.GlobalConfig) (http.Handler, context.CancelFunc, []string, []RouteSnapshot, error) {
+func buildHandlerChain(ctx context.Context, serverId string, conf config.HTTPListener, dGlobal *GlobalDispatcher) (http.Handler, context.CancelFunc, []string, []RouteSnapshot, error) {
 	ctx, cancel := context.WithCancel(ctx)
 	ctx = context.WithValue(ctx, ctxkeys.Port, conf.Port)
 	ctx = context.WithValue(ctx, ctxkeys.ServerID, serverId)
@@ -47,20 +47,17 @@ func buildHandlerChain(ctx context.Context, serverId string, conf config.HTTPLis
 	}
 
 	//global mw → route mw → path mw → proxy
-	handler, globalMwNames, err := buildGlobalDispatcher(ctx, global, hostHandler)
-	if err != nil {
-		cancel()
-		return nil, nil, nil, nil, fmt.Errorf("failed to build global dispatcher: %w", err)
-	}
-	if globalMwNames != nil {
+	hostHandler = dGlobal.registerHandler(conf.Port, hostHandler.ServeHTTP)
+
+	if dGlobal.globalMwNames != nil && len(dGlobal.globalMwNames) > 0 {
 		for i := range routeSnapshots {
-			routeSnapshots[i].GlobalMiddlewares = append([]string(nil), globalMwNames...)
+			routeSnapshots[i].GlobalMiddlewares = append([]string(nil), dGlobal.globalMwNames...)
 		}
 	}
-	return handler, cancel, backends, routeSnapshots, nil
+	return hostHandler, cancel, backends, routeSnapshots, nil
 }
 
-func buildHttpServer(ctx context.Context, conf config.HTTPListener, global *config.GlobalConfig) (MicroHttpServer, error) {
+func buildHttpServer(ctx context.Context, conf config.HTTPListener, dGlobal *GlobalDispatcher) (MicroHttpServer, error) {
 	applyDefaultTimeouts(&conf)
 	zap.S().Infof("Building HTTP server on port %d", conf.Port)
 	zap.S().Info("Middleware order apply is global mw → route mw → path mw → proxy")
@@ -85,7 +82,7 @@ func buildHttpServer(ctx context.Context, conf config.HTTPListener, global *conf
 	}
 	serverId := fmt.Sprintf("http-%d", conf.Port)
 
-	handler, cancelChain, backends, routeSnapshots, err := buildHandlerChain(ctx, serverId, conf, global)
+	handler, cancelChain, backends, routeSnapshots, err := buildHandlerChain(ctx, serverId, conf, dGlobal)
 	if err != nil {
 		return nil, err
 	}

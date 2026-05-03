@@ -257,7 +257,7 @@ func (s *managedService) AddHttpListener(conf config.HTTPListener) error {
 	zap.S().Infof("Adding HTTP listener on port %d", conf.Port)
 	ctx := context.WithValue(context.Background(), ctxkeys.MetricsMgr, s.globalMetricsManager)
 	ctx = context.WithValue(ctx, ctxkeys.CacheInsightMgr, s.cacheInsightsManager)
-	if err := s.micro.AddHttpServer(ctx, conf, nil); err != nil {
+	if err := s.micro.AddHttpServer(ctx, conf); err != nil {
 		return fmt.Errorf("failed to add HTTP listener on port %d: %w", conf.Port, err)
 	}
 	s.serviceStore.GetAcmeService().NotifyDomainsChanged()
@@ -288,7 +288,7 @@ func (s *managedService) EditProxy(port int, conf config.HTTPListener) error {
 		if err := s.micro.DeleteHttpProxy(port); err != nil {
 			return fmt.Errorf("failed to delete old proxy on port %d: %w", port, err)
 		}
-		if err := s.micro.AddHttpServer(ctx, conf, nil); err != nil {
+		if err := s.micro.AddHttpServer(ctx, conf); err != nil {
 			return fmt.Errorf("failed to recreate proxy on port %d: %w", port, err)
 		}
 		if wasStarted {
@@ -302,7 +302,7 @@ func (s *managedService) EditProxy(port int, conf config.HTTPListener) error {
 
 	// Only routes/middleware changed — hot-swap the handler (preserves connections + middleware caches)
 	//H2C is a special case
-	if err := s.micro.HotSwapHandler(ctx, port, conf, nil); err != nil {
+	if err := s.micro.HotSwapHandler(ctx, port, conf); err != nil {
 		return fmt.Errorf("failed to edit proxy on port %d: %w", port, err)
 	}
 	s.serviceStore.GetAcmeService().NotifyDomainsChanged()

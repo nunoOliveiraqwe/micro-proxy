@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"net"
 	"net/http"
+	"strings"
 
 	"github.com/nunoOliveiraqwe/torii/config"
 	"github.com/nunoOliveiraqwe/torii/internal/ctxkeys"
@@ -25,11 +26,14 @@ type VirtualHostDispatcher struct {
 func (d *VirtualHostDispatcher) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	host := r.Host
 
-	host, _, err := net.SplitHostPort(host)
-	if err != nil {
-		zap.S().Errorf("Failed to parse host %s: %v", host, err)
-		http.Error(w, "Bad Gateway", http.StatusBadGateway)
-		return
+	if strings.Contains(host, ":") {
+		var err error
+		host, _, err = net.SplitHostPort(host)
+		if err != nil {
+			zap.S().Errorf("Failed to parse host %s: %v", r.Host, err)
+			http.Error(w, "Bad Gateway", http.StatusBadGateway)
+			return
+		}
 	}
 
 	handler := d.routeTrie.Contains(host)

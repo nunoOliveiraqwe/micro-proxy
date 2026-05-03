@@ -316,7 +316,7 @@ function renderRouteDetail(routes) {
 
         var host = r.host || '<em>default</em>';
 
-        var globalMw = (r.global_middlewares && r.global_middlewares.length) ? r.global_middlewares.join(', ') : '';
+        var globalMw = (r.global_middlewares && r.global_middlewares.length) ? 'Global('+r.global_middlewares.join(', ')+')' : 'global()';
         var mw = (r.middlewares && r.middlewares.length) ? r.middlewares.join(', ') : '<em>none</em>';
         var fullMw = globalMw ? (globalMw + ', ' + mw) : mw;
         var backendAddr = (typeof r.backend === 'object' && r.backend) ? r.backend.address : (r.backend || '');

@@ -5,57 +5,67 @@ import (
 	"net/http"
 
 	"github.com/nunoOliveiraqwe/torii/config"
-	"github.com/nunoOliveiraqwe/torii/middleware"
+	"github.com/nunoOliveiraqwe/torii/internal/ctxkeys"
 	"go.uber.org/zap"
 )
 
 type GlobalDispatcher struct {
-	internalHandlers map[string]http.HandlerFunc
-	next             http.Handler
+	globalConfig       *config.GlobalConfig
+	globalMwNames      []string
+	registeredHandlers map[int]http.HandlerFunc
+	globalChain        http.HandlerFunc
+}
+
+func (d *GlobalDispatcher) registerHandler(port int, next http.HandlerFunc) http.HandlerFunc {
+	if d.globalConfig == nil {
+		return next
+	} else if d.globalChain == nil {
+		return next
+	}
+	d.registeredHandlers[port] = next
+	return func(w http.ResponseWriter, r *http.Request) {
+		r = r.WithContext(context.WithValue(r.Context(), ctxkeys.Port, port))
+		d.globalChain(w, r)
+	}
 }
 
 func (d *GlobalDispatcher) ServeHTTP(w http.ResponseWriter, r *http.Request) {
-	if handler, ok := d.internalHandlers[r.URL.Path]; ok {
-		zap.S().Debugf("Matched internal handler for path %s", r.URL.Path)
+	if handler, exists := d.registeredHandlers[r.Context().Value(ctxkeys.Port).(int)]; exists {
 		handler(w, r)
-		return
+	} else {
+		zap.S().Errorf("No handler registered for port %d", r.Context().Value(ctxkeys.Port).(int))
+		http.Error(w, "", http.StatusNotFound)
 	}
-	d.next.ServeHTTP(w, r)
 }
 
-func buildGlobalDispatcher(ctx context.Context, global *config.GlobalConfig, next http.Handler) (http.Handler, []string, error) {
+func initGlobalDispatcher(ctx context.Context, global *config.GlobalConfig) (*GlobalDispatcher, error) {
 	if global == nil {
 		zap.S().Infof("No global dispatcher configuration provided. Skipping")
-		return next, nil, nil
+		return &GlobalDispatcher{}, nil
 	}
 
-	zap.S().Infof("Building global dispatcher with %d middlewares",
-		len(global.Middlewares))
-
-	d := &GlobalDispatcher{
-		internalHandlers: make(map[string]http.HandlerFunc),
-		next:             next,
-	}
+	zap.S().Infof("Initializing global dispatcher with %d middlewares", len(global.Middlewares))
 
 	if len(global.Middlewares) == 0 && global.TrustedProxies == nil {
-		return d, nil, nil
+		return &GlobalDispatcher{}, nil
 	}
 
-	var handler http.HandlerFunc = d.ServeHTTP
-
-	var globalMwNames []middleware.Config
+	d := &GlobalDispatcher{
+		globalConfig:       global,
+		registeredHandlers: make(map[int]http.HandlerFunc),
+	}
+	handler := d.ServeHTTP
 
 	if len(global.Middlewares) > 0 {
 		wrapped, appliedMw, err := buildMiddlewareChain(ctx, handler, global.Middlewares, global.DisableDefaults)
 		if err != nil {
-			return nil, nil, err
+			return nil, err
 		}
 		handler = wrapped
-
-		globalMwNames = appliedMw
+		d.globalMwNames = middlewareNames(appliedMw)
 	}
 
 	handler = wrapTrustedProxies(ctx, handler, global.TrustedProxies)
-
-	return handler, middlewareNames(globalMwNames), nil
+	d.globalChain = handler
+	return d, nil
 }
