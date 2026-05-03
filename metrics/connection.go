@@ -343,20 +343,6 @@ func (h *ConnectionMetricsManager) updateConnectionMetrics(metric *RequestMetric
 		h.notifyListeners(cur.connectionName, parentSnapshot)
 	}
 
-	h.requestLog.Add(RequestLogEntry{
-		Timestamp:      time.Now(),
-		RemoteAddress:  metric.RemoteAddress,
-		Host:           metric.Host,
-		Country:        metric.Country,
-		ConnectionName: metric.connectionName,
-		StatusCode:     metric.StatusCode,
-		Method:         metric.Method,
-		Path:           metric.Path,
-		LatencyMs:      metric.LatencyMs,
-		BytesSent:      metric.BytesSent,
-		BytesReceived:  metric.BytesReceived,
-	})
-
 	if metric.IsMiddlewareBlockedRequest {
 		h.blockedLog.Add(BlockLogEntry{
 			RemoteAddress:      metric.RemoteAddress,
@@ -369,9 +355,7 @@ func (h *ConnectionMetricsManager) updateConnectionMetrics(metric *RequestMetric
 			BlockReason:        metric.BlockReason,
 			BlockingMiddleware: metric.BlockingMiddleware,
 		})
-	}
-
-	if metric.Is5xxResponse {
+	} else if metric.Is5xxResponse {
 		h.errorLog.Add(ErrorLogEntry{
 			Timestamp:      time.Now(),
 			ConnectionName: metric.connectionName,
@@ -381,6 +365,20 @@ func (h *ConnectionMetricsManager) updateConnectionMetrics(metric *RequestMetric
 			Method:         metric.Method,
 			Path:           metric.Path,
 			LatencyMs:      metric.LatencyMs,
+		})
+	} else {
+		h.requestLog.Add(RequestLogEntry{
+			Timestamp:      time.Now(),
+			RemoteAddress:  metric.RemoteAddress,
+			Host:           metric.Host,
+			Country:        metric.Country,
+			ConnectionName: metric.connectionName,
+			StatusCode:     metric.StatusCode,
+			Method:         metric.Method,
+			Path:           metric.Path,
+			LatencyMs:      metric.LatencyMs,
+			BytesSent:      metric.BytesSent,
+			BytesReceived:  metric.BytesReceived,
 		})
 	}
 }
