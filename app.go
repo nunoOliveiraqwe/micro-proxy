@@ -117,9 +117,9 @@ func (a *Application) loadManaged() error {
 		}
 	} else {
 		logBoot("--config provided: %s", a.flags.ConfigPath)
-		conf, err = config.LoadConfiguration(a.workingConfigPath)
+		conf, err = config.LoadConfiguration(a.flags.ConfigPath)
 		if err != nil {
-			return fmt.Errorf("failed to load working config from %q: %w", a.workingConfigPath, err)
+			return fmt.Errorf("failed to load working config from %q: %w", a.flags.ConfigPath, err)
 		}
 	}
 
