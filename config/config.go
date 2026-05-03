@@ -80,6 +80,7 @@ func (c LogConfig) IsColorEnabled() bool {
 type APIServerConfig struct {
 	Port             int    `yaml:"port" json:"port"`
 	Host             string `yaml:"host" json:"host"`
+	EnableMetrics    bool   `yaml:"enable-metrics" json:"enable-metrics"`
 	AccessLogPath    string `yaml:"access-log-path" json:"access-log-path"`
 	IdleTimeoutSecs  int    `yaml:"idle-timeout" json:"idle-timeout"`
 	ReadTimeoutSecs  int    `yaml:"read-timeout" json:"read-timeout"`
@@ -97,6 +98,7 @@ func DefaultConfiguration() AppConfig {
 			IdleTimeoutSecs:  60,
 			ReadTimeoutSecs:  60,
 			WriteTimeoutSecs: 60,
+			EnableMetrics:    true,
 		},
 		Session: SessionConfig{
 			Lifetime:        16 * time.Hour,
