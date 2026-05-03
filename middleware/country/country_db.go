@@ -11,6 +11,7 @@ import (
 	"time"
 
 	"github.com/nunoOliveiraqwe/torii/internal/ctxkeys"
+	"github.com/nunoOliveiraqwe/torii/internal/netutil"
 	"github.com/nunoOliveiraqwe/torii/internal/util"
 	"github.com/nunoOliveiraqwe/torii/metrics"
 	"github.com/oschwald/maxminddb-golang/v2"
@@ -60,6 +61,7 @@ type Filter struct {
 	countryFieldPath   []string // pre-split field path, e.g. ["country_code"] or ["country", "iso_code"]
 	continentFieldPath []string
 	onUnknown          bool // true = allow unknown, false = block unknown
+	lanAllowList       *netutil.SubnetTrie
 }
 
 func splitFieldPath(field string) []string {
@@ -72,7 +74,8 @@ func splitFieldPath(field string) []string {
 	return strings.Split(field, ".")
 }
 
-func NewFilter(ctx context.Context, cacheOpts *util.CacheOptions, loader DbLoader, countryMode ListMode, countryCodes []string, continentMode ListMode, continentCodes []string, refreshInterval time.Duration, countryField string, continentField string, onUnknown bool) (*Filter, error) {
+func NewFilter(ctx context.Context, cacheOpts *util.CacheOptions, loader DbLoader, countryMode ListMode,
+	countryCodes []string, continentMode ListMode, continentCodes []string, refreshInterval time.Duration, countryField string, continentField string, onUnknown bool, lanAllowList []string) (*Filter, error) {
 	hasCountryList := len(countryCodes) > 0
 	hasContinentList := len(continentCodes) > 0
 
@@ -107,6 +110,15 @@ func NewFilter(ctx context.Context, cacheOpts *util.CacheOptions, loader DbLoade
 		continentSet[code] = byte(0)
 	}
 
+	var lanTrie *netutil.SubnetTrie
+	if len(lanAllowList) > 0 {
+		zap.S().Infof("Building LAN allow list with %d entries", len(lanAllowList))
+		lanTrie, err = buildLanIpList(lanAllowList)
+		if err != nil {
+			return nil, fmt.Errorf("failed to build lan ip allow list: %w", err)
+		}
+	}
+
 	zap.S().Infof("Country filter: country %s mode with %d entries, continent %s mode with %d entries, on-unknown=%v",
 		modeString(countryMode), len(countrySet), modeString(continentMode), len(continentSet), onUnknown)
 	f := &Filter{
@@ -123,6 +135,7 @@ func NewFilter(ctx context.Context, cacheOpts *util.CacheOptions, loader DbLoade
 		countryFieldPath:   splitFieldPath(countryField),
 		continentFieldPath: splitFieldPath(continentField),
 		onUnknown:          onUnknown,
+		lanAllowList:       lanTrie,
 	}
 
 	if refreshInterval > 0 && loader.isRefreshable() {
@@ -187,6 +200,16 @@ func (c *Filter) reloadDB() {
 }
 
 func (c *Filter) IsFromAllowedCountry(logger *zap.Logger, r *http.Request, ip netip.Addr) bool {
+	if c.lanAllowList != nil {
+		logger.Debug("Checking LAN allow list for IP")
+		containsIP := c.lanAllowList.Contains(ip)
+		if containsIP {
+			logger.Info("Request ALLOWED: client IP is in LAN allow list", zap.String("clientIp", ip.String()))
+			return true
+		}
+		logger.Debug("Client IP not in LAN allow list, proceeding", zap.String("clientIp", ip.String()))
+	}
+
 	entry, err := c.clientCache.GetValue(ip.String())
 	if err != nil && errors.Is(err, util.ErrCacheMiss) {
 		entry = c.lookupIPAndCacheValue(logger, r, ip)
@@ -378,4 +401,16 @@ func extractFieldByPath(raw map[string]any, path []string) string {
 		return s
 	}
 	return ""
+}
+
+func buildLanIpList(entries []string) (*netutil.SubnetTrie, error) {
+	trie := netutil.NewSubnetTrie()
+	zap.S().Debugf("Parsing %d ip/subnets", len(entries))
+	for _, entry := range entries {
+		if err := trie.InsertFromString(entry); err != nil {
+			zap.S().Errorf("Cannot parse %s: %v", entry, err)
+			return nil, err
+		}
+	}
+	return trie, nil
 }

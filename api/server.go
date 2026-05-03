@@ -46,7 +46,7 @@ func buildMux(port int, logPath string, svc app.SystemService) *http.ServeMux {
 
 	globalHandler := mux.ServeHTTP
 
-	globalHandler = middleware.MetricsMiddleware(ctx, globalHandler, middleware.Config{})
+	//globalHandler = middleware.MetricsMiddleware(ctx, globalHandler, middleware.Config{})
 	globalHandler = middleware.BodySizeLimitMiddleware(ctx, globalHandler, middleware.Config{
 		Options: map[string]interface{}{"max-size": "20m"},
 	})

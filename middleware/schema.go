@@ -168,6 +168,9 @@ func GetMiddlewareSchemas() []MiddlewareSchema {
 				{Key: "continent-list", Label: "Continent Codes", Type: FieldTypeStringList,
 					Placeholder: "e.g. EU, NA, AS",
 					HelpText:    "Continent codes (AF, AN, AS, EU, NA, OC, SA). Acts as the broad policy when combined with country list."},
+				{Key: "allow", Label: "Lan Allow List", Type: FieldTypeStringList,
+					Placeholder: "e.g. 192.168.1.0/24",
+					HelpText:    "IP addresses or CIDR that are always allowed, bypassing country/continent checks. Useful for allowing internal traffic."},
 			}, cacheFields...),
 		},
 		{

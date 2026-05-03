@@ -173,8 +173,16 @@ func initCountryFilter(ctx context.Context, middlewareConf Config) (*country.Fil
 			return nil, err
 		}
 	}
+	var lanAllowList []string
+	if _, hasLanAllowList := middlewareConf.Options["lan-allow-list"]; hasLanAllowList {
+		lanAllowList, err = parseCodeList(middlewareConf.Options, "lan-allow-list")
+		if err != nil {
+			return nil, err
+		}
+	}
 
-	return country.NewFilter(ctx, cacheOpts, loader, countryListMode, countryCodes, continentListMode, continentCodes, refreshInterval, countryField, continentField, onUnknown)
+	return country.NewFilter(ctx, cacheOpts, loader, countryListMode, countryCodes, continentListMode,
+		continentCodes, refreshInterval, countryField, continentField, onUnknown, lanAllowList)
 }
 
 func parseListMode(options map[string]interface{}, key string) (country.ListMode, error) {
