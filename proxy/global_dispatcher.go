@@ -57,6 +57,9 @@ func initGlobalDispatcher(ctx context.Context, global *config.GlobalConfig) (*Gl
 	handler := d.ServeHTTP
 
 	if len(global.Middlewares) > 0 {
+		ctx = context.WithValue(ctx, ctxkeys.ServerID, "global")
+		ctx = context.WithValue(ctx, ctxkeys.OverrideMetricsName, "global")
+
 		wrapped, appliedMw, err := buildMiddlewareChain(ctx, handler, global.Middlewares, global.DisableDefaults)
 		if err != nil {
 			return nil, err

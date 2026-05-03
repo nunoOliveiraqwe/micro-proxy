@@ -14,4 +14,5 @@ const (
 	ContinentCode
 	BlockInfo
 	CacheInsightMgr
+	OverrideMetricsName
 )

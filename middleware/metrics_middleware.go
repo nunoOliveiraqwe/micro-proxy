@@ -90,12 +90,25 @@ func MetricsMiddleware(ctx context.Context, next http.HandlerFunc, _ Config) htt
 }
 
 func resolveReportFunc(ctx context.Context) metrics.MetricsReportFunc {
+	var conName string
+	name := ctx.Value(ctxkeys.OverrideMetricsName) //Todo: this is a hack
+	//I need to think about metrics and the global dispatcher a bit more and see if there is a better way to do this,
+	//but for now this is the only way I can think of to allow middlewares to override the connection name used for metrics reporting
+	//i might just end up refactoring all of this, expecially the rolling log
+	if name != nil {
+		if nameStr, ok := name.(string); ok {
+			conName = nameStr
+		}
+		zap.S().Warnf("Override metrics name in context is not a string. Ignoring it and resolving connection name as normal")
+	}
 
-	conName, err := buildNameForConnection(ctx, "metric")
-
-	if err != nil {
-		zap.S().Warnf("Failed to build connection name for metrics resolution: %v", err)
-		return nil
+	if conName == "" {
+		var err error
+		conName, err = buildNameForConnection(ctx, "metric")
+		if err != nil {
+			zap.S().Warnf("Failed to build connection name for metrics resolution: %v", err)
+			return nil
+		}
 	}
 
 	mgrManager := ctx.Value(ctxkeys.MetricsMgr)
