@@ -12,7 +12,7 @@ import (
 	"github.com/nunoOliveiraqwe/torii/api"
 	"github.com/nunoOliveiraqwe/torii/config"
 	"github.com/nunoOliveiraqwe/torii/internal/app"
-	"github.com/nunoOliveiraqwe/torii/logging"
+	"github.com/nunoOliveiraqwe/torii/internal/logging"
 	"go.uber.org/zap"
 )
 
