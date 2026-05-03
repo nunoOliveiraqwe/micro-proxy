@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"net"
 	"net/http"
 
 	"github.com/nunoOliveiraqwe/torii/config"
@@ -23,6 +24,13 @@ type VirtualHostDispatcher struct {
 
 func (d *VirtualHostDispatcher) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	host := r.Host
+
+	host, _, err := net.SplitHostPort(host)
+	if err != nil {
+		zap.S().Errorf("Failed to parse host %s: %v", host, err)
+		http.Error(w, "Bad Gateway", http.StatusBadGateway)
+		return
+	}
 
 	handler := d.routeTrie.Contains(host)
 
