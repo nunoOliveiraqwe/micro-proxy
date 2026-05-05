@@ -1,13 +1,8 @@
-package metrics
+package ctx
 
 import (
-	"context"
 	"net/http"
-
-	"github.com/nunoOliveiraqwe/torii/internal/ctxkeys"
 )
-
-var blockInfoContextKey = ctxkeys.BlockInfo
 
 type BlockInfo struct {
 	Middleware string
@@ -23,18 +18,11 @@ func CreateAndAddBlockInfo(r *http.Request, middleware, reason string) {
 }
 
 func SetBlockInfo(r *http.Request, info *BlockInfo) {
-	ctx := context.WithValue(r.Context(), blockInfoContextKey, info)
-	*r = *r.WithContext(ctx)
+	ctxStruct := GetContextStruct(r)
+	ctxStruct.BlockInfo = info
 }
 
 func GetBlockInfo(r *http.Request) *BlockInfo {
-	v := r.Context().Value(blockInfoContextKey)
-	if v == nil {
-		return nil
-	}
-	info, ok := v.(*BlockInfo)
-	if !ok {
-		return nil
-	}
-	return info
+	ctxStruct := GetContextStruct(r)
+	return ctxStruct.BlockInfo
 }

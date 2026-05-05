@@ -9,7 +9,7 @@ import (
 	"github.com/nunoOliveiraqwe/torii/internal/ctxkeys"
 	"github.com/nunoOliveiraqwe/torii/internal/netutil"
 	"github.com/nunoOliveiraqwe/torii/internal/util"
-	"github.com/nunoOliveiraqwe/torii/metrics"
+	"github.com/nunoOliveiraqwe/torii/middleware/ctx"
 	"github.com/nunoOliveiraqwe/torii/middleware/honeypot"
 	"go.uber.org/zap"
 )
@@ -104,8 +104,8 @@ var honeypotDefaults = map[string][]string{
 	},
 }
 
-func HoneyPotMiddleware(ctx context.Context, next http.HandlerFunc, conf Config) http.HandlerFunc {
-	h, err := parseHoneyPotConfig(ctx, conf)
+func HoneyPotMiddleware(context context.Context, next http.HandlerFunc, conf Config) http.HandlerFunc {
+	h, err := parseHoneyPotConfig(context, conf)
 	if err != nil {
 		zap.S().Errorf("HoneyPotMiddleware failed to parse configuration: %v. Failing closed.", err)
 		return func(writer http.ResponseWriter, request *http.Request) {
@@ -143,7 +143,7 @@ func HoneyPotMiddleware(ctx context.Context, next http.HandlerFunc, conf Config)
 
 		if isHoneyPotted {
 			logger.Warn("HoneyPotMiddleware: blocked request from cached IP", zap.String("clientIp", clientIP))
-			metrics.CreateAndAddBlockInfo(r, "honeypot", "cached honeypot IP")
+			ctx.CreateAndAddBlockInfo(r, "honeypot", "cached honeypot IP")
 			honeyServer.Serve(w, r, logger)
 			return
 		}
@@ -156,7 +156,7 @@ func HoneyPotMiddleware(ctx context.Context, next http.HandlerFunc, conf Config)
 				zap.String("clientIp", clientIP), zap.String("path", r.URL.Path))
 
 			honeyServer.AddIpToHoneyPot(addr.String())
-			metrics.CreateAndAddBlockInfo(r, "honeypot", fmt.Sprintf("honeypot path: %s", r.URL.Path))
+			ctx.CreateAndAddBlockInfo(r, "honeypot", fmt.Sprintf("honeypot path: %s", r.URL.Path))
 			honeyServer.Serve(w, r, logger)
 			return
 		}

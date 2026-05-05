@@ -7,7 +7,7 @@ import (
 	"strings"
 
 	"github.com/nunoOliveiraqwe/torii/internal/resolve"
-	"github.com/nunoOliveiraqwe/torii/metrics"
+	"github.com/nunoOliveiraqwe/torii/middleware/ctx"
 	"go.uber.org/zap"
 )
 
@@ -97,7 +97,7 @@ func (h *headersConfig) compareHeadersInRequest(r *http.Request) bool {
 		actualVal := r.Header.Get(header)
 		if actualVal != expectedVal {
 			zap.S().Debugf("Header %s value %s does not match expected value", header, actualVal) //don't leak the value
-			metrics.CreateAndAddBlockInfo(r, "headers", fmt.Sprintf("header-%s-mismatch-value", header))
+			ctx.CreateAndAddBlockInfo(r, "headers", fmt.Sprintf("header-%s-mismatch-value", header))
 			return false
 		}
 	}

@@ -11,7 +11,7 @@ import (
 	"github.com/corazawaf/coraza/v3"
 	"github.com/corazawaf/coraza/v3/types"
 	"github.com/nunoOliveiraqwe/torii/internal/netutil"
-	"github.com/nunoOliveiraqwe/torii/metrics"
+	"github.com/nunoOliveiraqwe/torii/middleware/ctx"
 	"go.uber.org/zap"
 )
 
@@ -104,7 +104,7 @@ func CorazaWAFMiddleware(_ context.Context, next http.HandlerFunc, conf Config) 
 		}
 
 		if it := tx.ProcessRequestHeaders(); it != nil {
-			metrics.CreateAndAddBlockInfo(r, "coraza-waf",
+			ctx.CreateAndAddBlockInfo(r, "coraza-waf",
 				fmt.Sprintf("Blocked by Coraza at phase 1: rule %d, status %d", it.RuleID, it.Status))
 			w.WriteHeader(it.Status)
 			return
@@ -120,7 +120,7 @@ func CorazaWAFMiddleware(_ context.Context, next http.HandlerFunc, conf Config) 
 			}
 
 			if it, _, err := tx.ReadRequestBodyFrom(bytes.NewReader(bodyBytes)); it != nil {
-				metrics.CreateAndAddBlockInfo(r, "coraza-waf",
+				ctx.CreateAndAddBlockInfo(r, "coraza-waf",
 					fmt.Sprintf("Blocked by Coraza at phase 2: rule %d, status %d", it.RuleID, it.Status))
 				w.WriteHeader(it.Status)
 				return
@@ -131,7 +131,7 @@ func CorazaWAFMiddleware(_ context.Context, next http.HandlerFunc, conf Config) 
 			}
 
 			if it, err := tx.ProcessRequestBody(); it != nil {
-				metrics.CreateAndAddBlockInfo(r, "coraza-waf",
+				ctx.CreateAndAddBlockInfo(r, "coraza-waf",
 					fmt.Sprintf("Blocked by Coraza at phase 3: rule %d, status %d", it.RuleID, it.Status))
 				w.WriteHeader(it.Status)
 				return
@@ -150,7 +150,7 @@ func CorazaWAFMiddleware(_ context.Context, next http.HandlerFunc, conf Config) 
 
 		if cfg.inspectResBody {
 			if it, err := tx.ProcessResponseBody(); it != nil {
-				metrics.CreateAndAddBlockInfo(r, "coraza-waf",
+				ctx.CreateAndAddBlockInfo(r, "coraza-waf",
 					fmt.Sprintf("Blocked by Coraza at phase 4: rule %d, status %d", it.RuleID, it.Status))
 			} else if err != nil {
 				logger.Warn("CorazaMiddleware: error processing response body", zap.Error(err))

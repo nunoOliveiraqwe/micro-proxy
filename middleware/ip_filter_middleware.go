@@ -6,13 +6,13 @@ import (
 	"net/http"
 
 	"github.com/nunoOliveiraqwe/torii/internal/netutil"
-	"github.com/nunoOliveiraqwe/torii/metrics"
+	"github.com/nunoOliveiraqwe/torii/middleware/ctx"
 	"github.com/nunoOliveiraqwe/torii/middleware/ip_filter"
 	"go.uber.org/zap"
 )
 
-func IpFilterMiddleware(ctx context.Context, next http.HandlerFunc, conf Config) http.HandlerFunc {
-	filter, err := initIpFilter(ctx, conf)
+func IpFilterMiddleware(context context.Context, next http.HandlerFunc, conf Config) http.HandlerFunc {
+	filter, err := initIpFilter(context, conf)
 	if err != nil {
 		zap.S().Errorf("IpFilterMiddleware: failed to initialize: %v. Failing closed.", err)
 		return func(w http.ResponseWriter, r *http.Request) {
@@ -32,7 +32,7 @@ func IpFilterMiddleware(ctx context.Context, next http.HandlerFunc, conf Config)
 		blocked, err := filter.IsBlocked(clientIP)
 		if err != nil {
 			logger.Error("IpFilterMiddleware: error checking IP", zap.String("clientIp", clientIP), zap.Error(err))
-			metrics.CreateAndAddBlockInfo(r, "ip-filter", fmt.Sprintf("An error occurred check if IP %s is blocked. err = %s",
+			ctx.CreateAndAddBlockInfo(r, "ip-filter", fmt.Sprintf("An error occurred check if IP %s is blocked. err = %s",
 				clientIP,
 				err.Error()))
 			http.Error(w, "Forbidden", http.StatusForbidden)
@@ -41,7 +41,7 @@ func IpFilterMiddleware(ctx context.Context, next http.HandlerFunc, conf Config)
 
 		if blocked {
 			logger.Warn("IpFilterMiddleware: blocked request", zap.String("clientIp", clientIP))
-			metrics.CreateAndAddBlockInfo(r, "ip-filter", fmt.Sprintf("Blocked IP: %s", clientIP))
+			ctx.CreateAndAddBlockInfo(r, "ip-filter", fmt.Sprintf("Blocked IP: %s", clientIP))
 			http.Error(w, "Forbidden", http.StatusForbidden)
 			return
 		}

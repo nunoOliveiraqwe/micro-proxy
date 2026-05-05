@@ -10,6 +10,7 @@ import (
 	"github.com/nunoOliveiraqwe/torii/config"
 	"github.com/nunoOliveiraqwe/torii/internal/ctxkeys"
 	"github.com/nunoOliveiraqwe/torii/internal/netutil"
+	ctx2 "github.com/nunoOliveiraqwe/torii/middleware/ctx"
 	"go.uber.org/zap"
 )
 
@@ -54,6 +55,7 @@ func buildHandlerChain(ctx context.Context, serverId string, conf config.HTTPLis
 			routeSnapshots[i].GlobalMiddlewares = append([]string(nil), dGlobal.globalMwNames...)
 		}
 	}
+	hostHandler = ctx2.InjectContextStruct(hostHandler.ServeHTTP)
 	return hostHandler, cancel, backends, routeSnapshots, nil
 }
 

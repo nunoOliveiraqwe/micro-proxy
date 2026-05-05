@@ -10,10 +10,8 @@ import (
 	"strings"
 	"sync/atomic"
 
-	"github.com/nunoOliveiraqwe/torii/internal/ctxkeys"
+	"github.com/nunoOliveiraqwe/torii/middleware/ctx"
 )
-
-var requestIdContextKey = ctxkeys.RequestID
 
 var requestIDCounter uint64
 
@@ -32,7 +30,8 @@ func RequestIDMiddleware(_ context.Context, next http.HandlerFunc, middlewareCon
 	}
 	return func(w http.ResponseWriter, r *http.Request) {
 		localPrefix := prefix
-		reqId := GetRequestIDFromContext(r.Context())
+		ctxStruct := ctx.GetContextStruct(r)
+		reqId := ctxStruct.RequestId
 		if reqId != "" {
 			if !strings.HasPrefix(reqId, localPrefix) { //double injection, for example coming from global or default and this is applying at path levle
 				localPrefix = fmt.Sprintf("%s-%s", reqId, localPrefix)
@@ -42,8 +41,8 @@ func RequestIDMiddleware(_ context.Context, next http.HandlerFunc, middlewareCon
 			}
 		}
 		reqId = generateRequestID(localPrefix)
-		ctx := context.WithValue(r.Context(), requestIdContextKey, reqId)
-		next.ServeHTTP(w, r.WithContext(ctx))
+		ctxStruct.RequestId = reqId
+		next.ServeHTTP(w, r)
 	}
 
 }
@@ -64,18 +63,9 @@ func generateRequestPrefix() string {
 	return fmt.Sprintf("%s/%s", hostname, b64[0:10])
 }
 
-func GetRequestIDFromContext(ctx context.Context) string {
-	if ctx == nil {
-		return ""
-	}
-	val := ctx.Value(requestIdContextKey)
-	if val == nil {
-		return ""
-	}
-	if requestID, ok := val.(string); ok {
-		return requestID
-	}
-	return ""
+func GetRequestIDFromContext(r *http.Request) string {
+	ctxStruct := ctx.GetContextStruct(r)
+	return ctxStruct.RequestId
 }
 
 func generateRequestID(prefix string) string {

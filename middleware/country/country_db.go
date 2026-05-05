@@ -10,10 +10,9 @@ import (
 	"sync"
 	"time"
 
-	"github.com/nunoOliveiraqwe/torii/internal/ctxkeys"
 	"github.com/nunoOliveiraqwe/torii/internal/netutil"
 	"github.com/nunoOliveiraqwe/torii/internal/util"
-	"github.com/nunoOliveiraqwe/torii/metrics"
+	"github.com/nunoOliveiraqwe/torii/middleware/ctx"
 	"github.com/oschwald/maxminddb-golang/v2"
 	"go.uber.org/zap"
 )
@@ -218,16 +217,16 @@ func (c *Filter) IsFromAllowedCountry(logger *zap.Logger, r *http.Request, ip ne
 		logger.Info("Request decision by on-unknown: cannot determine country",
 			zap.Bool("onUnknown", c.onUnknown))
 		if !c.onUnknown {
-			metrics.CreateAndAddBlockInfo(r, "country-block", "blocked due to unknown country")
+			ctx.CreateAndAddBlockInfo(r, "country-block", "blocked due to unknown country")
 		}
 		return c.onUnknown
 	}
-	ctx := context.WithValue(r.Context(), ctxkeys.CountryCode, entry.countryCode)
-	ctx = context.WithValue(ctx, ctxkeys.ContinentCode, entry.continentCode)
-	*r = *r.WithContext(ctx)
+	ctxStruct := ctx.GetContextStruct(r)
+	ctxStruct.CountryCode = entry.countryCode
+	ctxStruct.ContinentCode = entry.continentCode
 
 	if !entry.IsAllowed {
-		metrics.CreateAndAddBlockInfo(r, "country-block", fmt.Sprintf("blocked country %s, continent %s", entry.countryCode, entry.continentCode))
+		ctx.CreateAndAddBlockInfo(r, "country-block", fmt.Sprintf("blocked country %s, continent %s", entry.countryCode, entry.continentCode))
 	}
 	return entry.IsAllowed
 }
@@ -261,7 +260,7 @@ func (c *Filter) isAllowed(logger *zap.Logger, r *http.Request, countryCode stri
 			case BlockList:
 				logger.Info("Request BLOCKED: country override – country is in block-list",
 					zap.String("country", countryCode), zap.String("continent", continentCode))
-				metrics.CreateAndAddBlockInfo(r, "country-block", fmt.Sprintf("country %s blocked", countryCode))
+				ctx.CreateAndAddBlockInfo(r, "country-block", fmt.Sprintf("country %s blocked", countryCode))
 				return false
 			}
 		}
@@ -275,7 +274,7 @@ func (c *Filter) isAllowed(logger *zap.Logger, r *http.Request, countryCode stri
 			logger.Info("Request BLOCKED: no country override, continent policy denies",
 				zap.String("country", countryCode), zap.String("continent", continentCode),
 				zap.String("continentMode", modeString(c.continentMode)))
-			metrics.CreateAndAddBlockInfo(r, "country-block", fmt.Sprintf("continent %s blocked", continentCode))
+			ctx.CreateAndAddBlockInfo(r, "country-block", fmt.Sprintf("continent %s blocked", continentCode))
 		}
 		return allowed
 	}

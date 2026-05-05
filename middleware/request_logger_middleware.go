@@ -5,12 +5,10 @@ import (
 	"net/http"
 	"time"
 
-	"github.com/nunoOliveiraqwe/torii/internal/ctxkeys"
+	"github.com/nunoOliveiraqwe/torii/middleware/ctx"
 	"go.uber.org/zap"
 	"go.uber.org/zap/zapcore"
 )
-
-var logEntryContextKey = ctxkeys.Logger
 
 type zapLogFormatter struct {
 	logger *zap.Logger
@@ -73,7 +71,7 @@ func (z *zapLogFormatter) newRequestLogger(r *http.Request) *zap.Logger {
 	ctx := r.Context()
 	reqId := ""
 	if ctx != nil {
-		reqId = GetRequestIDFromContext(ctx)
+		reqId = GetRequestIDFromContext(r)
 	}
 	return z.logger.With(
 		zap.String("request_id", reqId),
@@ -88,15 +86,11 @@ func (z *zapLogFormatter) newRequestLogger(r *http.Request) *zap.Logger {
 }
 
 func GetRequestLoggerFromContext(r *http.Request) *zap.Logger {
-	ctx := r.Context()
-	if ctx == nil || ctx.Value(logEntryContextKey) == nil {
+	ctxStruct := ctx.GetContextStruct(r)
+	if ctxStruct.Logger == nil {
 		return zap.L()
 	}
-	log := ctx.Value(logEntryContextKey)
-	if logEntry, ok := log.(*zap.Logger); ok {
-		return logEntry
-	}
-	return zap.L()
+	return ctxStruct.Logger
 }
 
 func RequestLoggerMiddleware(_ context.Context, next http.HandlerFunc, conf Config) http.HandlerFunc {
@@ -106,8 +100,8 @@ func RequestLoggerMiddleware(_ context.Context, next http.HandlerFunc, conf Conf
 		start := time.Now()
 		log := formatter.newRequestLogger(r)
 
-		ctx := context.WithValue(r.Context(), logEntryContextKey, log)
-		r = r.WithContext(ctx)
+		ctxStruct := ctx.GetContextStruct(r)
+		ctxStruct.Logger = log
 
 		aw := &accessLogResponseWriter{ResponseWriter: w, statusCode: http.StatusOK}
 

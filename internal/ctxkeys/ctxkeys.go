@@ -8,11 +8,7 @@ const (
 	Path
 	ServerID
 	MetricsMgr
-	RequestID
-	Logger
-	CountryCode
-	ContinentCode
-	BlockInfo
-	CacheInsightMgr
 	OverrideMetricsName
+	ContextStruct
+	CacheInsightMgr
 )
