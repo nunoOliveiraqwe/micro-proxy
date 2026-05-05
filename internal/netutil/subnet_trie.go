@@ -4,6 +4,8 @@ import (
 	"fmt"
 	"net/netip"
 	"sync"
+
+	"go.uber.org/zap"
 )
 
 // SubnetTrie is a binary trie (prefix tree) for fast subnet matching.
@@ -148,4 +150,15 @@ func (t *SubnetTrie) IsEmpty() bool {
 	defer t.mu.RUnlock()
 	return t.v4.children[0] == nil && t.v4.children[1] == nil &&
 		t.v6.children[0] == nil && t.v6.children[1] == nil
+}
+
+func NewSubnetTrieFromStrings(entries []string) (*SubnetTrie, error) {
+	zap.S().Debugf("Parsing %d ip/subnets", len(entries))
+	trie := NewSubnetTrie()
+	for _, entry := range entries {
+		if err := trie.InsertFromString(entry); err != nil {
+			return nil, fmt.Errorf("failed to insert %q: %v", entry, err)
+		}
+	}
+	return trie, nil
 }

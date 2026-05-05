@@ -51,7 +51,12 @@ func CountryBlockMiddleware(ctx context.Context, next http.HandlerFunc, middlewa
 }
 
 func initCountryFilter(ctx context.Context, middlewareConf Config) (*country.Filter, error) {
-	//i want to register this cache
+	//TODO -> this was to be one of the first middleware I wrote
+	//and has such it doesn't use any of the helper functions for parsing options that I later wrote,
+	//so it looks a bit more verbose than the other middleware in terms of option parsing.
+	//I may want to refactor this at some point to be more consistent with the other middleware,
+	//but for now it works and I don't want to risk breaking anything by changing it.
+
 	middlewareConf.Options[util.CacheInsightKey] = ctx.Value(ctxkeys.CacheInsightMgr)
 	cacheOpts, err := util.ParseCacheOptions(middlewareConf.Options)
 	if err != nil {

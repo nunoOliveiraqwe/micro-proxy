@@ -9,7 +9,7 @@ import (
 
 func ParseStringOpt(opts map[string]interface{}, key string, defaultVal string) (string, error) {
 	raw, ok := opts[key]
-	if !ok {
+	if !ok || raw == nil {
 		return defaultVal, nil
 	}
 	switch v := raw.(type) {
@@ -22,7 +22,7 @@ func ParseStringOpt(opts map[string]interface{}, key string, defaultVal string) 
 
 func ParseStringRequired(opts map[string]interface{}, key string) (string, error) {
 	raw, ok := opts[key]
-	if !ok {
+	if !ok || raw == nil {
 		return "", fmt.Errorf("missing required option '%s'", key)
 	}
 	s, ok := raw.(string)
@@ -37,7 +37,7 @@ func ParseStringRequired(opts map[string]interface{}, key string) (string, error
 
 func ParseBoolOpt(opts map[string]interface{}, key string, defaultVal bool) bool {
 	raw, ok := opts[key]
-	if !ok {
+	if !ok || raw == nil {
 		return defaultVal
 	}
 	switch v := raw.(type) {
@@ -58,7 +58,7 @@ func ParseBoolOpt(opts map[string]interface{}, key string, defaultVal bool) bool
 
 func ParseIntOpt(opts map[string]interface{}, key string, defaultValue int) int {
 	raw, ok := opts[key]
-	if !ok {
+	if !ok || raw == nil {
 		return defaultValue
 	}
 	switch v := raw.(type) {
@@ -73,7 +73,7 @@ func ParseIntOpt(opts map[string]interface{}, key string, defaultValue int) int 
 
 func ParseIntOptRequired(opts map[string]interface{}, key string) (int, error) {
 	raw, ok := opts[key]
-	if !ok {
+	if !ok || raw == nil {
 		return 0, fmt.Errorf("missing required option '%s'", key)
 	}
 	switch v := raw.(type) {
@@ -88,7 +88,7 @@ func ParseIntOptRequired(opts map[string]interface{}, key string) (int, error) {
 
 func ParseFloatOptRequired(opts map[string]interface{}, key string) (float64, error) {
 	raw, ok := opts[key]
-	if !ok {
+	if !ok || raw == nil {
 		return 0, fmt.Errorf("missing required option '%s'", key)
 	}
 	switch v := raw.(type) {
@@ -103,7 +103,7 @@ func ParseFloatOptRequired(opts map[string]interface{}, key string) (float64, er
 
 func ParseStringSliceOpt(opts map[string]interface{}, key string, defaultVal []string) ([]string, error) {
 	raw, ok := opts[key]
-	if !ok {
+	if !ok || raw == nil {
 		return defaultVal, nil
 	}
 	slice, ok := raw.([]interface{})
@@ -123,7 +123,7 @@ func ParseStringSliceOpt(opts map[string]interface{}, key string, defaultVal []s
 
 func ParseRawSliceRequired(opts map[string]interface{}, key string) ([]interface{}, error) {
 	raw, ok := opts[key]
-	if !ok {
+	if !ok || raw == nil {
 		return nil, fmt.Errorf("missing required option '%s'", key)
 	}
 	slice, ok := raw.([]interface{})

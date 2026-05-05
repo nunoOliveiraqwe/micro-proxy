@@ -2,10 +2,12 @@ package ua
 
 import (
 	"fmt"
+	"net/netip"
 	"strings"
 	"time"
 
 	"github.com/cloudflare/ahocorasick"
+	"github.com/nunoOliveiraqwe/torii/internal/netutil"
 	"github.com/nunoOliveiraqwe/torii/internal/util"
 	"go.uber.org/zap"
 )
@@ -24,6 +26,7 @@ type UaBlockerConfig struct {
 	ExtendedBlockedUAs    []string
 	DefaultListAllowedUAs []string
 	ExtendedAllowedUAs    []string
+	LanAllowList          []string
 	CacheOpt              *util.CacheOptions
 }
 
@@ -32,6 +35,7 @@ type Blocker struct {
 	blockedUas   *ahocorasick.Matcher       // Aho-Corasick matcher for blocked patterns; nil if none
 	allowedUas   *ahocorasick.Matcher       // Aho-Corasick matcher for allow patterns; nil if none
 	cache        *util.Cache[*uaCacheEntry] // nil if caching disabled
+	lanAllowList *netutil.SubnetTrie
 }
 
 func NewUaBlocker(conf *UaBlockerConfig) (*Blocker, error) {
@@ -69,11 +73,21 @@ func NewUaBlocker(conf *UaBlockerConfig) (*Blocker, error) {
 		allowedUas = append(allowedUas, conf.ExtendedAllowedUAs...)
 	}
 
+	var lanTrie *netutil.SubnetTrie
+	if len(conf.LanAllowList) > 0 {
+		zap.S().Infof("Building LAN allow list with %d entries", len(conf.LanAllowList))
+		lanTrie, err = netutil.NewSubnetTrieFromStrings(conf.LanAllowList)
+		if err != nil {
+			return nil, fmt.Errorf("failed to build lan ip allow list: %w", err)
+		}
+	}
+
 	return &Blocker{
 		blockEmptyUA: conf.BlockEmptyUA,
 		blockedUas:   buildAhoCorasick(blockedUas),
 		allowedUas:   buildAhoCorasick(allowedUas),
 		cache:        cache,
+		lanAllowList: lanTrie,
 	}, nil
 }
 
@@ -105,6 +119,13 @@ func buildAhoCorasick(patterns []string) *ahocorasick.Matcher {
 func (b *Blocker) IsBlockedIP(ip string) bool {
 	_, err := b.cache.GetValue(ip)
 	return err == nil
+}
+
+func (b *Blocker) IsIpInAllowList(ip netip.Addr) bool {
+	if b.lanAllowList == nil {
+		return false
+	}
+	return b.lanAllowList.Contains(ip)
 }
 
 func (b *Blocker) IsBlockedUA(ua string) bool {

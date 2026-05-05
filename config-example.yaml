@@ -287,6 +287,8 @@ net-config:
               continent-list-mode: block          # allow | block
               continent-list:
                 - EU
+              lan-allow-list: # IPs/CIDRs to allow without blocking (should only be used for internal networks, as it bypasses all UA checks)
+                - "192.168.1.1/24"
               cache-ttl: 24h
               cleanup-interval: 1h
               max-cache-size: 10000
@@ -313,6 +315,8 @@ net-config:
                 - "search-engines"
               allow:                              # Custom UA substrings to always allow (overrides blocks)
                 - "googlebot"
+              lan-allow-list:                     # IPs/CIDRs to allow without blocking (should only be used for internal networks, as it bypasses all UA checks)
+                - "192.168.1.1/24"
               cache-ttl: 24h
               cleanup-interval: 1h
               max-cache-size: 100000

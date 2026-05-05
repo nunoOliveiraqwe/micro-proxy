@@ -89,6 +89,7 @@ func (l *perClientLimiter) limit(r *http.Request, w http.ResponseWriter) bool {
 	if entry.limiter.Allow() {
 		return true
 	}
+	logger.Warn("RateLimitMiddleware: rate limit exceeded for client IP", zap.String("Ip", ipAddr))
 	ctx.CreateAndAddBlockInfo(r, "rate-limit", fmt.Sprintf("rate limit of %f req/s exceeded", entry.limiter.Limit()))
 	w.Header().Set("Retry-After", l.retryAfter)
 	http.Error(w, http.StatusText(http.StatusTooManyRequests), http.StatusTooManyRequests)

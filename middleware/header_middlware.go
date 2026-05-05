@@ -118,7 +118,7 @@ func HeadersMiddleware(_ context.Context, next http.HandlerFunc, conf Config) ht
 		len(h.stripHeadersRes) > 0 || len(h.cmpHeadersReq) > 0
 	return func(w http.ResponseWriter, r *http.Request) {
 		logger := GetRequestLoggerFromContext(r)
-		logger.Info("Applying headers middleware for request")
+		logger.Debug("Applying headers middleware for request")
 		if !hasElements {
 			next(w, r)
 			return

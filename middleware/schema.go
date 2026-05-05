@@ -270,6 +270,9 @@ func GetMiddlewareSchemas() []MiddlewareSchema {
 				{Key: "allow", Label: "Custom Allow Patterns", Type: FieldTypeStringList,
 					Placeholder: "e.g. my-good-bot",
 					HelpText:    "Custom User-Agent substrings to always allow. If a UA matches both allow and block, allow wins."},
+				{Key: "lan-allow-list", Label: "Lan Allow List", Type: FieldTypeStringList,
+					Placeholder: "e.g. 192.168.1.0/24",
+					HelpText:    "IP addresses or CIDR that are always allowed, bypassing any UA checks. Useful for allowing internal traffic that may have non-standard UAs."},
 			}, cacheFields...),
 		},
 		{

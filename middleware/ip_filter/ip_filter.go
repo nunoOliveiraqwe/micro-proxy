@@ -97,13 +97,9 @@ func (f *IpFilter) IsBlocked(ip string) (bool, error) {
 }
 
 func buildIpList(entries []string) (*IpList, error) {
-	trie := netutil.NewSubnetTrie()
-	zap.S().Debugf("Parsing %d ip/subnets", len(entries))
-	for _, entry := range entries {
-		if err := trie.InsertFromString(entry); err != nil {
-			zap.S().Errorf("Cannot parse %s: %v", entry, err)
-			return nil, err
-		}
+	trie, err := netutil.NewSubnetTrieFromStrings(entries)
+	if err != nil {
+		return nil, err
 	}
 	return &IpList{trie: trie}, nil
 }

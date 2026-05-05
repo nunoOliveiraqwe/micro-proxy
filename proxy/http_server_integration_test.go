@@ -920,6 +920,56 @@ func TestMiddleware_UserAgentBlocker_AllowOverridesBlock(t *testing.T) {
 		"allow list should override block list for the same UA pattern")
 }
 
+func TestMiddleware_UserAgentBlocker_Empty(t *testing.T) {
+	backend := newEchoBackend(t)
+	port := getFreePort(t)
+	mws := []middleware.Config{{
+		Type: "UserAgentBlocker",
+		Options: map[string]interface{}{
+			"block-empty-ua":   true,
+			"block-defaults":   []interface{}{"scanners"},
+			"cache-ttl":        "1h",
+			"cleanup-interval": "1h",
+			"max-cache-size":   100,
+		},
+	}}
+	baseURL := buildAndStart(t, simpleListener(port, backend.URL, mws), nil)
+
+	req, _ := http.NewRequest(http.MethodGet, baseURL+"/", nil)
+	req.Header.Set("User-Agent", "")
+	resp, err := defaultClient().Do(req)
+	require.NoError(t, err)
+	defer resp.Body.Close()
+	assert.Equal(t, http.StatusForbidden, resp.StatusCode)
+}
+
+func TestMiddleware_UserAgentBlocker_Empty_Allow_Lan_List(t *testing.T) {
+	backend := newEchoBackend(t)
+	port := getFreePort(t)
+	mws := []middleware.Config{{
+		Type: "UserAgentBlocker",
+		Options: map[string]interface{}{
+			"block-empty-ua":   true,
+			"block-defaults":   []interface{}{"scanners"},
+			"cache-ttl":        "1h",
+			"cleanup-interval": "1h",
+			"max-cache-size":   100,
+			"lan-allow-list":   []interface{}{"127.0.0.1"},
+		},
+	}}
+	baseURL := buildAndStart(t, simpleListener(port, backend.URL, mws), nil)
+
+	req, _ := http.NewRequest(http.MethodGet, baseURL+"/", nil)
+	req.Header.Set("User-Agent", "")
+	resp, err := defaultClient().Do(req)
+	require.NoError(t, err)
+	defer resp.Body.Close()
+	// The test client connects from 127.0.0.1, which is in the lan-allow-list.
+	// Even with an empty User-Agent, the request should be allowed.
+	assert.Equal(t, http.StatusOK, resp.StatusCode,
+		"requests from LAN allow list IPs should bypass User-Agent blocking")
+}
+
 // ── CircuitBreaker ───────────────────────────────────────────────────────────
 
 func TestMiddleware_CircuitBreaker_HealthyBackend(t *testing.T) {

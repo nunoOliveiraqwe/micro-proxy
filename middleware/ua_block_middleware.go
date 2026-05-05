@@ -48,6 +48,12 @@ func UserAgentBlockMiddleware(context context.Context, next http.HandlerFunc, co
 			return
 		}
 
+		if uaBlocker.IsIpInAllowList(addr) {
+			logger.Debug("UserAgentBlockMiddleware: IP is in allow list, skipping UA check", zap.String("clientIp", clientIP))
+			next(w, r)
+			return
+		}
+
 		if uaBlocker.IsBlockedIP(addr.String()) {
 			logger.Warn("UserAgentBlockMiddleware: blocked request from cached IP", zap.String("clientIp", clientIP))
 			ctx.CreateAndAddBlockInfo(r, "ua-block", "cached blocked IP")
@@ -117,6 +123,11 @@ func parseUaConfig(ctx context.Context, conf Config) (*ua.UaBlockerConfig, error
 		return nil, err
 	}
 
+	lanAllowList, err := ParseStringSliceOpt(conf.Options, "lan-allow-list", []string{})
+	if err != nil {
+		return nil, err
+	}
+
 	return &ua.UaBlockerConfig{
 		BlockEmptyUA:          blockEmptyUA,
 		DefaultListBlockedUAs: defaultBlocked,
@@ -124,5 +135,6 @@ func parseUaConfig(ctx context.Context, conf Config) (*ua.UaBlockerConfig, error
 		ExtendedBlockedUAs:    extraBlocked,
 		ExtendedAllowedUAs:    extraAllow,
 		CacheOpt:              cacheOpts,
+		LanAllowList:          lanAllowList,
 	}, nil
 }

@@ -112,7 +112,7 @@ func NewFilter(ctx context.Context, cacheOpts *util.CacheOptions, loader DbLoade
 	var lanTrie *netutil.SubnetTrie
 	if len(lanAllowList) > 0 {
 		zap.S().Infof("Building LAN allow list with %d entries", len(lanAllowList))
-		lanTrie, err = buildLanIpList(lanAllowList)
+		lanTrie, err = netutil.NewSubnetTrieFromStrings(lanAllowList)
 		if err != nil {
 			return nil, fmt.Errorf("failed to build lan ip allow list: %w", err)
 		}
@@ -400,16 +400,4 @@ func extractFieldByPath(raw map[string]any, path []string) string {
 		return s
 	}
 	return ""
-}
-
-func buildLanIpList(entries []string) (*netutil.SubnetTrie, error) {
-	trie := netutil.NewSubnetTrie()
-	zap.S().Debugf("Parsing %d ip/subnets", len(entries))
-	for _, entry := range entries {
-		if err := trie.InsertFromString(entry); err != nil {
-			zap.S().Errorf("Cannot parse %s: %v", entry, err)
-			return nil, err
-		}
-	}
-	return trie, nil
 }
