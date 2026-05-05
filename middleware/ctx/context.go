@@ -9,7 +9,7 @@ import (
 	"go.uber.org/zap"
 )
 
-type contextStruct struct {
+type ContextStruct struct {
 	BlockInfo     *BlockInfo
 	CountryCode   string
 	ContinentCode string
@@ -26,24 +26,28 @@ func InjectContextStruct(next http.HandlerFunc) http.HandlerFunc {
 			return
 		}
 		ctx := r.Context()
-		c := contextStruct{}
+		c := ContextStruct{}
 		ctx = context.WithValue(ctx, ctxkeys.ContextStruct, &c)
 		r = r.WithContext(ctx)
 		next.ServeHTTP(w, r)
 	}
 }
 
-func GetContextStruct(r *http.Request) *contextStruct {
+func GetContextStruct(r *http.Request) *ContextStruct {
+	if r == nil {
+		zap.S().Error("GetContextStruct: request is nil")
+		return &ContextStruct{}
+	}
 	v := r.Context().Value(ctxkeys.ContextStruct)
 	if v == nil {
 		// This should never happen, but if it does, we return an empty contextStruct to avoid panics in the middleware.
-		return &contextStruct{}
+		return &ContextStruct{}
 	}
-	c, ok := v.(*contextStruct)
+	c, ok := v.(*ContextStruct)
 	if !ok {
 		// This should also never happen, but we log an error and return an empty contextStruct to avoid panics.
 		zap.S().Error("GetContextStruct: context value is not of type *contextStruct")
-		return &contextStruct{}
+		return &ContextStruct{}
 	}
 	return c
 }

@@ -71,7 +71,7 @@ func (z *zapLogFormatter) newRequestLogger(r *http.Request) *zap.Logger {
 	ctx := r.Context()
 	reqId := ""
 	if ctx != nil {
-		reqId = GetRequestIDFromContext(r)
+		reqId = GetRequestIDFromRequest(r)
 	}
 	return z.logger.With(
 		zap.String("request_id", reqId),

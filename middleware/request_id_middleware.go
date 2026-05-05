@@ -63,7 +63,7 @@ func generateRequestPrefix() string {
 	return fmt.Sprintf("%s/%s", hostname, b64[0:10])
 }
 
-func GetRequestIDFromContext(r *http.Request) string {
+func GetRequestIDFromRequest(r *http.Request) string {
 	ctxStruct := ctx.GetContextStruct(r)
 	return ctxStruct.RequestId
 }

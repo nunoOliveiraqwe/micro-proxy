@@ -6,6 +6,8 @@ import (
 	"net/http/httptest"
 	"testing"
 
+	"github.com/nunoOliveiraqwe/torii/internal/ctxkeys"
+	ctx2 "github.com/nunoOliveiraqwe/torii/middleware/ctx"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -18,11 +20,11 @@ func TestRequestIDMiddleware_GeneratesID(t *testing.T) {
 	next := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		called = true
 		// The middleware should have set a request ID in the context.
-		reqID := GetRequestIDFromContext(r.Context())
+		reqID := GetRequestIDFromRequest(r)
 		assert.NotEmpty(t, reqID)
 	})
 
-	mw := RequestIDMiddleware(context.Background(), next, Config{})
+	mw := ctx2.InjectContextStruct(RequestIDMiddleware(context.Background(), next, Config{}))
 
 	req := httptest.NewRequest(http.MethodGet, "/", nil)
 	rec := httptest.NewRecorder()
@@ -37,16 +39,19 @@ func TestRequestIDMiddleware_UsesExistingID(t *testing.T) {
 	called := false
 	next := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		called = true
-		reqID := GetRequestIDFromContext(r.Context())
+		reqID := GetRequestIDFromRequest(r)
 		assert.Equal(t, prefix+"-42", reqID)
 	})
 
 	conf := Config{Options: map[string]interface{}{"prefix": prefix}}
-	mw := RequestIDMiddleware(context.Background(), next, conf)
+	mw := ctx2.InjectContextStruct(RequestIDMiddleware(context.Background(), next, conf))
 
 	req := httptest.NewRequest(http.MethodGet, "/", nil)
+
 	existingID := prefix + "-42"
-	ctx := context.WithValue(req.Context(), requestIdContextKey, existingID)
+	ctxStruct := ctx2.ContextStruct{RequestId: existingID}
+
+	ctx := context.WithValue(req.Context(), ctxkeys.ContextStruct, &ctxStruct)
 	req = req.WithContext(ctx)
 	rec := httptest.NewRecorder()
 	mw.ServeHTTP(rec, req)
@@ -58,14 +63,15 @@ func TestRequestIDMiddleware_CompositeID_DifferentPrefix(t *testing.T) {
 	called := false
 	next := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		called = true
-		reqID := GetRequestIDFromContext(r.Context())
+		reqID := GetRequestIDFromRequest(r)
 		assert.Contains(t, reqID, "existing-request-id")
 	})
 
-	mw := RequestIDMiddleware(context.Background(), next, Config{})
+	mw := ctx2.InjectContextStruct(RequestIDMiddleware(context.Background(), next, Config{}))
 
 	req := httptest.NewRequest(http.MethodGet, "/", nil)
-	ctx := context.WithValue(req.Context(), requestIdContextKey, "existing-request-id")
+	ctxStruct := ctx2.ContextStruct{RequestId: "existing-request-id"}
+	ctx := context.WithValue(req.Context(), ctxkeys.ContextStruct, &ctxStruct)
 	req = req.WithContext(ctx)
 	rec := httptest.NewRecorder()
 	mw.ServeHTTP(rec, req)
@@ -77,7 +83,7 @@ func TestRequestIDMiddleware_WithPrefix(t *testing.T) {
 	called := false
 	next := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		called = true
-		reqID := GetRequestIDFromContext(r.Context())
+		reqID := GetRequestIDFromRequest(r)
 		assert.Contains(t, reqID, "testprefix")
 	})
 
@@ -86,7 +92,7 @@ func TestRequestIDMiddleware_WithPrefix(t *testing.T) {
 			"prefix": "testprefix",
 		},
 	}
-	mw := RequestIDMiddleware(context.Background(), next, conf)
+	mw := ctx2.InjectContextStruct(RequestIDMiddleware(context.Background(), next, conf))
 
 	req := httptest.NewRequest(http.MethodGet, "/", nil)
 	rec := httptest.NewRecorder()
@@ -100,18 +106,20 @@ func TestRequestIDMiddleware_WithPrefix(t *testing.T) {
 // ---------------------------------------------------------------------------
 
 func TestGetRequestIDFromContext_NilContext(t *testing.T) {
-	result := GetRequestIDFromContext(nil)
+	result := GetRequestIDFromRequest(nil)
 	assert.Empty(t, result)
 }
 
 func TestGetRequestIDFromContext_NoValue(t *testing.T) {
-	ctx := context.Background()
-	result := GetRequestIDFromContext(ctx)
+	req := httptest.NewRequest(http.MethodGet, "/", nil)
+	result := GetRequestIDFromRequest(req)
 	assert.Empty(t, result)
 }
 
 func TestGetRequestIDFromContext_WrongType(t *testing.T) {
-	ctx := context.WithValue(context.Background(), requestIdContextKey, 12345)
-	result := GetRequestIDFromContext(ctx)
+	req := httptest.NewRequest(http.MethodGet, "/", nil)
+	ctx := context.WithValue(context.Background(), ctxkeys.ContextStruct, 12345)
+	req = req.WithContext(ctx)
+	result := GetRequestIDFromRequest(req)
 	assert.Empty(t, result)
 }
