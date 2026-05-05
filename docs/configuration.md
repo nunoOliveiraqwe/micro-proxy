@@ -325,6 +325,8 @@ When both country and continent lists are defined, the country list acts as an e
     country-list: [PT, CA]
     continent-list-mode: block
     continent-list: [EU]
+    lan-allow-list:
+      - 192.168.1.1/24
 ```
 
 ---

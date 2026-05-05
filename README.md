@@ -209,44 +209,35 @@ Keeping track of what's done and what's next. This is not a roadmap, just my per
 
 
 ### Needs work
-- [x] IP block lists: middleware is registered, filtering logic is stubbed out
 - [ ] Create HTTP Proxy UI: works, but the UX needs another pass
-- [ ] ACME UI: need a delete button for individual certificates, the reset button placement is bad
+- [ ] ACME UI: need a revoke button for individual certificates (altough this might cause some 'funny' side effects), the reset button placement is bad
 - [ ] Proxy Routes UI: host names should be clickable links that open in a new tab
-- [x] Server timeouts: review the defaults for the Create HTTP Proxy wizard
 
 ### Up next
-- [ ] The rolling logs needs to be decoupled from metrics. Right now the metrics middleware is used to track them, but this feels wrong, it just not elegant, and is leading to issues when using global middlewares.
+- [ ] The rolling logs needs to be decoupled from metrics. Right now the metrics middleware is used to track them, but this feels wrong, it's just not elegant, and is leading to ~~issues~~ quirks when using global middlewares.
 - [ ] Enabled API server midlewares to be fully configurable through the config file
-- [x] Config persistence: proxy routes created or deleted via the UI are memory-only — they need to be written back to the config file so they survive restarts - not sure if I will. maybe with an overridable flag, because if I want to expose the proxy API to the internet for dynamic route management, I don't want those changes written to disk, and if I want to manage the config through the file, I don't want the UI overwriting it. Maybe a `persist-ui-changes` flag that defaults to `false` and can be set per-route or globally. Also maybe don't even allow proxy route changes to be created. If the session is hijacked, then not much can be done if no config can be done. Ask for password when creating a proxy!!!!!
-- [x] Wildcard host matching: `VirtualHostDispatcher` uses exact map lookup, no support for `*.home.example.com`. Replace the `map[string]http.Handler` in `VirtualHostDispatcher` with a reversed-label trie so wildcard routes match with DNS-style semantics (one label only, most-specific wins). Priority chain: exact match → longest wildcard match → `default` → 502. Normalize to lowercase, strip trailing dots. Watch out for ACME domain collection (preserve `*.example.com` for wildcard cert issuance) and SNI matching in TLS config.
-- [x] CPU usage in system activity: add CPU usage metrics to the system health/activity dashboard alongside the existing memory and other system stats.
-- [x] Terminating middleware support in UI: update the Create/Edit Proxy UI so that when a terminating middleware (e.g., Redirect) is present in the chain, the backend field becomes optional. Currently the UI always requires a backend.
-- [x] Route editing in UI: add edit support for existing proxy routes through the web UI (there is already a comment/placeholder for this in the codebase). Users should be able to modify host, backend, middlewares, and path rules for an existing route without deleting and recreating it.
 - [ ] TCP proxying: config schema is there, implementation is not
-- [x] Make `RequestId`, `RequestLog`, and `Metrics` default on all endpoints (too easy to forget and then the dashboard shows nothing)
-- [x] Blocked IP observability: surface blocked IPs (from honeypot, UA blocker, country block) in the UI with timestamps and metadata, probably as a rolling log
-- [x] API keys: Homepage integration endpoint, `read_config` and `write_config` scopes (may be dropped depending on how useful they turn out to be)
 - [ ] UA fingerprint rotation detection: bots that rotate user agents mid-scan are easy to spot — a real client doesn't switch from macOS to Linux to Windows between requests. Track UA consistency per IP and flag or block IPs whose OS/browser family changes unnaturally fast. I encountered this with a bot that rotated through 20+ UAs in a single scan, hitting 100+ endpoints in minutes. The honeypot caught it, but this would be another layer of defense against UA rotation.
-- [x] Coraza WAF integration: [Coraza](https://coraza.io/) is a full-featured open-source WAF (OWASP CRS compatible). Add it as a middleware so routes can opt into proper WAF rules alongside the existing bot defense. There's overlap with what the honeypot and UA blocker already do, but Coraza covers a much wider surface (SQLi, XSS, protocol violations, etc.).
-- [x] AbuseIPDB middleware: check client IPs against [AbuseIPDB](https://www.abuseipdb.com/) and block or flag IPs with a high abuse confidence score. Optionally report blocked IPs back (honeypot hits, rate-limit violations, etc.) so the community benefits too.
 - [ ] ForwardAuth middleware: delegate auth decisions to an external service (like Traefik's ForwardAuth / nginx auth_request)
-- [x] When initializng with a complete config, the UI still needs FTS to be done. It should be possible to completly disable the UI and run the proxy in raw mode
+- [ ] Setting headers based on IP or other request attributes (e.g. add `X-Client-IP` $remote_addr), need to buidl a list of useful attributes that can be templated
+- [ ] Bait domains, e.g. `admin.yourdomain.com`, these would be domains that have no reason to receive any traffic, so any request to them would be highly suspicious. I can potentialy have a DNS provider integration that automatically creates and removes these bait domains, so they can be rotated periodically. This would be a great way to catch bots that are targeting specific subdomains (e.g. `admin`, `dev`, `staging`) without exposing any real services on those subdomains. Bonus points that this would serve as a legitimate IP trap, where any IP hitting this would be instantly blocked, and the funny thing is, they need to connect before they can verify it's legit or not, I only need for them to connect before banning them.
+- [ ] CrowdSec integration: implement Torii as a CrowdSec bouncer using the streaming mode. Long-poll from the CrowdSec LAPI, so IP checks are pure in-memory lookups with no per-request latency. CrowdSec runs as a separate daemon, parses Torii's logs, and benefits from the community blocklist. Two directions: Torii as enforcer (reads decisions) and Torii as sensor (feeds logs to CrowdSec for scenario detection).
+- [ ] Detect the slick ones. Most traffic is easy to catch with the right rules, but there are always going to be some bots that fly under the radar. Implement a "suspicious activity" score based on request patterns (e.g. high request rate, odd paths, inconsistent UAs) and flag IPs that exceed a certain threshold for manual review. This would be a way to catch the bots that are just good enough to avoid the traps, but still exhibit behavior that's not typical of real users.
+- [ ] Active backend health checks, periodically probe backends in the background so they're marked down before real traffic is affected, rather than relying solely on the circuit breaker's passive failure detection. Config per-backend: health check path, interval, timeout, and consecutive failure/success thresholds to transition between healthy/unhealthy. Unhealthy backends should be shown in the dashboard. Health check state and circuit breaker state should share the same backend status so they don't contradict each other.
+- [ ] Internal event bus, a lightweight pub/sub backbone so middlewares and subsystems can emit and react to events (request blocked, honeypot triggered, backend went down, suspicious IP flagged, etc.) without direct coupling. This seems unavoidable as I keep seeing the need for it emerging everywhere. is the prerequisite that makes CrowdSec sensor mode, suspicious activity scoring, bait domain blocking, where the IP is shared across middleware's, UA rotation detection, and alerting/webhooks all clean to implement. Without it, each new feature needs to reach into other components directly.
 
 
 ### Known Bugs
-- [x] **ACME port leak on startup:** if a route has `use-acme: true` but ACME is not configured, the server fails to start. Starting the proxy manually afterwards returns an ACME error, but the port is already bound from the first attempt. A second manual start then fails with a "bind: address already in use" error. The listener from the failed first start is never closed.
-- [x] **ACME config not loadable from config file:** there is no way to specify ACME configuration (provider, credentials, etc.) in the YAML config file. On first start with `use-acme: true`, it should be possible to seed the ACME configuration from the config file instead of requiring it to be set up through the UI first.
-- [x] **When using wildcards, the ACME cert will show as orphaned in the UI:** fixed by normalizing domains to lowercase and adding wildcard-aware matching when determining cert active status.
 
 ### Maybe
 - [ ] Proxy-level authentication: login pages so the proxy handles auth before forwarding to backends
 - [ ] Dedicated tar pitting middleware (separate from the honeypot trickster mode)
-- [ ] Login endpoint rate limiting
+- [ ] Anubis integration (I really want this, but need to figure out how to best integrate it, given anubis has a pretty large config surface)
+- 
 
 ## Requirements
 
-- Go 1.25+
+- Go 1.26+
 
 ## License
 
