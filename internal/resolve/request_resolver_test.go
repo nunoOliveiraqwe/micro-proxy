@@ -9,10 +9,8 @@ import (
 )
 
 func TestGetRequestResolverInfoMatchesRegisteredResolvers(t *testing.T) {
-	infos := GetRequestResolverInfo()
-
-	require.NotEmpty(t, infos)
-	for _, info := range infos {
+	require.NotEmpty(t, requestVarInfo)
+	for _, info := range requestVarInfo {
 		assert.NotEmpty(t, info.Key)
 		assert.NotEmpty(t, info.Description)
 
@@ -22,13 +20,13 @@ func TestGetRequestResolverInfoMatchesRegisteredResolvers(t *testing.T) {
 }
 
 func TestRequestResolverInfoReturnsCopy(t *testing.T) {
-	infos := GetRequestResolverInfo()
+	infos := requestVarInfo
 	require.NotEmpty(t, infos)
 
 	infos[0].Key = "$mutated"
 
 	assert.Nil(t, GetRequestResolver("$mutated"))
-	assert.NotEqual(t, "$mutated", GetRequestResolverInfo()[0].Key)
+	assert.NotEqual(t, "$mutated", requestVarInfo[0].Key)
 }
 
 func TestRegisteredRequestResolvers(t *testing.T) {

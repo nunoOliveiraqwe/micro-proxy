@@ -4,11 +4,6 @@ import "net/http"
 
 type RequestResolver func(r *http.Request) string
 
-type RequestResolverInfo struct {
-	Key         string `json:"key"`
-	Description string `json:"description"`
-}
-
 var requestVars = map[string]RequestResolver{
 	"$remote_addr": func(r *http.Request) string { return r.RemoteAddr },
 	"$host":        func(r *http.Request) string { return r.Host },

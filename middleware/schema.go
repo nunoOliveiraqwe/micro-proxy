@@ -56,7 +56,7 @@ var cacheFields = []OptionField{
 }
 
 func requestResolverSuggestions() []FieldSuggestion {
-	infos := resolve.GetRequestResolverInfo()
+	infos := resolve.GetAllResolverInfo()
 	suggestions := make([]FieldSuggestion, 0, len(infos))
 	for _, info := range infos {
 		suggestions = append(suggestions, FieldSuggestion{
