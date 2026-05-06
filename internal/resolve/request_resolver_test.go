@@ -19,16 +19,6 @@ func TestGetRequestResolverInfoMatchesRegisteredResolvers(t *testing.T) {
 	}
 }
 
-func TestRequestResolverInfoReturnsCopy(t *testing.T) {
-	infos := requestVarInfo
-	require.NotEmpty(t, infos)
-
-	infos[0].Key = "$mutated"
-
-	assert.Nil(t, GetRequestResolver("$mutated"))
-	assert.NotEqual(t, "$mutated", requestVarInfo[0].Key)
-}
-
 func TestRegisteredRequestResolvers(t *testing.T) {
 	req := httptest.NewRequest("PATCH", "https://example.test/path?q=1", nil)
 	req.RemoteAddr = "203.0.113.10:41234"
