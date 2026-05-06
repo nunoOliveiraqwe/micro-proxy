@@ -311,14 +311,12 @@ func (m *Torii) DoesConfigRequireServerRestart(oldPort int, newConf config.HTTPL
 func (m *Torii) initializeHttpNetworkStackFromConf(ctx context.Context, conf config.NetworkConfig) error {
 	zap.S().Debugf("Initializing HTTP network stack with configuration: %+v", conf)
 
-	if conf.Global != nil {
-		zap.S().Debugf("Initializing global dispatcher with configuration: %+v", conf.Global)
-		dGlobal, err := initGlobalDispatcher(ctx, conf.Global)
-		if err != nil {
-			return fmt.Errorf("failed to initialize global dispatcher: %w", err)
-		}
-		m.gDispatcher = dGlobal
+	zap.S().Debugf("Initializing global dispatcher with configuration: %+v", conf.Global)
+	dGlobal, err := initGlobalDispatcher(ctx, conf.Global)
+	if err != nil {
+		return fmt.Errorf("failed to initialize global dispatcher: %w", err)
 	}
+	m.gDispatcher = dGlobal
 
 	zap.S().Infof("Initializing HTTP servers")
 	if (conf.HTTPListeners == nil || len(conf.HTTPListeners) == 0) &&
@@ -329,7 +327,9 @@ func (m *Torii) initializeHttpNetworkStackFromConf(ctx context.Context, conf con
 	}
 	for _, ln := range conf.HTTPListeners {
 		zap.S().Debugf("Initializing HTTP server with configuration: %+v", ln)
-		m.AddHttpServer(ctx, ln)
+		if err := m.AddHttpServer(ctx, ln); err != nil {
+			return err
+		}
 	}
 	return nil
 }

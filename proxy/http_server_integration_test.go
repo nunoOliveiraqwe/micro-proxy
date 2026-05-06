@@ -3854,6 +3854,31 @@ func TestEdge_NilGlobalConfig(t *testing.T) {
 	_ = echo
 }
 
+func TestEdge_NewToriiWithoutGlobalConfigCanAddHttpServerLater(t *testing.T) {
+	backend := newEchoBackend(t)
+	port := getFreePort(t)
+	mgr := metrics.NewGlobalMetricsHandler(1, context.Background())
+	mgr.StartCollectingMetrics()
+	t.Cleanup(mgr.StopCollectingMetrics)
+
+	torii, err := NewTorii(config.NetworkConfig{}, mgr, nil, nil)
+	require.NoError(t, err)
+
+	err = torii.AddHttpServer(context.Background(), simpleListener(port, backend.URL, nil))
+	require.NoError(t, err)
+	err = torii.StartHttpProxy(port)
+	require.NoError(t, err)
+	t.Cleanup(func() { _ = torii.StopHttpProxy(port) })
+
+	addr := fmt.Sprintf("127.0.0.1:%d", port)
+	waitForServer(t, addr, 3*time.Second)
+
+	resp := doGet(t, "http://"+addr+"/")
+	echo := readEcho(t, resp)
+	assert.Equal(t, http.StatusOK, resp.StatusCode)
+	assert.Equal(t, "/", echo.Path)
+}
+
 // ═══════════════════════════════════════════════════════════════════════════
 // SECTION 29 — Redirect external-scheme-only mode
 // ═══════════════════════════════════════════════════════════════════════════

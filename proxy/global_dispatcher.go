@@ -17,10 +17,13 @@ type GlobalDispatcher struct {
 }
 
 func (d *GlobalDispatcher) registerHandler(port int, next http.HandlerFunc) http.HandlerFunc {
-	if d.globalConfig == nil {
+	if d == nil || d.globalConfig == nil {
 		return next
 	} else if d.globalChain == nil {
 		return next
+	}
+	if d.registeredHandlers == nil {
+		d.registeredHandlers = make(map[int]http.HandlerFunc)
 	}
 	d.registeredHandlers[port] = next
 	return func(w http.ResponseWriter, r *http.Request) {
