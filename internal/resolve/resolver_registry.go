@@ -1,25 +1,76 @@
 package resolve
 
+import (
+	"fmt"
+	"strings"
+)
+
 type ResolverRegistry struct {
-	resolvers map[string]Resolver
+	valueResolverRegistry   map[string]ValueResolver
+	requestResolverRegistry map[string]RequestResolver
 }
 
 var registry *ResolverRegistry
 
 func init() {
 	registry = &ResolverRegistry{
-		resolvers: make(map[string]Resolver),
+		valueResolverRegistry:   make(map[string]ValueResolver),
+		requestResolverRegistry: make(map[string]RequestResolver),
 	}
 	f := FileResolver{}
 	e := EnvResolver{}
-	registry.register(&f)
-	registry.register(&e)
+	registry.valueResolverRegistry["$file"] = &f
+	registry.valueResolverRegistry["$env"] = &e
+
+	for k, v := range requestVars {
+		registry.requestResolverRegistry[k] = v
+	}
 }
 
-func (r *ResolverRegistry) register(resolver Resolver) {
-	r.resolvers[resolver.getResolverKey()] = resolver
+func GetRequestResolver(key string) RequestResolver {
+	if key == "" {
+		return nil
+	}
+	return registry.requestResolverRegistry[key]
 }
 
-func GetResolver(key string) Resolver {
-	return registry.resolvers[key]
+func ResolveValue(raw string) (string, error) { //acceptable formats:
+	// $env:VAR_NAME
+	// $file:/path/to/file
+
+	if strings.HasPrefix(raw, "$") {
+		if len(raw) == 1 {
+			return "", fmt.Errorf("invalid resolver format: %s", raw)
+		}
+	} else {
+		//not a resolver, return as is
+		return raw, nil
+	}
+
+	firstIndexOf := strings.Index(raw, ":")
+	key := raw[:firstIndexOf]
+	value := raw[firstIndexOf+1:]
+
+	resolver := registry.valueResolverRegistry[key]
+
+	if resolver == nil {
+		return "", fmt.Errorf("no resolver registered for %q", key)
+	}
+	return resolver.Resolve(value)
+}
+
+var requestVarInfo = []RequestResolverInfo{
+	{Key: "$remote_addr", Description: "Client network address from the request, including the source port."},
+	{Key: "$host", Description: "Host requested by the client, usually from the Host header."},
+	{Key: "$method", Description: "HTTP method used by the request, such as GET or POST."},
+	{Key: "$uri", Description: "Request URI sent by the client, including path and query string."},
+	{Key: "$scheme", Description: "Request scheme inferred by Torii: http or https."},
+	{Key: "$env:ENV_VAR", Description: "Value of the specified environment variable."},
+	{Key: "$file:/path/to/file", Description: "Contents of the specified file. (Docker secrets like /run/secrets/* are supported.)"},
+}
+
+func GetRequestResolverInfo() []RequestResolverInfo {
+	out := make([]RequestResolverInfo, len(requestVarInfo))
+	copy(out, requestVarInfo)
+	return out
 }

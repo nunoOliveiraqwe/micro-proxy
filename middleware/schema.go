@@ -1,5 +1,7 @@
 package middleware
 
+import "github.com/nunoOliveiraqwe/torii/internal/resolve"
+
 // OptionFieldType defines the type of a middleware configuration field for UI rendering.
 type OptionFieldType string
 
@@ -16,15 +18,21 @@ const (
 
 // OptionField describes a single configuration option for a middleware.
 type OptionField struct {
-	Key         string          `json:"key"`
-	Label       string          `json:"label"`
-	Type        OptionFieldType `json:"type"`
-	Required    bool            `json:"required"`
-	Default     interface{}     `json:"default,omitempty"`
-	Placeholder string          `json:"placeholder,omitempty"`
-	HelpText    string          `json:"help_text,omitempty"`
-	Choices     []string        `json:"choices,omitempty"`
-	Group       string          `json:"group,omitempty"`
+	Key         string            `json:"key"`
+	Label       string            `json:"label"`
+	Type        OptionFieldType   `json:"type"`
+	Required    bool              `json:"required"`
+	Default     interface{}       `json:"default,omitempty"`
+	Placeholder string            `json:"placeholder,omitempty"`
+	HelpText    string            `json:"help_text,omitempty"`
+	Choices     []string          `json:"choices,omitempty"`
+	Suggestions []FieldSuggestion `json:"suggestions,omitempty"`
+	Group       string            `json:"group,omitempty"`
+}
+
+type FieldSuggestion struct {
+	Value       string `json:"value"`
+	Description string `json:"description"`
 }
 
 // MiddlewareSchema describes a middleware type and its configuration options.
@@ -47,8 +55,21 @@ var cacheFields = []OptionField{
 		HelpText:    "Maximum number of entries in the cache. Oldest entries are evicted when full."},
 }
 
+func requestResolverSuggestions() []FieldSuggestion {
+	infos := resolve.GetRequestResolverInfo()
+	suggestions := make([]FieldSuggestion, 0, len(infos))
+	for _, info := range infos {
+		suggestions = append(suggestions, FieldSuggestion{
+			Value:       info.Key,
+			Description: info.Description,
+		})
+	}
+	return suggestions
+}
+
 // GetMiddlewareSchemas returns the schema for all available middlewares.
 func GetMiddlewareSchemas() []MiddlewareSchema {
+	requestResolvers := requestResolverSuggestions()
 	schemas := []MiddlewareSchema{
 		{
 			Name:        "RequestId",
@@ -80,15 +101,17 @@ func GetMiddlewareSchemas() []MiddlewareSchema {
 			Description: "Manipulates request and response headers. Can set, strip, or validate headers.",
 			Fields: []OptionField{
 				{Key: "set-headers-req", Label: "Set Request Headers", Type: FieldTypeMap,
-					HelpText: "Headers to add or override on incoming requests. Values starting with $ are resolved dynamically (e.g., $file:/path/to/secret)."},
+					HelpText:    "Headers to add or override on incoming requests. Values starting with $ can use request resolvers such as $remote_addr, or static resolvers such as $file:/path/to/secret.",
+					Suggestions: requestResolvers},
+				{Key: "cmp-headers-req", Label: "Required Request Headers", Type: FieldTypeMap,
+					HelpText:    "Headers that must match exact values. If any don't match, the request is rejected with 401 Unauthorized. Values can use request resolvers such as $method or $host.",
+					Suggestions: requestResolvers},
 				{Key: "set-headers-res", Label: "Set Response Headers", Type: FieldTypeMap,
 					HelpText: "Headers to add or override on outgoing responses."},
 				{Key: "strip-headers-req", Label: "Strip Request Headers", Type: FieldTypeStringList,
 					HelpText: "Header names to remove from incoming requests before proxying."},
 				{Key: "strip-headers-res", Label: "Strip Response Headers", Type: FieldTypeStringList,
 					HelpText: "Header names to remove from outgoing responses."},
-				{Key: "cmp-headers-req", Label: "Required Request Headers", Type: FieldTypeMap,
-					HelpText: "Headers that must match exact values. If any don't match, the request is rejected with 401 Unauthorized."},
 			},
 		},
 		{

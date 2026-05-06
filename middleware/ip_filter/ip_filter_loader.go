@@ -4,7 +4,6 @@ import (
 	"bufio"
 	"context"
 	"fmt"
-	"strings"
 	"time"
 
 	"github.com/nunoOliveiraqwe/torii/internal/abuseipdb"
@@ -79,19 +78,7 @@ func NewAbuseIpDbBlockListLoader(apiKey string, confidenceInterval int, refreshI
 // $env:API_KEY or $file:/run/secrets/key) and resolves it. Plain strings
 // are returned as-is.
 func resolveValue(value string) (string, error) {
-	if !strings.HasPrefix(value, "$") {
-		return value, nil
-	}
-	idx := strings.Index(value, ":")
-	if idx < 0 {
-		return "", fmt.Errorf("invalid resolver syntax: %s", value)
-	}
-	resolverKey := value[1:idx]
-	resolver := resolve.GetResolver(resolverKey)
-	if resolver == nil {
-		return "", fmt.Errorf("unknown resolver: %s", resolverKey)
-	}
-	return resolver.Resolve(value[idx+1:])
+	return resolve.ResolveValue(value)
 }
 
 func (s *AbuseIpDbBlockListLoader) StartRefreshTimer(ctx context.Context, callback func([]string)) ([]string, error) {

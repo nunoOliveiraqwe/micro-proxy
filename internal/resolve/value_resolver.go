@@ -8,13 +8,11 @@ import (
 	"go.uber.org/zap"
 )
 
-type Resolver interface {
-	getResolverKey() string
+type ValueResolver interface {
 	Resolve(string) (string, error)
 }
 
-type FileResolver struct{} //to be used with docker secrets or similar structures, where the path is the key and the content of the file is the value
-
+type FileResolver struct{}
 type EnvResolver struct{}
 
 func (f *FileResolver) Resolve(path string) (string, error) {
@@ -27,10 +25,6 @@ func (f *FileResolver) Resolve(path string) (string, error) {
 	return strings.TrimRight(string(b), "\n"), nil //remove trailing newline
 }
 
-func (f *FileResolver) getResolverKey() string {
-	return "file"
-}
-
 func (e *EnvResolver) Resolve(key string) (string, error) {
 	zap.S().Infof("Resolving environment variable: %s", key)
 	value, exists := os.LookupEnv(key)
@@ -39,24 +33,4 @@ func (e *EnvResolver) Resolve(key string) (string, error) {
 		return "", fmt.Errorf("environment variable %s not found", key)
 	}
 	return value, nil
-}
-
-func (e *EnvResolver) getResolverKey() string {
-	return "env"
-}
-
-func ResolveValue(raw string) (string, error) {
-	for prefix, key := range map[string]string{
-		"$env:":  "env",
-		"$file:": "file",
-	} {
-		if strings.HasPrefix(raw, prefix) {
-			r := GetResolver(key)
-			if r == nil {
-				return "", fmt.Errorf("no resolver registered for %q", key)
-			}
-			return r.Resolve(strings.TrimPrefix(raw, prefix))
-		}
-	}
-	return raw, nil
 }

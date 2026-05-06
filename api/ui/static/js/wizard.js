@@ -431,7 +431,7 @@ function lfRenderMwOptions(container, fields, values) {
             if (val && typeof val === 'object' && !Array.isArray(val)) {
                 initMap = val;
             }
-            lfInitMapTagInput(mp, initMap);
+            lfInitMapTagInput(mp, initMap, f.suggestions || []);
             wrap.appendChild(mp);
         } else {
             var lbl6 = document.createElement('label');
@@ -594,8 +594,9 @@ function lfParseMapEntry(text) {
     return { key: k, value: v };
 }
 
-function lfInitMapTagInput(container, initMap) {
+function lfInitMapTagInput(container, initMap, suggestions) {
     container.className = 'mw-tag-input';
+    container.style.position = 'relative';
     var tagList = document.createElement('span');
     tagList.className = 'mw-tag-list';
     container.appendChild(tagList);
@@ -606,11 +607,125 @@ function lfInitMapTagInput(container, initMap) {
     input.placeholder = 'key:value then Enter';
     container.appendChild(input);
 
+    var resolverSuggestions = Array.isArray(suggestions) ? suggestions : [];
+    var suggestMenu = document.createElement('div');
+    suggestMenu.className = 'mw-resolver-suggest';
+    suggestMenu.style.display = 'none';
+    suggestMenu.setAttribute('role', 'listbox');
+    container.appendChild(suggestMenu);
+    var activeSuggestionIndex = -1;
+
     Object.keys(initMap).forEach(function(k) {
         lfAddMapTag(container, k, initMap[k]);
     });
 
+    function currentValueQuery() {
+        var text = input.value;
+        var idx = text.indexOf(':');
+        if (idx < 1) return null;
+        var valuePart = text.substring(idx + 1).trim();
+        if (valuePart.charAt(0) !== '$') return null;
+        return valuePart;
+    }
+
+    function hideResolverSuggestions() {
+        suggestMenu.style.display = 'none';
+        suggestMenu.innerHTML = '';
+        activeSuggestionIndex = -1;
+        var chainItem = container.closest('.mw-chain-item');
+        if (chainItem) chainItem.classList.remove('mw-resolver-open');
+    }
+
+    function applyResolverSuggestion(value) {
+        var text = input.value;
+        var idx = text.indexOf(':');
+        if (idx < 1) return;
+        input.value = text.substring(0, idx + 1) + value;
+        hideResolverSuggestions();
+        input.focus();
+    }
+
+    function setActiveResolverSuggestion(index) {
+        var items = suggestMenu.querySelectorAll('.mw-resolver-suggest-item');
+        if (!items.length) {
+            activeSuggestionIndex = -1;
+            return;
+        }
+        if (index < 0) index = items.length - 1;
+        if (index >= items.length) index = 0;
+        activeSuggestionIndex = index;
+        items.forEach(function(item, i) {
+            item.classList.toggle('active', i === activeSuggestionIndex);
+        });
+    }
+
+    function updateResolverSuggestions() {
+        var query = currentValueQuery();
+        if (!query || resolverSuggestions.length === 0) {
+            hideResolverSuggestions();
+            return;
+        }
+
+        var lower = query.toLowerCase();
+        var matches = resolverSuggestions.filter(function(s) {
+            return s.value && s.value.toLowerCase().indexOf(lower) === 0;
+        });
+
+        if (matches.length === 0) {
+            hideResolverSuggestions();
+            return;
+        }
+
+        suggestMenu.innerHTML = '';
+        matches.forEach(function(s, i) {
+            var item = document.createElement('button');
+            item.type = 'button';
+            item.className = 'mw-resolver-suggest-item';
+            item.setAttribute('role', 'option');
+            item.title = s.description || '';
+            item.innerHTML = '<span class="mw-resolver-suggest-value"></span><span class="mw-resolver-suggest-help"></span>';
+            item.querySelector('.mw-resolver-suggest-value').textContent = s.value;
+            item.querySelector('.mw-resolver-suggest-help').textContent = s.description || '';
+            item.addEventListener('mousedown', function(e) {
+                e.preventDefault();
+                applyResolverSuggestion(s.value);
+            });
+            suggestMenu.appendChild(item);
+            if (i === 0) item.classList.add('active');
+        });
+        activeSuggestionIndex = 0;
+        suggestMenu.style.display = 'block';
+        var chainItem = container.closest('.mw-chain-item');
+        if (chainItem) chainItem.classList.add('mw-resolver-open');
+    }
+
     input.addEventListener('keydown', function(e) {
+        if (suggestMenu.style.display !== 'none') {
+            if (e.key === 'ArrowDown') {
+                e.preventDefault();
+                setActiveResolverSuggestion(activeSuggestionIndex + 1);
+                return;
+            }
+            if (e.key === 'ArrowUp') {
+                e.preventDefault();
+                setActiveResolverSuggestion(activeSuggestionIndex - 1);
+                return;
+            }
+            if (e.key === 'Escape') {
+                e.preventDefault();
+                hideResolverSuggestions();
+                return;
+            }
+            if (e.key === 'Enter') {
+                var active = suggestMenu.querySelector('.mw-resolver-suggest-item.active');
+                if (active) {
+                    e.preventDefault();
+                    applyResolverSuggestion(active.querySelector('.mw-resolver-suggest-value').textContent);
+                    return;
+                }
+            }
+        }
+
         if (e.key === 'Backspace' && !input.value) {
             var tags = tagList.querySelectorAll('.mw-tag');
             if (tags.length) tags[tags.length - 1].remove();
@@ -623,11 +738,15 @@ function lfInitMapTagInput(container, initMap) {
             var entry = lfParseMapEntry(text);
             if (entry) lfAddMapTag(container, entry.key, entry.value);
             input.value = '';
+            hideResolverSuggestions();
         }
     });
 
+    input.addEventListener('input', updateResolverSuggestions);
+
     input.addEventListener('blur', function() {
         var text = input.value.trim();
+        setTimeout(hideResolverSuggestions, 120);
         if (!text) return;
         var entry = lfParseMapEntry(text);
         if (entry) { lfAddMapTag(container, entry.key, entry.value); input.value = ''; }
