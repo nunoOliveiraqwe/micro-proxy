@@ -21,7 +21,9 @@ func NewAcmeStore(db *DB) store.AcmeStore {
 	return &AcmeStore{db: db}
 }
 
-func (s *AcmeStore) GetConfiguration() (*domain.AcmeConfiguration, error) {
+const acmeConfigColumns = `ID, EMAIL, DNS_PROVIDER, CA_DIR_URL, RENEWAL_CHECK_INTERVAL, ENABLED, DNS_PROVIDER_SERIALIZED_FIELDS, ACME_DOMAINS, DNS_RESOLVERS, AUTO_DISCOVER, CREATED_AT, UPDATED_AT`
+
+func (s *AcmeStore) GetConfigurations() ([]*domain.AcmeConfiguration, error) {
 	ctx := context.Background()
 	tx, err := s.db.BeginTx(ctx, nil)
 	if err != nil {
@@ -29,15 +31,129 @@ func (s *AcmeStore) GetConfiguration() (*domain.AcmeConfiguration, error) {
 	}
 	defer tx.Rollback()
 
+	rows, err := tx.QueryContext(ctx, `SELECT `+acmeConfigColumns+` FROM acme_configuration ORDER BY id`)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var out []*domain.AcmeConfiguration
+	for rows.Next() {
+		conf, err := scanAcmeConfiguration(rows)
+		if err != nil {
+			return nil, err
+		}
+		out = append(out, conf)
+	}
+	return out, rows.Err()
+}
+
+func (s *AcmeStore) GetConfiguration(id int) (*domain.AcmeConfiguration, error) {
+	ctx := context.Background()
+	tx, err := s.db.BeginTx(ctx, nil)
+	if err != nil {
+		return nil, err
+	}
+	defer tx.Rollback()
+
+	row := tx.QueryRowContext(ctx, `SELECT `+acmeConfigColumns+` FROM acme_configuration WHERE id = ?`, id)
+	conf, err := scanAcmeConfiguration(row)
+	if err == sql.ErrNoRows {
+		return nil, nil
+	}
+	if err != nil {
+		return nil, err
+	}
+	return conf, nil
+}
+
+func (s *AcmeStore) SaveConfiguration(conf *domain.AcmeConfiguration) error {
+	ctx := context.Background()
+	tx, err := s.db.BeginTx(ctx, nil)
+	if err != nil {
+		return err
+	}
+	defer tx.Rollback()
+
+	domainsCSV := strings.Join(conf.Domains, ",")
+	resolversCSV := strings.Join(conf.DNSResolvers, ",")
+	intervalStr := conf.RenewalCheckInterval.String()
+
+	if conf.ID == 0 {
+		res, err := tx.ExecContext(ctx, `
+			INSERT INTO acme_configuration (EMAIL, DNS_PROVIDER, CA_DIR_URL, RENEWAL_CHECK_INTERVAL, ENABLED, DNS_PROVIDER_SERIALIZED_FIELDS, ACME_DOMAINS, DNS_RESOLVERS, AUTO_DISCOVER, UPDATED_AT)
+			VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP)`,
+			conf.Email,
+			conf.DNSProvider,
+			conf.CADirURL,
+			intervalStr,
+			conf.Enabled,
+			conf.SerializedFields,
+			domainsCSV,
+			resolversCSV,
+			conf.AutoDiscover,
+		)
+		if err != nil {
+			return err
+		}
+		id, err := res.LastInsertId()
+		if err != nil {
+			return err
+		}
+		conf.ID = int(id)
+	} else {
+		_, err := tx.ExecContext(ctx, `
+			UPDATE acme_configuration SET
+				email                          = ?,
+				dns_provider                   = ?,
+				ca_dir_url                     = ?,
+				renewal_check_interval         = ?,
+				enabled                        = ?,
+				dns_provider_serialized_fields = ?,
+				acme_domains                   = ?,
+				dns_resolvers                  = ?,
+				auto_discover                  = ?,
+				updated_at                     = CURRENT_TIMESTAMP
+			WHERE id = ?`,
+			conf.Email,
+			conf.DNSProvider,
+			conf.CADirURL,
+			intervalStr,
+			conf.Enabled,
+			conf.SerializedFields,
+			domainsCSV,
+			resolversCSV,
+			conf.AutoDiscover,
+			conf.ID,
+		)
+		if err != nil {
+			return err
+		}
+	}
+	return tx.Commit()
+}
+
+func (s *AcmeStore) DeleteConfiguration(id int) error {
+	ctx := context.Background()
+	tx, err := s.db.BeginTx(ctx, nil)
+	if err != nil {
+		return err
+	}
+	defer tx.Rollback()
+
+	if _, err := tx.ExecContext(ctx, `DELETE FROM acme_configuration WHERE id = ?`, id); err != nil {
+		return err
+	}
+	return tx.Commit()
+}
+
+// scanAcmeConfiguration scans either a *sql.Row or *sql.Rows because both expose Scan.
+func scanAcmeConfiguration(scanner interface {
+	Scan(dest ...any) error
+}) (*domain.AcmeConfiguration, error) {
 	var conf domain.AcmeConfiguration
-	var intervalStr string
-	var domainsStr string
-	var dnsResolversStr string
-	err = tx.QueryRowContext(ctx, `
-		SELECT ID, EMAIL, DNS_PROVIDER, CA_DIR_URL, RENEWAL_CHECK_INTERVAL, ENABLED, DNS_PROVIDER_SERIALIZED_FIELDS, ACME_DOMAINS, DNS_RESOLVERS, CREATED_AT, UPDATED_AT
-		FROM acme_configuration
-		WHERE id = 1`,
-	).Scan(
+	var intervalStr, domainsStr, dnsResolversStr string
+	err := scanner.Scan(
 		&conf.ID,
 		&conf.Email,
 		&conf.DNSProvider,
@@ -47,12 +163,10 @@ func (s *AcmeStore) GetConfiguration() (*domain.AcmeConfiguration, error) {
 		&conf.SerializedFields,
 		&domainsStr,
 		&dnsResolversStr,
+		&conf.AutoDiscover,
 		(*NullTime)(&conf.CreatedAt),
 		(*NullTime)(&conf.UpdatedAt),
 	)
-	if err == sql.ErrNoRows {
-		return nil, nil
-	}
 	if err != nil {
 		return nil, err
 	}
@@ -70,47 +184,11 @@ func (s *AcmeStore) GetConfiguration() (*domain.AcmeConfiguration, error) {
 	return &conf, nil
 }
 
-func (s *AcmeStore) SaveConfiguration(conf *domain.AcmeConfiguration) error {
-	ctx := context.Background()
-	tx, err := s.db.BeginTx(ctx, nil)
-	if err != nil {
-		return err
-	}
-	defer tx.Rollback()
-
-	_, err = tx.ExecContext(ctx, `
-		INSERT INTO acme_configuration (ID, EMAIL, DNS_PROVIDER, CA_DIR_URL, RENEWAL_CHECK_INTERVAL, ENABLED, DNS_PROVIDER_SERIALIZED_FIELDS, ACME_DOMAINS, DNS_RESOLVERS, UPDATED_AT)
-		VALUES (1, ?, ?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP)
-		ON CONFLICT(id) DO UPDATE SET
-			email                  = excluded.email,
-			dns_provider           = excluded.dns_provider,
-			ca_dir_url             = excluded.ca_dir_url,
-			renewal_check_interval = excluded.renewal_check_interval,
-			enabled                = excluded.enabled,
-			dns_provider_serialized_fields            = excluded.dns_provider_serialized_fields,
-			acme_domains           = excluded.acme_domains,
-			dns_resolvers          = excluded.dns_resolvers,
-			updated_at             = CURRENT_TIMESTAMP`,
-		conf.Email,
-		conf.DNSProvider,
-		conf.CADirURL,
-		conf.RenewalCheckInterval.String(),
-		conf.Enabled,
-		conf.SerializedFields,
-		strings.Join(conf.Domains, ","),
-		strings.Join(conf.DNSResolvers, ","),
-	)
-	if err != nil {
-		return err
-	}
-	return tx.Commit()
-}
-
 // ---------------------------------------------------------------------------
 // Account
 // ---------------------------------------------------------------------------
 
-func (s *AcmeStore) GetAccount(email string) (*domain.AcmeAccount, error) {
+func (s *AcmeStore) GetAccountFor(email string) (*domain.AcmeAccount, error) {
 	ctx := context.Background()
 	tx, err := s.db.BeginTx(ctx, nil)
 	if err != nil {
@@ -148,10 +226,9 @@ func (s *AcmeStore) SaveAccount(account *domain.AcmeAccount) error {
 	defer tx.Rollback()
 
 	_, err = tx.ExecContext(ctx, `
-		INSERT INTO acme_account (ID, EMAIL, PRIVATE_KEY, REGISTRATION)
-		VALUES (1, ?, ?, ?)
-		ON CONFLICT(id) DO UPDATE SET
-			email        = excluded.email,
+		INSERT INTO acme_account (EMAIL, PRIVATE_KEY, REGISTRATION)
+		VALUES (?, ?, ?)
+		ON CONFLICT(email) DO UPDATE SET
 			private_key  = excluded.private_key,
 			registration = excluded.registration`,
 		account.Email,

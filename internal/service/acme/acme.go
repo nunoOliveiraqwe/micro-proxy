@@ -21,6 +21,8 @@ type LegoAcmeManager struct {
 
 	store store.AcmeStore
 
+	configID int
+
 	client *lego.Client
 	user   *acmeUser
 
@@ -30,6 +32,8 @@ type LegoAcmeManager struct {
 	startStopMu sync.Mutex
 	cancelFunc  context.CancelFunc
 }
+
+func (m *LegoAcmeManager) ConfigID() int { return m.configID }
 
 func NewLegoAcmeManager(conf *domain.AcmeConfiguration, acmeStore store.AcmeStore) (*LegoAcmeManager, error) {
 	if conf.Email == "" {
@@ -46,6 +50,7 @@ func NewLegoAcmeManager(conf *domain.AcmeConfiguration, acmeStore store.AcmeStor
 
 	mgr := &LegoAcmeManager{
 		store:           acmeStore,
+		configID:        conf.ID,
 		certCache:       make(map[string]*tls.Certificate),
 		renewalInterval: renewalInterval,
 	}

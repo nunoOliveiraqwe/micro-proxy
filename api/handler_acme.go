@@ -73,6 +73,7 @@ func handleGetAcmeConfig(svc app.SystemService) http.HandlerFunc {
 			Configured:           true,
 			Domains:              domains,
 			DNSResolvers:         dnsResolvers,
+			AutoDiscover:         result.AutoDiscover,
 		}, w)
 	}
 }
@@ -105,10 +106,14 @@ func handleSaveAcmeConfig(svc app.SystemService) http.HandlerFunc {
 			CredentialMap:        credMap,
 			Domains:              req.Domains,
 			DNSResolvers:         req.DNSResolvers,
+			AutoDiscover:         req.AutoDiscover,
 		})
 		if err != nil {
 			status := http.StatusInternalServerError
 			if errors.Is(err, service.ErrAcmeAlreadyConfigured) {
+				status = http.StatusConflict
+			} else if errors.Is(err, service.ErrMultipleAutoDiscover) ||
+				errors.Is(err, service.ErrDomainOwnedByOtherConfig) {
 				status = http.StatusConflict
 			} else if errors.Is(err, service.ErrEmailRequired) ||
 				errors.Is(err, service.ErrDNSProviderRequired) ||

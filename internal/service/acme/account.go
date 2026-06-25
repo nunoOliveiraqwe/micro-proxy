@@ -26,7 +26,7 @@ func (u *acmeUser) GetRegistration() *registration.Resource { return u.registrat
 func (u *acmeUser) GetPrivateKey() crypto.PrivateKey        { return u.key }
 
 func (m *LegoAcmeManager) loadOrCreateAccount(acmeConf *domain.AcmeConfiguration) error {
-	account, err := m.store.GetAccount(acmeConf.Email)
+	account, err := m.store.GetAccountFor(acmeConf.Email)
 	if err != nil {
 		return fmt.Errorf("could not load existing acme account: %w", err)
 	}

@@ -39,7 +39,7 @@ func NewHeadlessService(conf config.AppConfig, dataDir string) (SystemService, e
 	var svcStore *service.ServiceStore
 	var acmeSvc *service.AcmeService
 
-	if conf.Acme != nil && conf.Acme.Enabled {
+	if anyAcmeEnabled(conf.Acme) {
 		dbPath := filepath.Join(dataDir, "torii.db")
 		db = sqlite.NewDB(dbPath)
 		if err := db.Open(); err != nil {
@@ -187,4 +187,13 @@ func (s *headlessService) AddHttpListener(conf config.HTTPListener) error {
 
 func (s *headlessService) EditProxy(port int, conf config.HTTPListener) error {
 	return fmt.Errorf("cannot mutate proxies in headless mode")
+}
+
+func anyAcmeEnabled(confs []*config.AcmeConfig) bool {
+	for _, c := range confs {
+		if c != nil && c.Enabled {
+			return true
+		}
+	}
+	return false
 }

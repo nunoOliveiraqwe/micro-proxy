@@ -35,6 +35,7 @@ type AcmeConfigResponse struct {
 	Configured           bool     `json:"configured"`
 	Domains              []string `json:"domains"`
 	DNSResolvers         []string `json:"dnsResolvers"`
+	AutoDiscover         bool     `json:"autoDiscover"`
 }
 
 type AcmeConfigRequest struct {
@@ -44,6 +45,7 @@ type AcmeConfigRequest struct {
 	Enabled                  bool                      `json:"enabled"`
 	Domains                  []string                  `json:"domains"`
 	DNSResolvers             []string                  `json:"dnsResolvers"`
+	AutoDiscover             bool                      `json:"autoDiscover"`
 	DnsProviderConfigRequest *DnsProviderConfigRequest `json:"dns_provider_config_request"`
 }
 
@@ -78,6 +80,39 @@ type AcmeProviderField struct {
 	Required    bool   `json:"required"`
 	Sensitive   bool   `json:"sensitive"`
 	Placeholder string `json:"placeholder"`
+}
+
+type AcmePreviewDomainsRequest struct {
+	ConfigID int      `json:"configId"`
+	Proposed []string `json:"proposed"`
+	Samples  []string `json:"samples"`
+}
+
+type AcmePreviewDomainsResponse struct {
+	HardConflicts []AcmeDomainConflict `json:"hardConflicts"`
+	Overlaps      []AcmeDomainOverlap  `json:"overlaps"`
+	Routing       []AcmeDomainRouting  `json:"routing"`
+}
+
+type AcmeDomainConflict struct {
+	Domain      string `json:"domain"`
+	ConfigID    int    `json:"configId"`
+	ConfigEmail string `json:"configEmail"`
+}
+
+type AcmeDomainOverlap struct {
+	Proposed      string `json:"proposed"`
+	InteractsWith string `json:"interactsWith"`
+	ConfigID      int    `json:"configId"`
+	ConfigEmail   string `json:"configEmail"`
+	Effect        string `json:"effect"`
+}
+
+type AcmeDomainRouting struct {
+	Domain      string `json:"domain"`
+	ConfigID    int    `json:"configId"`
+	ConfigEmail string `json:"configEmail"`
+	Reason      string `json:"reason"`
 }
 
 type NetworkInterfaceDTO struct {

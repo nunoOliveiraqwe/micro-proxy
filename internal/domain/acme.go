@@ -14,8 +14,12 @@ type AcmeConfiguration struct {
 	Enabled              bool
 	Domains              []string
 	DNSResolvers         []string
-	CreatedAt            time.Time
-	UpdatedAt            time.Time
+	// AutoDiscover, when true, asks this configuration to also obtain
+	// certificates for any host the proxy currently serves. At most one
+	// configuration in the system may have this enabled.
+	AutoDiscover bool
+	CreatedAt    time.Time
+	UpdatedAt    time.Time
 }
 
 func (a *AcmeConfiguration) IsValid() bool {

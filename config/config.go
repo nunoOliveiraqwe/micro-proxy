@@ -15,7 +15,7 @@ type AppConfig struct {
 	APIServer APIServerConfig `yaml:"api-server" json:"api-server"`
 	NetConfig NetworkConfig   `yaml:"net-config" json:"net-config"`
 	Session   SessionConfig   `yaml:"session" json:"session"`
-	Acme      *AcmeConfig     `yaml:"acme" json:"acme,omitempty"`
+	Acme      []*AcmeConfig   `yaml:"acme" json:"acme,omitempty"`
 }
 
 type AcmeConfig struct {
@@ -27,6 +27,7 @@ type AcmeConfig struct {
 	Enabled              bool              `yaml:"enabled" json:"enabled"`
 	Domains              []string          `yaml:"domains" json:"domains,omitempty"`
 	DNSResolvers         []string          `yaml:"dns-resolvers" json:"dns-resolvers,omitempty"`
+	AutoDiscover         bool              `yaml:"auto-discover" json:"auto-discover,omitempty"`
 }
 
 type SessionConfig struct {

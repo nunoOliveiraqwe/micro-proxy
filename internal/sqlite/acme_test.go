@@ -54,14 +54,18 @@ func TestAcmeStore_SaveAndGetConfiguration_CloudflareProvider(t *testing.T) {
 	if err := store.SaveConfiguration(conf); err != nil {
 		t.Fatalf("SaveConfiguration: %v", err)
 	}
+	if conf.ID == 0 {
+		t.Fatal("SaveConfiguration did not assign an ID")
+	}
 
-	loaded, err := store.GetConfiguration()
+	all, err := store.GetConfigurations()
 	if err != nil {
-		t.Fatalf("GetConfiguration: %v", err)
+		t.Fatalf("GetConfigurations: %v", err)
 	}
-	if loaded == nil {
-		t.Fatal("GetConfiguration returned nil")
+	if len(all) != 1 {
+		t.Fatalf("GetConfigurations len = %d, want 1", len(all))
 	}
+	loaded := all[0]
 
 	if loaded.Email != conf.Email {
 		t.Errorf("Email = %q, want %q", loaded.Email, conf.Email)
@@ -100,20 +104,20 @@ func TestAcmeStore_SaveAndGetConfiguration_CloudflareProvider(t *testing.T) {
 	}
 }
 
-func TestAcmeStore_GetConfiguration_ReturnsNilWhenEmpty(t *testing.T) {
+func TestAcmeStore_GetConfigurations_EmptyWhenNoRows(t *testing.T) {
 	db := openTestDB(t)
 	store := sqlite.NewAcmeStore(db)
 
-	conf, err := store.GetConfiguration()
+	confs, err := store.GetConfigurations()
 	if err != nil {
-		t.Fatalf("GetConfiguration: %v", err)
+		t.Fatalf("GetConfigurations: %v", err)
 	}
-	if conf != nil {
-		t.Fatalf("expected nil, got %+v", conf)
+	if len(confs) != 0 {
+		t.Fatalf("expected empty, got %+v", confs)
 	}
 }
 
-func TestAcmeStore_SaveConfiguration_Upsert(t *testing.T) {
+func TestAcmeStore_SaveConfiguration_InsertVsUpdate(t *testing.T) {
 	db := openTestDB(t)
 	store := sqlite.NewAcmeStore(db)
 
@@ -121,47 +125,97 @@ func TestAcmeStore_SaveConfiguration_Upsert(t *testing.T) {
 	blob1, _ := factory.Serialize(map[string]string{"api_token": "first-token"})
 	blob2, _ := factory.Serialize(map[string]string{"api_token": "second-token"})
 
-	err := store.SaveConfiguration(&domain.AcmeConfiguration{
+	first := &domain.AcmeConfiguration{
 		Email:                "a@b.com",
 		DNSProvider:          "cloudflare",
 		SerializedFields:     blob1,
 		RenewalCheckInterval: 12 * time.Hour,
 		Enabled:              true,
 		DNSResolvers:         []string{"1.1.1.1:53"},
-	})
-	if err != nil {
+	}
+	if err := store.SaveConfiguration(first); err != nil {
 		t.Fatalf("first save: %v", err)
 	}
 
-	err = store.SaveConfiguration(&domain.AcmeConfiguration{
+	// Second save with no ID inserts another row, not overwrite.
+	second := &domain.AcmeConfiguration{
 		Email:                "x@y.com",
 		DNSProvider:          "cloudflare",
 		SerializedFields:     blob2,
 		RenewalCheckInterval: 1 * time.Hour,
 		Enabled:              false,
 		DNSResolvers:         []string{"9.9.9.9:53", "8.8.4.4:53"},
-	})
-	if err != nil {
-		t.Fatalf("upsert save: %v", err)
+	}
+	if err := store.SaveConfiguration(second); err != nil {
+		t.Fatalf("second save: %v", err)
+	}
+	if second.ID == first.ID {
+		t.Fatalf("second insert reused ID %d", first.ID)
 	}
 
-	loaded, err := store.GetConfiguration()
+	all, err := store.GetConfigurations()
 	if err != nil {
-		t.Fatalf("get after upsert: %v", err)
+		t.Fatalf("GetConfigurations: %v", err)
 	}
-	if loaded.Email != "x@y.com" {
-		t.Errorf("Email = %q, want %q", loaded.Email, "x@y.com")
+	if len(all) != 2 {
+		t.Fatalf("expected 2 configurations, got %d", len(all))
 	}
-	if loaded.Enabled {
-		t.Error("Enabled should be false after upsert")
+
+	// Update by ID changes only the targeted row.
+	second.Enabled = true
+	second.DNSResolvers = []string{"1.0.0.1:53"}
+	if err := store.SaveConfiguration(second); err != nil {
+		t.Fatalf("update by id: %v", err)
 	}
-	if !reflect.DeepEqual(loaded.DNSResolvers, []string{"9.9.9.9:53", "8.8.4.4:53"}) {
-		t.Errorf("DNSResolvers = %v, want %v", loaded.DNSResolvers, []string{"9.9.9.9:53", "8.8.4.4:53"})
+
+	got, err := store.GetConfiguration(second.ID)
+	if err != nil {
+		t.Fatalf("GetConfiguration: %v", err)
+	}
+	if got == nil {
+		t.Fatalf("GetConfiguration(%d) returned nil", second.ID)
+	}
+	if !got.Enabled {
+		t.Error("Enabled should be true after update")
+	}
+	if !reflect.DeepEqual(got.DNSResolvers, []string{"1.0.0.1:53"}) {
+		t.Errorf("DNSResolvers = %v, want %v", got.DNSResolvers, []string{"1.0.0.1:53"})
 	}
 
 	var m map[string]string
-	_ = json.Unmarshal(loaded.SerializedFields, &m)
+	_ = json.Unmarshal(got.SerializedFields, &m)
 	if m["api_token"] != "second-token" {
 		t.Errorf("api_token = %q, want %q", m["api_token"], "second-token")
+	}
+}
+
+func TestAcmeStore_DeleteConfiguration(t *testing.T) {
+	db := openTestDB(t)
+	store := sqlite.NewAcmeStore(db)
+
+	factory, _ := acme.GetDNSProvider("cloudflare")
+	blob, _ := factory.Serialize(map[string]string{"api_token": "tok"})
+
+	conf := &domain.AcmeConfiguration{
+		Email:                "a@b.com",
+		DNSProvider:          "cloudflare",
+		SerializedFields:     blob,
+		RenewalCheckInterval: 12 * time.Hour,
+		Enabled:              true,
+	}
+	if err := store.SaveConfiguration(conf); err != nil {
+		t.Fatalf("save: %v", err)
+	}
+
+	if err := store.DeleteConfiguration(conf.ID); err != nil {
+		t.Fatalf("delete: %v", err)
+	}
+
+	all, err := store.GetConfigurations()
+	if err != nil {
+		t.Fatalf("GetConfigurations: %v", err)
+	}
+	if len(all) != 0 {
+		t.Fatalf("expected 0 configurations after delete, got %d", len(all))
 	}
 }

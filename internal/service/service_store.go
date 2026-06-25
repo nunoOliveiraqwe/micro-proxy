@@ -12,7 +12,7 @@ type ServiceStore struct {
 	acmeService                *AcmeService
 }
 
-func NewServiceStore(ds *DataStore, acmeConf *config.AcmeConfig) *ServiceStore {
+func NewServiceStore(ds *DataStore, acmeConf []*config.AcmeConfig) *ServiceStore {
 	conf, err := ds.SystemConfigStore.GetSystemConfiguration()
 	if err != nil {
 		zap.S().Errorf("Failed to get system configuration: %v", err)
